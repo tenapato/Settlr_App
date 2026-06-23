@@ -133,29 +133,16 @@ struct IncomeView: View {
     private var incomeList: some View {
         List {
             ForEach(vm.filteredIncomes) { item in
-                Button {
-                    selectedIncome = item
-                } label: {
+                LedgerSwipeRow(
+                    onTap: { selectedIncome = item },
+                    onEdit: { incomeToEdit = item },
+                    onDelete: { incomeToDelete = item }
+                ) {
                     IncomeRow(item: item, categories: vm.categories)
                 }
-                .buttonStyle(.plain)
                 .listRowBackground(Color(hex: "#15171a"))
                 .listRowSeparatorTint(Color(hex: "#2a2d32"))
                 .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    Button {
-                        incomeToEdit = item
-                    } label: {
-                        Label("Edit", systemImage: "pencil")
-                    }
-                    .tint(Color(hex: "#c8ff5a"))
-
-                    Button(role: .destructive) {
-                        incomeToDelete = item
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
-                }
             }
 
             // Footer: count + total

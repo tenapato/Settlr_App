@@ -52,6 +52,7 @@
 		AA000000000000000000BB43 /* TelegramSettingsVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR44 /* TelegramSettingsVM.swift */; };
 		AA000000000000000000BB44 /* TelegramSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR45 /* TelegramSettingsSection.swift */; };
 		AA000000000000000000BB45 /* LedgerTags.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR46 /* LedgerTags.swift */; };
+		AA000000000000000000BB46 /* LedgerSwipeRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR47 /* LedgerSwipeRow.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -100,6 +101,7 @@
 		AA000000000000000000FR44 /* TelegramSettingsVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelegramSettingsVM.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR45 /* TelegramSettingsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelegramSettingsSection.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR46 /* LedgerTags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerTags.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR47 /* LedgerSwipeRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerSwipeRow.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR36 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AA000000000000000000PROD /* Settlr.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Settlr.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -267,6 +269,7 @@
 				AA000000000000000000FR37 /* TransactionDetailSheet.swift */,
 				AA000000000000000000FR38 /* DeleteConfirmDialog.swift */,
 				AA000000000000000000FR39 /* VirtualCardFace.swift */,
+				AA000000000000000000FR47 /* LedgerSwipeRow.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -401,6 +404,7 @@
 				AA000000000000000000BB43 /* TelegramSettingsVM.swift in Sources */,
 				AA000000000000000000BB44 /* TelegramSettingsSection.swift in Sources */,
 				AA000000000000000000BB45 /* LedgerTags.swift in Sources */,
+				AA000000000000000000BB46 /* LedgerSwipeRow.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

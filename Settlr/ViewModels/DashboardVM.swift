@@ -21,7 +21,9 @@ final class DashboardVM {
         do {
             let path = Endpoints.summary(workspaceId) + MonthRangeQuery.summaryQuery(month: selectedMonth)
             summary = try await api.fetch(path)
+            errorMessage = nil
         } catch {
+            summary = nil
             errorMessage = error.localizedDescription
         }
     }

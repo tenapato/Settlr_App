@@ -198,29 +198,16 @@ struct ExpensesView: View {
     private var expenseList: some View {
         List {
             ForEach(vm.filteredExpenses) { expense in
-                Button {
-                    selectedExpense = expense
-                } label: {
+                LedgerSwipeRow(
+                    onTap: { selectedExpense = expense },
+                    onEdit: { expenseToEdit = expense },
+                    onDelete: { expenseToDelete = expense }
+                ) {
                     ExpenseRow(expense: expense, vm: vm)
                 }
-                .buttonStyle(.plain)
                 .listRowBackground(Color(hex: "#15171a"))
                 .listRowSeparatorTint(Color(hex: "#2a2d32"))
                 .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    Button {
-                        expenseToEdit = expense
-                    } label: {
-                        Label("Edit", systemImage: "pencil")
-                    }
-                    .tint(Color(hex: "#c8ff5a"))
-
-                    Button(role: .destructive) {
-                        expenseToDelete = expense
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
-                }
             }
 
             // Footer: count + total

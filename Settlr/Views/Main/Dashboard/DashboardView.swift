@@ -22,6 +22,15 @@ struct DashboardView: View {
                         MonthPickerRow(selectedMonth: $vm.selectedMonth)
                             .padding(.horizontal, 24)
 
+                        if !vm.isLoading {
+                            TransactionCounter(
+                                incomeCount: vm.summary?.incomeCount ?? 0,
+                                expenseCount: vm.summary?.expenseCount ?? 0,
+                                transactionCount: vm.summary?.transactionCount ?? 0
+                            )
+                            .padding(.horizontal, 24)
+                        }
+
                         ZStack {
                             if vm.isLoading {
                                 DashboardSkeleton()
@@ -195,6 +204,78 @@ private struct BalanceHero: View {
             .padding(24)
         }
         .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+// MARK: - Transaction Counter
+
+private struct TransactionCounter: View {
+    let incomeCount: Int
+    let expenseCount: Int
+    let transactionCount: Int
+
+    var body: some View {
+        HStack(spacing: 0) {
+            CounterCell(
+                value: transactionCount,
+                label: "Transactions",
+                color: Color(hex: "#c8ff5a")
+            )
+
+            counterDivider
+
+            CounterCell(
+                value: incomeCount,
+                label: "Income",
+                color: Color(hex: "#5ddf8a")
+            )
+
+            counterDivider
+
+            CounterCell(
+                value: expenseCount,
+                label: "Expenses",
+                color: Color(hex: "#ff6b6b")
+            )
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(hex: "#15171a"))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1)
+                )
+        )
+    }
+
+    private var counterDivider: some View {
+        Rectangle()
+            .fill(Color(hex: "#2a2d32"))
+            .frame(width: 1, height: 36)
+    }
+}
+
+private struct CounterCell: View {
+    let value: Int
+    let label: String
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Text("\(value)")
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .foregroundStyle(color)
+                .contentTransition(.numericText())
+                .monospacedDigit()
+
+            Text(label)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Color(hex: "#8e9197"))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
     }
 }
 
@@ -551,6 +632,9 @@ private struct DashboardSkeleton: View {
     var body: some View {
         VStack(spacing: 20) {
             SkeletonRect(cornerRadius: 20, height: 130)
+                .padding(.horizontal, 24)
+
+            SkeletonRect(cornerRadius: 16, height: 72)
                 .padding(.horizontal, 24)
 
             HStack(spacing: 10) {
