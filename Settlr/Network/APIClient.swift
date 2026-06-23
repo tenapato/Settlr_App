@@ -27,7 +27,7 @@ final class APIClient {
 
     private let baseURL: String = {
         #if DEBUG
-        return "https://localhost:8787"
+        return "https://api.settlr.cash"
         #else
         return "https://api.settlr.cash"
         #endif

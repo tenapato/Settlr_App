@@ -13,6 +13,12 @@ struct DashboardView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
+                        DashboardWorkspaceHeader(
+                            name: appState.activeWorkspace?.name ?? "Dashboard",
+                            onSwitchWorkspace: { appState.activeWorkspace = nil }
+                        )
+                        .padding(.horizontal, 16)
+
                         MonthPickerRow(selectedMonth: $vm.selectedMonth)
                             .padding(.horizontal, 24)
 
@@ -39,8 +45,8 @@ struct DashboardView: View {
                 }
                 .refreshable { await vm.load(workspaceId: workspaceId) }
             }
-            .navigationTitle(appState.activeWorkspace?.name ?? "Dashboard")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { showSettings = true } label: {
@@ -59,20 +65,49 @@ struct DashboardView: View {
     }
 }
 
+// MARK: - Workspace header
+
+private struct DashboardWorkspaceHeader: View {
+    let name: String
+    let onSwitchWorkspace: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Text(name)
+                .font(.system(size: 34, weight: .bold))
+                .foregroundStyle(Color(hex: "#ecedee"))
+
+            Button(action: onSwitchWorkspace) {
+                Image(systemName: "arrow.left.arrow.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color(hex: "#8e9197"))
+                    .frame(width: 32, height: 32)
+                    .background(
+                        Circle()
+                            .fill(Color(hex: "#1c1f23"))
+                            .overlay(
+                                Circle()
+                                    .strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1)
+                            )
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Switch workspace")
+
+            Spacer(minLength: 0)
+        }
+    }
+}
+
 // MARK: - Content container (staggered entry)
 
 private struct DashboardContent: View {
     let summary: SummaryResponse
-    @Environment(AppState.self) private var appState
     @State private var appeared = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            BalanceHero(
-                summary: summary,
-                workspace: appState.activeWorkspace,
-                onSwitchWorkspace: { appState.activeWorkspace = nil }
-            )
+            BalanceHero(summary: summary)
                 .padding(.horizontal, 24)
                 .opacity(appeared ? 1 : 0)
                 .offset(y: appeared ? 0 : 18)
@@ -109,8 +144,6 @@ private struct DashboardContent: View {
 
 private struct BalanceHero: View {
     let summary: SummaryResponse
-    let workspace: WorkspaceWithRole?
-    let onSwitchWorkspace: () -> Void
 
     private var isPositive: Bool { summary.netCents >= 0 }
     private var accentColor: Color {
@@ -135,34 +168,11 @@ private struct BalanceHero: View {
             .clipShape(RoundedRectangle(cornerRadius: 20))
 
             VStack(alignment: .leading, spacing: 20) {
-                HStack(alignment: .center, spacing: 12) {
-                    Text("Net Balance")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color(hex: "#8e9197"))
-                        .tracking(1.4)
-                        .textCase(.uppercase)
-
-                    Spacer(minLength: 0)
-
-                    if workspace != nil {
-                        Button(action: onSwitchWorkspace) {
-                            Image(systemName: "arrow.left.arrow.right")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(Color(hex: "#8e9197"))
-                                .frame(width: 32, height: 32)
-                                .background(
-                                    Circle()
-                                        .fill(Color(hex: "#1c1f23"))
-                                        .overlay(
-                                            Circle()
-                                                .strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1)
-                                        )
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Switch workspace")
-                    }
-                }
+                Text("Net Balance")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color(hex: "#8e9197"))
+                    .tracking(1.4)
+                    .textCase(.uppercase)
 
                 VStack(alignment: .leading, spacing: 8) {
                     AmountLabel(
