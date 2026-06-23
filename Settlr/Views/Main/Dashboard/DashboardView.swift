@@ -63,11 +63,16 @@ struct DashboardView: View {
 
 private struct DashboardContent: View {
     let summary: SummaryResponse
+    @Environment(AppState.self) private var appState
     @State private var appeared = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            BalanceHero(summary: summary)
+            BalanceHero(
+                summary: summary,
+                workspace: appState.activeWorkspace,
+                onSwitchWorkspace: { appState.activeWorkspace = nil }
+            )
                 .padding(.horizontal, 24)
                 .opacity(appeared ? 1 : 0)
                 .offset(y: appeared ? 0 : 18)
@@ -76,6 +81,13 @@ private struct DashboardContent: View {
                 .padding(.horizontal, 24)
                 .opacity(appeared ? 1 : 0)
                 .offset(y: appeared ? 0 : 18)
+
+            if summary.expenseCents > 0 && !summary.expensesByCategory.isEmpty {
+                SpendingRing(summary: summary)
+                    .padding(.horizontal, 24)
+                    .opacity(appeared ? 1 : 0)
+                    .offset(y: appeared ? 0 : 18)
+            }
 
             if !summary.expensesByCategory.isEmpty {
                 TopCategories(summary: summary)
@@ -97,6 +109,8 @@ private struct DashboardContent: View {
 
 private struct BalanceHero: View {
     let summary: SummaryResponse
+    let workspace: WorkspaceWithRole?
+    let onSwitchWorkspace: () -> Void
 
     private var isPositive: Bool { summary.netCents >= 0 }
     private var accentColor: Color {
@@ -121,11 +135,34 @@ private struct BalanceHero: View {
             .clipShape(RoundedRectangle(cornerRadius: 20))
 
             VStack(alignment: .leading, spacing: 20) {
-                Text("Net Balance")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#8e9197"))
-                    .tracking(1.4)
-                    .textCase(.uppercase)
+                HStack(alignment: .center, spacing: 12) {
+                    Text("Net Balance")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color(hex: "#8e9197"))
+                        .tracking(1.4)
+                        .textCase(.uppercase)
+
+                    Spacer(minLength: 0)
+
+                    if workspace != nil {
+                        Button(action: onSwitchWorkspace) {
+                            Image(systemName: "arrow.left.arrow.right")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Color(hex: "#8e9197"))
+                                .frame(width: 32, height: 32)
+                                .background(
+                                    Circle()
+                                        .fill(Color(hex: "#1c1f23"))
+                                        .overlay(
+                                            Circle()
+                                                .strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1)
+                                        )
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Switch workspace")
+                    }
+                }
 
                 VStack(alignment: .leading, spacing: 8) {
                     AmountLabel(
@@ -165,9 +202,11 @@ private struct FlowSummary: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            HStack(spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
                 FlowCard(label: "Income",   cents: summary.incomeCents,  icon: "arrow.up",   color: Color(hex: "#5ddf8a"))
+                    .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
                 FlowCard(label: "Expenses", cents: summary.expenseCents, icon: "arrow.down", color: Color(hex: "#ff6b6b"))
+                    .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
             }
 
             if total > 0 {
@@ -225,7 +264,7 @@ private struct FlowCard: View {
     let color: Color
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
             ZStack {
                 Circle()
                     .fill(color.opacity(0.12))
@@ -234,6 +273,7 @@ private struct FlowCard: View {
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(color)
             }
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(label)
                     .font(.system(size: 12, weight: .medium))
@@ -241,9 +281,12 @@ private struct FlowCard: View {
                 AmountLabel(cents: cents, font: .system(size: 15, weight: .semibold))
                     .foregroundStyle(Color(hex: "#ecedee"))
                     .contentTransition(.numericText())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             }
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 16)
@@ -339,6 +382,152 @@ private struct CategoryRow: View {
         .onChange(of: targetRatio) { _, new in
             withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                 animatedRatio = new
+            }
+        }
+    }
+}
+
+// MARK: - Spending Ring
+
+private struct SpendingRing: View {
+    let summary: SummaryResponse
+    @State private var animatedProgress: Double = 0
+
+    private let ringWidth: CGFloat = 18
+    private let gap: Double = 0.013
+    private let palette: [Color] = [
+        Color(hex: "#ff6b6b"),
+        Color(hex: "#ffb547"),
+        Color(hex: "#c8ff5a"),
+        Color(hex: "#5ddf8a"),
+        Color(hex: "#4db8ff"),
+        Color(hex: "#b47ef5"),
+    ]
+
+    private struct Slice: Identifiable {
+        let id: Int
+        let name: String
+        let trimStart: Double
+        let trimEnd: Double
+        let fraction: Double
+        let color: Color
+    }
+
+    private var slices: [Slice] {
+        let total = Double(summary.expenseCents)
+        guard total > 0 else { return [] }
+        var cum: Double = 0
+        return Array(summary.expensesByCategory.prefix(6)).enumerated().map { i, cat in
+            let f = Double(cat.totalCents) / total
+            let s = Slice(id: i,
+                          name: cat.categoryName ?? "Other",
+                          trimStart: cum + gap / 2,
+                          trimEnd: cum + f - gap / 2,
+                          fraction: f,
+                          color: palette[i % palette.count])
+            cum += f
+            return s
+        }
+    }
+
+    private var centerAmountMaxWidth: CGFloat {
+        168 - ringWidth * 2 - 12
+    }
+
+    private var centerAmountText: String {
+        let value = Double(summary.expenseCents) / 100.0
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        formatter.groupingSeparator = ","
+        formatter.decimalSeparator = "."
+        let number = formatter.string(from: NSNumber(value: value)) ?? "\(value)"
+        return "$\(number)"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Spending Breakdown")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Color(hex: "#8e9197"))
+                .tracking(1.4)
+                .textCase(.uppercase)
+
+            VStack(spacing: 20) {
+                ZStack {
+                    Circle()
+                        .stroke(Color(hex: "#2a2d32"), lineWidth: ringWidth)
+
+                    ForEach(slices) { slice in
+                        Circle()
+                            .trim(from: slice.trimStart * animatedProgress,
+                                  to: slice.trimEnd * animatedProgress)
+                            .stroke(slice.color,
+                                    style: StrokeStyle(lineWidth: ringWidth - 2, lineCap: .butt))
+                            .rotationEffect(.degrees(-90))
+                    }
+
+                    VStack(spacing: 4) {
+                        Text("SPENT")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(Color(hex: "#5a5d63"))
+                            .tracking(1.2)
+                        Text(centerAmountText)
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(Color(hex: "#ecedee"))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.55)
+                            .frame(maxWidth: centerAmountMaxWidth)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.horizontal, 6)
+                }
+                .frame(width: 168, height: 168)
+
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                    ForEach(slices) { slice in
+                        HStack(spacing: 6) {
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(slice.color)
+                                .frame(width: 8, height: 8)
+                            Text(slice.name)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Color(hex: "#8e9197"))
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                                .layoutPriority(0)
+                            Text("\(Int((slice.fraction * 100).rounded()))%")
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .foregroundStyle(Color(hex: "#ecedee"))
+                                .monospacedDigit()
+                                .fixedSize(horizontal: true, vertical: false)
+                                .layoutPriority(1)
+                        }
+                    }
+                }
+                .padding(.horizontal, 2)
+            }
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(hex: "#15171a"))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1)
+                    )
+            )
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.9, dampingFraction: 0.85).delay(0.2)) {
+                animatedProgress = 1
+            }
+        }
+        .onChange(of: summary.expenseCents) { _, _ in
+            animatedProgress = 0
+            withAnimation(.spring(response: 0.7, dampingFraction: 0.8)) {
+                animatedProgress = 1
             }
         }
     }

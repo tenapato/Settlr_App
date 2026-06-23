@@ -27,9 +27,19 @@ final class APIClient {
 
     private let baseURL: String = {
         #if DEBUG
-        return "http://localhost:8787"
+        return "https://localhost:8787"
         #else
-        return "https://settlr.tenapatricio.com"
+        return "https://api.settlr.cash"
+        #endif
+    }()
+
+    /// Must match Server `BETTER_AUTH_URL` (panel/web origin). OAuth session cookies are
+    /// set on this host — not on `api.*`. Using the API host for Google sign-in yields `no_session`.
+    private let authBaseURL: String = {
+        #if DEBUG
+        return "https://web.settlr.cash"
+        #else
+        return "https://web.settlr.cash"
         #endif
     }()
 
@@ -41,14 +51,20 @@ final class APIClient {
 
     private let encoder = JSONEncoder()
 
-    private func makeRequest(_ path: String, method: String = "GET", body: (any Encodable)? = nil) throws -> URLRequest {
-        guard let url = URL(string: baseURL + path) else {
+    private func makeRequest(
+        _ path: String,
+        method: String = "GET",
+        body: (any Encodable)? = nil,
+        origin: String? = nil
+    ) throws -> URLRequest {
+        let apiOrigin = origin ?? baseURL
+        guard let url = URL(string: apiOrigin + path) else {
             throw APIError.server("Invalid endpoint: \(path)")
         }
         var req = URLRequest(url: url)
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Accept")
-        req.setValue(baseURL, forHTTPHeaderField: "Origin")
+        req.setValue(apiOrigin, forHTTPHeaderField: "Origin")
         if let token = TokenStore.get() {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
@@ -59,8 +75,13 @@ final class APIClient {
         return req
     }
 
-    func fetch<T: Decodable>(_ path: String, method: String = "GET", body: (any Encodable)? = nil) async throws -> T {
-        let req = try makeRequest(path, method: method, body: body)
+    func fetch<T: Decodable>(
+        _ path: String,
+        method: String = "GET",
+        body: (any Encodable)? = nil,
+        origin: String? = nil
+    ) async throws -> T {
+        let req = try makeRequest(path, method: method, body: body, origin: origin)
         let (data, response) = try await URLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse else { throw APIError.server("No response") }
 
@@ -133,11 +154,12 @@ final class APIClient {
         struct SocialResponse: Decodable {
             let url: String
         }
-        let nativeCallback = "\(baseURL)/api/native-callback"
+        let nativeCallback = "\(authBaseURL)/api/native-callback"
         let socialResp: SocialResponse = try await fetch(
             "/api/auth/sign-in/social",
             method: "POST",
-            body: SocialBody(provider: "google", callbackURL: nativeCallback, disableRedirect: true)
+            body: SocialBody(provider: "google", callbackURL: nativeCallback, disableRedirect: true),
+            origin: authBaseURL
         )
         guard let authURL = URL(string: socialResp.url) else {
             throw APIError.server("Invalid OAuth URL from server")

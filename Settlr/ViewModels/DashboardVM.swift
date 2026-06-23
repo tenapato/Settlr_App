@@ -19,7 +19,7 @@ final class DashboardVM {
         isLoading = true
         defer { isLoading = false }
         do {
-            let path = Endpoints.summary(workspaceId) + "?month=\(selectedMonth)"
+            let path = Endpoints.summary(workspaceId) + MonthRangeQuery.summaryQuery(month: selectedMonth)
             summary = try await api.fetch(path)
         } catch {
             errorMessage = error.localizedDescription

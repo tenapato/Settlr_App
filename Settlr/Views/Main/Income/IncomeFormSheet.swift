@@ -3,15 +3,42 @@ import SwiftUI
 struct IncomeFormSheet: View {
     let workspaceId: String
     let categories: [Category]
+    var income: Income?
     let onSave: (CreateIncomeBody) -> Void
 
     @Environment(\.dismiss) private var dismiss
 
-    @State private var description = ""
-    @State private var amountText = ""
-    @State private var selectedDate = Date()
-    @State private var selectedCategoryId: String? = nil
+    @State private var description: String
+    @State private var amountText: String
+    @State private var selectedDate: Date
+    @State private var selectedCategoryId: String?
     @State private var errorMessage: String?
+
+    private var isEditing: Bool { income != nil }
+
+    init(
+        workspaceId: String,
+        categories: [Category],
+        income: Income? = nil,
+        onSave: @escaping (CreateIncomeBody) -> Void
+    ) {
+        self.workspaceId = workspaceId
+        self.categories = categories
+        self.income = income
+        self.onSave = onSave
+
+        if let income {
+            _description = State(initialValue: income.description)
+            _amountText = State(initialValue: Self.formatAmount(income.amountCents))
+            _selectedDate = State(initialValue: Self.parseFormDate(income.occurredAt))
+            _selectedCategoryId = State(initialValue: income.categoryId)
+        } else {
+            _description = State(initialValue: "")
+            _amountText = State(initialValue: "")
+            _selectedDate = State(initialValue: Date())
+            _selectedCategoryId = State(initialValue: nil)
+        }
+    }
 
     private var incomeCategories: [Category] {
         categories.filter { $0.scope == "income" || $0.scope == "both" }
@@ -92,7 +119,7 @@ struct IncomeFormSheet: View {
                     .padding(.bottom, 40)
                 }
             }
-            .navigationTitle("Add Income")
+            .navigationTitle(isEditing ? "Edit Income" : "Add Income")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -129,5 +156,19 @@ struct IncomeFormSheet: View {
             categoryId: selectedCategoryId
         ))
         dismiss()
+    }
+
+    private static func formatAmount(_ cents: Int) -> String {
+        String(format: "%.2f", Double(cents) / 100.0)
+    }
+
+    private static func parseFormDate(_ raw: String) -> Date {
+        let formats = ["yyyy-MM-dd'T'HH:mm:ss.SSSZ", "yyyy-MM-dd'T'HH:mm:ssZ", "yyyy-MM-dd"]
+        for fmt in formats {
+            let f = DateFormatter()
+            f.dateFormat = fmt
+            if let date = f.date(from: raw) { return date }
+        }
+        return Date()
     }
 }

@@ -15,9 +15,10 @@ struct LoginView: View {
 
                     // Logo / wordmark
                     VStack(spacing: 8) {
-                        Image(systemName: "creditcard.and.123")
-                            .font(.system(size: 44, weight: .light))
-                            .foregroundStyle(Color(hex: "#c8ff5a"))
+                        Image("SettlrLogo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 72, height: 72)
                         Text("Settlr")
                             .font(.system(size: 34, weight: .bold))
                             .foregroundStyle(Color(hex: "#ecedee"))

@@ -10,13 +10,22 @@ struct ContentView: View {
             } else if !appState.isAuthenticated {
                 LoginView()
             } else if appState.activeWorkspace == nil {
-                WorkspacePickerView()
+                if appState.isRestoringWorkspace {
+                    SplashView()
+                } else {
+                    WorkspacePickerView()
+                }
             } else {
                 MainTabView()
             }
         }
         .task {
             await appState.initialize()
+        }
+        .onChange(of: appState.isAuthenticated) { _, authenticated in
+            if authenticated {
+                Task { await appState.restoreLastWorkspaceIfNeeded() }
+            }
         }
     }
 }
@@ -26,9 +35,10 @@ private struct SplashView: View {
         ZStack {
             Color(hex: "#0e0f11").ignoresSafeArea()
             VStack(spacing: 12) {
-                Image(systemName: "creditcard.and.123")
-                    .font(.system(size: 52, weight: .light))
-                    .foregroundStyle(Color(hex: "#c8ff5a"))
+                Image("SettlrLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 80, height: 80)
                 Text("Settlr")
                     .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(Color(hex: "#ecedee"))

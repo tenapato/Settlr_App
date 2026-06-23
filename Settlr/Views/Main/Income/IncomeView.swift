@@ -4,6 +4,8 @@ struct IncomeView: View {
     let workspaceId: String
     @Binding var showForm: Bool
     @State private var vm = IncomeVM()
+    @State private var selectedIncome: Income?
+    @State private var incomeToDelete: Income?
 
     var body: some View {
         NavigationStack {
@@ -51,6 +53,34 @@ struct IncomeView: View {
                     Task { await vm.create(workspaceId: workspaceId, body: body) }
                 }
             }
+            .sheet(item: $selectedIncome) { income in
+                IncomeDetailSheet(
+                    workspaceId: workspaceId,
+                    income: income,
+                    categories: vm.categories,
+                    onUpdated: { updated in
+                        if let idx = vm.incomes.firstIndex(where: { $0.id == updated.id }) {
+                            vm.incomes[idx] = updated
+                        }
+                        selectedIncome = updated
+                    }
+                )
+            }
+            .overlay {
+                if let income = incomeToDelete {
+                    DeleteConfirmDialog(
+                        title: "Delete Income?",
+                        itemName: income.description,
+                        onConfirm: {
+                            Task { await vm.delete(workspaceId: workspaceId, incomeId: income.id) }
+                            incomeToDelete = nil
+                        },
+                        onCancel: { incomeToDelete = nil }
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                }
+            }
+            .animation(.easeOut(duration: 0.2), value: incomeToDelete != nil)
         }
         .preferredColorScheme(.dark)
         .task { await vm.load(workspaceId: workspaceId) }
@@ -97,13 +127,18 @@ struct IncomeView: View {
     private var incomeList: some View {
         List {
             ForEach(vm.filteredIncomes) { item in
-                IncomeRow(item: item, categories: vm.categories)
-                    .listRowBackground(Color(hex: "#15171a"))
-                    .listRowSeparatorTint(Color(hex: "#2a2d32"))
-                    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                Button {
+                    selectedIncome = item
+                } label: {
+                    IncomeRow(item: item, categories: vm.categories)
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(Color(hex: "#15171a"))
+                .listRowSeparatorTint(Color(hex: "#2a2d32"))
+                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                         Button(role: .destructive) {
-                            Task { await vm.delete(workspaceId: workspaceId, incomeId: item.id) }
+                            incomeToDelete = item
                         } label: {
                             Label("Delete", systemImage: "trash")
                         }
@@ -206,10 +241,15 @@ private struct IncomeRow: View {
             }
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(item.description)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Color(hex: "#ecedee"))
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(item.description)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Color(hex: "#ecedee"))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+
+                    IncomeMarkerTags(income: item)
+                }
 
                 HStack(spacing: 6) {
                     Text(item.displayDate)

@@ -18,7 +18,6 @@
 		AA000000000000000000BB09 /* Income.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR09 /* Income.swift */; };
 		AA000000000000000000BB10 /* Category.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR10 /* Category.swift */; };
 		AA000000000000000000BB11 /* DashboardSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR11 /* DashboardSummary.swift */; };
-		AA000000000000000000BB35 /* CreditCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR35 /* CreditCard.swift */; };
 		AA000000000000000000BB12 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR12 /* AppState.swift */; };
 		AA000000000000000000BB13 /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR13 /* AuthViewModel.swift */; };
 		AA000000000000000000BB14 /* WorkspacePickerVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR14 /* WorkspacePickerVM.swift */; };
@@ -42,6 +41,17 @@
 		AA000000000000000000BB32 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR32 /* Assets.xcassets */; };
 		AA000000000000000000BB33 /* CategoriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR33 /* CategoriesView.swift */; };
 		AA000000000000000000BB34 /* CardsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR34 /* CardsView.swift */; };
+		AA000000000000000000BB35 /* CreditCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR35 /* CreditCard.swift */; };
+		AA000000000000000000BB36 /* TransactionDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR37 /* TransactionDetailSheet.swift */; };
+		AA000000000000000000BB37 /* DeleteConfirmDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR38 /* DeleteConfirmDialog.swift */; };
+		AA000000000000000000BB38 /* VirtualCardFace.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR39 /* VirtualCardFace.swift */; };
+		AA000000000000000000BB39 /* CardDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR40 /* CardDetailSheet.swift */; };
+		AA000000000000000000BB40 /* MonthRangeQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR41 /* MonthRangeQuery.swift */; };
+		AA000000000000000000BB41 /* LastWorkspaceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR42 /* LastWorkspaceStore.swift */; };
+		AA000000000000000000BB42 /* Telegram.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR43 /* Telegram.swift */; };
+		AA000000000000000000BB43 /* TelegramSettingsVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR44 /* TelegramSettingsVM.swift */; };
+		AA000000000000000000BB44 /* TelegramSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR45 /* TelegramSettingsSection.swift */; };
+		AA000000000000000000BB45 /* LedgerTags.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR46 /* LedgerTags.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -56,7 +66,6 @@
 		AA000000000000000000FR09 /* Income.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Income.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR10 /* Category.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Category.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR11 /* DashboardSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardSummary.swift; sourceTree = "<group>"; };
-		AA000000000000000000FR35 /* CreditCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreditCard.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR12 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR13 /* AuthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR14 /* WorkspacePickerVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspacePickerVM.swift; sourceTree = "<group>"; };
@@ -80,6 +89,17 @@
 		AA000000000000000000FR32 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AA000000000000000000FR33 /* CategoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoriesView.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR34 /* CardsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardsView.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR35 /* CreditCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreditCard.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR37 /* TransactionDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionDetailSheet.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR38 /* DeleteConfirmDialog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteConfirmDialog.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR39 /* VirtualCardFace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VirtualCardFace.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR40 /* CardDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardDetailSheet.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR41 /* MonthRangeQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthRangeQuery.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR42 /* LastWorkspaceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LastWorkspaceStore.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR43 /* Telegram.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Telegram.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR44 /* TelegramSettingsVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelegramSettingsVM.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR45 /* TelegramSettingsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelegramSettingsSection.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR46 /* LedgerTags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerTags.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR36 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AA000000000000000000PROD /* Settlr.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Settlr.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -95,20 +115,12 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		AA000000000000000000GP00 /* = */ = {
+		AA000000000000000000GP00 = {
 			isa = PBXGroup;
 			children = (
 				AA000000000000000000GP01 /* Settlr */,
 				AA000000000000000000GPPR /* Products */,
 			);
-			sourceTree = "<group>";
-		};
-		AA000000000000000000GPPR /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				AA000000000000000000PROD /* Settlr.app */,
-			);
-			name = Products;
 			sourceTree = "<group>";
 		};
 		AA000000000000000000GP01 /* Settlr */ = {
@@ -118,6 +130,7 @@
 				AA000000000000000000FR01 /* SettlrApp.swift */,
 				AA000000000000000000FR02 /* ContentView.swift */,
 				AA000000000000000000GP02 /* Network */,
+				AA000000000000000000GP0E /* Utils */,
 				AA000000000000000000GP03 /* Models */,
 				AA000000000000000000GP04 /* State */,
 				AA000000000000000000GP05 /* ViewModels */,
@@ -133,8 +146,18 @@
 				AA000000000000000000FR03 /* APIClient.swift */,
 				AA000000000000000000FR04 /* Endpoints.swift */,
 				AA000000000000000000FR05 /* TokenStore.swift */,
+				AA000000000000000000FR42 /* LastWorkspaceStore.swift */,
 			);
 			path = Network;
+			sourceTree = "<group>";
+		};
+		AA000000000000000000GP0E /* Utils */ = {
+			isa = PBXGroup;
+			children = (
+				AA000000000000000000FR41 /* MonthRangeQuery.swift */,
+				AA000000000000000000FR46 /* LedgerTags.swift */,
+			);
+			path = Utils;
 			sourceTree = "<group>";
 		};
 		AA000000000000000000GP03 /* Models */ = {
@@ -147,6 +170,7 @@
 				AA000000000000000000FR10 /* Category.swift */,
 				AA000000000000000000FR11 /* DashboardSummary.swift */,
 				AA000000000000000000FR35 /* CreditCard.swift */,
+				AA000000000000000000FR43 /* Telegram.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -167,6 +191,7 @@
 				AA000000000000000000FR15 /* DashboardVM.swift */,
 				AA000000000000000000FR16 /* ExpensesVM.swift */,
 				AA000000000000000000FR17 /* IncomeVM.swift */,
+				AA000000000000000000FR44 /* TelegramSettingsVM.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -201,6 +226,7 @@
 				AA000000000000000000GP0D /* Settings */,
 				AA000000000000000000FR33 /* CategoriesView.swift */,
 				AA000000000000000000FR34 /* CardsView.swift */,
+				AA000000000000000000FR40 /* CardDetailSheet.swift */,
 			);
 			path = Main;
 			sourceTree = "<group>";
@@ -238,6 +264,9 @@
 				AA000000000000000000FR29 /* AmountLabel.swift */,
 				AA000000000000000000FR30 /* CategoryBadge.swift */,
 				AA000000000000000000FR31 /* SectionCard.swift */,
+				AA000000000000000000FR37 /* TransactionDetailSheet.swift */,
+				AA000000000000000000FR38 /* DeleteConfirmDialog.swift */,
+				AA000000000000000000FR39 /* VirtualCardFace.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -246,8 +275,17 @@
 			isa = PBXGroup;
 			children = (
 				AA000000000000000000FR27 /* SettingsView.swift */,
+				AA000000000000000000FR45 /* TelegramSettingsSection.swift */,
 			);
 			path = Settings;
+			sourceTree = "<group>";
+		};
+		AA000000000000000000GPPR /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AA000000000000000000PROD /* Settlr.app */,
+			);
+			name = Products;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -353,6 +391,16 @@
 				AA000000000000000000BB31 /* SectionCard.swift in Sources */,
 				AA000000000000000000BB33 /* CategoriesView.swift in Sources */,
 				AA000000000000000000BB34 /* CardsView.swift in Sources */,
+				AA000000000000000000BB36 /* TransactionDetailSheet.swift in Sources */,
+				AA000000000000000000BB37 /* DeleteConfirmDialog.swift in Sources */,
+				AA000000000000000000BB38 /* VirtualCardFace.swift in Sources */,
+				AA000000000000000000BB39 /* CardDetailSheet.swift in Sources */,
+				AA000000000000000000BB40 /* MonthRangeQuery.swift in Sources */,
+				AA000000000000000000BB41 /* LastWorkspaceStore.swift in Sources */,
+				AA000000000000000000BB42 /* Telegram.swift in Sources */,
+				AA000000000000000000BB43 /* TelegramSettingsVM.swift in Sources */,
+				AA000000000000000000BB44 /* TelegramSettingsSection.swift in Sources */,
+				AA000000000000000000BB45 /* LedgerTags.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -483,6 +531,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = 49T6266TLB;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Settlr/Info.plist;
@@ -496,7 +545,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.settlr.app;
+				PRODUCT_BUNDLE_IDENTIFIER = cash.settlr.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -512,6 +561,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = 49T6266TLB;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Settlr/Info.plist;
@@ -525,7 +575,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.settlr.app;
+				PRODUCT_BUNDLE_IDENTIFIER = cash.settlr.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;

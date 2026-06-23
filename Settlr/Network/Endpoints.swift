@@ -17,6 +17,10 @@ enum Endpoints {
     static func category(_ wsId: String, _ id: String) -> String { "/api/workspaces/\(wsId)/categories/\(id)" }
     static func summary(_ wsId: String) -> String { "/api/workspaces/\(wsId)/summary" }
 
+    static func telegramStatus(_ wsId: String) -> String { "/api/workspaces/\(wsId)/telegram/status" }
+    static func telegramGenerateLink(_ wsId: String) -> String { "/api/workspaces/\(wsId)/telegram/generate-link" }
+    static func telegramDisconnect(_ wsId: String) -> String { "/api/workspaces/\(wsId)/telegram/disconnect" }
+
     static func creditCards(_ wsId: String) -> String { "/api/workspaces/\(wsId)/credit-cards" }
     static func creditCard(_ wsId: String, _ id: String) -> String { "/api/workspaces/\(wsId)/credit-cards/\(id)" }
 }

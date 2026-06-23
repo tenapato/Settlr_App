@@ -10,9 +10,19 @@ struct Expense: Codable, Identifiable {
     let creditCardId: String?
     let paymentChannel: String
     let notes: String?
+    let msiInstallment: Int?
+    let msiCount: Int?
+    let deferredInstallment: Int?
+    let deferredCount: Int?
 
     var amount: Double { Double(amountCents) / 100.0 }
     var displayDate: String { formatExpenseDate(occurredAt) }
+    var msiTagLabel: String? { LedgerMarkers.msiTagLabel(installment: msiInstallment, count: msiCount) }
+    var deferredTagLabel: String? {
+        LedgerMarkers.deferredTagLabel(installment: deferredInstallment, count: deferredCount)
+    }
+    var isStatementVerified: Bool { LedgerMarkers.isStatementVerified(notes: notes) }
+    var channelTagLabel: String? { LedgerMarkers.channelTagLabel(for: paymentChannel) }
 }
 
 private func formatExpenseDate(_ raw: String) -> String {

@@ -78,18 +78,38 @@ struct SettingsView: View {
                                     Button {
                                         appState.activeWorkspace = nil
                                     } label: {
-                                        HStack {
+                                        HStack(spacing: 10) {
                                             Image(systemName: "arrow.left.arrow.right")
-                                                .font(.system(size: 14))
+                                                .font(.system(size: 14, weight: .semibold))
                                             Text("Switch Workspace")
-                                                .font(.system(size: 15))
+                                                .font(.system(size: 15, weight: .medium))
+                                            Spacer()
+                                            Image(systemName: "chevron.right")
+                                                .font(.system(size: 12, weight: .semibold))
+                                                .foregroundStyle(Color(hex: "#5a5d63"))
                                         }
-                                        .foregroundStyle(Color(hex: "#8e9197"))
+                                        .foregroundStyle(Color(hex: "#ecedee"))
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 12)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .fill(Color(hex: "#1c1f23"))
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 12)
+                                                        .strokeBorder(Color(hex: "#3a3d44"), lineWidth: 1)
+                                                )
+                                        )
                                     }
+                                    .buttonStyle(.plain)
                                     .padding(.top, 4)
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             }
+
+                            TelegramSettingsSection(
+                                workspaceId: workspace.id,
+                                role: workspace.role
+                            )
                         }
 
                         // Sign out

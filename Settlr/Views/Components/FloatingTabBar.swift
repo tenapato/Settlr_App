@@ -33,6 +33,7 @@ struct FloatingTabBar: View {
                         .animation(.snappy(duration: 0.2), value: selected)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 13)
+                        .contentShape(Rectangle())
                         .background {
                             if selected == tab {
                                 RoundedRectangle(cornerRadius: 12)

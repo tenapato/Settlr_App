@@ -3,18 +3,49 @@ import SwiftUI
 struct ExpenseFormSheet: View {
     let workspaceId: String
     let categories: [Category]
+    var expense: Expense?
     let onSave: (CreateExpenseBody) -> Void
 
     @Environment(\.dismiss) private var dismiss
 
-    @State private var description = ""
-    @State private var amountText = ""
-    @State private var selectedDate = Date()
-    @State private var selectedCategoryId: String? = nil
-    @State private var paymentChannel = "cash"
+    @State private var description: String
+    @State private var amountText: String
+    @State private var selectedDate: Date
+    @State private var selectedCategoryId: String?
+    @State private var paymentChannel: String
     @State private var creditCards: [CreditCard] = []
-    @State private var selectedCreditCardId: String? = nil
+    @State private var selectedCreditCardId: String?
     @State private var errorMessage: String?
+
+    private var isEditing: Bool { expense != nil }
+
+    init(
+        workspaceId: String,
+        categories: [Category],
+        expense: Expense? = nil,
+        onSave: @escaping (CreateExpenseBody) -> Void
+    ) {
+        self.workspaceId = workspaceId
+        self.categories = categories
+        self.expense = expense
+        self.onSave = onSave
+
+        if let expense {
+            _description = State(initialValue: expense.description)
+            _amountText = State(initialValue: Self.formatAmount(expense.amountCents))
+            _selectedDate = State(initialValue: Self.parseFormDate(expense.occurredAt))
+            _selectedCategoryId = State(initialValue: expense.categoryId)
+            _paymentChannel = State(initialValue: expense.paymentChannel)
+            _selectedCreditCardId = State(initialValue: expense.creditCardId)
+        } else {
+            _description = State(initialValue: "")
+            _amountText = State(initialValue: "")
+            _selectedDate = State(initialValue: Date())
+            _selectedCategoryId = State(initialValue: nil)
+            _paymentChannel = State(initialValue: "cash")
+            _selectedCreditCardId = State(initialValue: nil)
+        }
+    }
 
     private var expenseCategories: [Category] {
         categories.filter { $0.scope == "expense" || $0.scope == "both" }
@@ -48,7 +79,7 @@ struct ExpenseFormSheet: View {
                     .padding(.bottom, 40)
                 }
             }
-            .navigationTitle("Add Expense")
+            .navigationTitle(isEditing ? "Edit Expense" : "Add Expense")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -190,6 +221,20 @@ struct ExpenseFormSheet: View {
             creditCardId: paymentChannel == "credit_card" ? selectedCreditCardId : nil
         ))
         dismiss()
+    }
+
+    private static func formatAmount(_ cents: Int) -> String {
+        String(format: "%.2f", Double(cents) / 100.0)
+    }
+
+    private static func parseFormDate(_ raw: String) -> Date {
+        let formats = ["yyyy-MM-dd'T'HH:mm:ss.SSSZ", "yyyy-MM-dd'T'HH:mm:ssZ", "yyyy-MM-dd"]
+        for fmt in formats {
+            let f = DateFormatter()
+            f.dateFormat = fmt
+            if let date = f.date(from: raw) { return date }
+        }
+        return Date()
     }
 }
 

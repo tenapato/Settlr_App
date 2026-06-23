@@ -55,6 +55,19 @@ final class CardsVM {
     }
 
     @MainActor
+    func updateCard(workspaceId: String, cardId: String, body: UpdateCreditCardBody) async throws -> CreditCard {
+        let resp: CreditCardResponse = try await api.fetch(
+            Endpoints.creditCard(workspaceId, cardId),
+            method: "PATCH",
+            body: body
+        )
+        if let idx = cards.firstIndex(where: { $0.id == cardId }) {
+            cards[idx] = resp.creditCard
+        }
+        return resp.creditCard
+    }
+
+    @MainActor
     func deleteCard(workspaceId: String, cardId: String) async {
         do {
             try await api.send(Endpoints.creditCard(workspaceId, cardId), method: "DELETE")
@@ -74,6 +87,17 @@ final class CardsVM {
 struct CardsView: View {
     let workspaceId: String
     @State private var vm = CardsVM()
+    @State private var searchText = ""
+    @State private var selectedCard: CreditCard?
+
+    private var filteredCards: [CreditCard] {
+        guard !searchText.isEmpty else { return vm.cards }
+        return vm.cards.filter {
+            $0.label.localizedCaseInsensitiveContains(searchText) ||
+            ($0.lastFour?.contains(searchText) ?? false) ||
+            ($0.network?.localizedCaseInsensitiveContains(searchText) ?? false)
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -87,8 +111,10 @@ struct CardsView: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .transition(.opacity)
                     } else if let err = vm.errorMessage {
-                        CardsErrorView(message: err) { Task { await vm.load(workspaceId: workspaceId) } }
-                            .transition(.opacity)
+                        CardsErrorView(message: err) {
+                            Task { await vm.load(workspaceId: workspaceId) }
+                        }
+                        .transition(.opacity)
                     } else if vm.cards.isEmpty {
                         CardsEmptyView { vm.showCreateSheet = true }
                             .transition(.opacity)
@@ -112,31 +138,80 @@ struct CardsView: View {
             .sheet(isPresented: $vm.showCreateSheet) {
                 CreateCardSheet(vm: vm, workspaceId: workspaceId)
             }
+            .sheet(item: $selectedCard) { card in
+                CardDetailSheet(workspaceId: workspaceId, card: card) { body in
+                    try await vm.updateCard(workspaceId: workspaceId, cardId: card.id, body: body)
+                }
+            }
         }
         .preferredColorScheme(.dark)
         .task { await vm.load(workspaceId: workspaceId) }
     }
 
     private var cardList: some View {
-        List {
-            ForEach(vm.cards) { card in
-                CardTile(card: card)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 24, bottom: 8, trailing: 24))
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            Task { await vm.deleteCard(workspaceId: workspaceId, cardId: card.id) }
-                        } label: {
-                            Label("Delete", systemImage: "trash")
+        ScrollView {
+            LazyVStack(spacing: 14) {
+                // Search bar pinned at top
+                HStack(spacing: 10) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Color(hex: "#5a5d63"))
+                    TextField("Search by name, network, or last 4", text: $searchText)
+                        .font(.system(size: 15))
+                        .foregroundStyle(Color(hex: "#ecedee"))
+                        .autocorrectionDisabled()
+                        .autocapitalization(.none)
+                    if !searchText.isEmpty {
+                        Button { searchText = "" } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundStyle(Color(hex: "#5a5d63"))
                         }
                     }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(Color(hex: "#15171a"))
+                        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1))
+                )
+                .padding(.horizontal, 20)
+                .padding(.top, 4)
+
+                if filteredCards.isEmpty {
+                    VStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 32))
+                            .foregroundStyle(Color(hex: "#5a5d63"))
+                        Text("No results for \"\(searchText)\"")
+                            .font(.system(size: 15))
+                            .foregroundStyle(Color(hex: "#8e9197"))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 60)
+                } else {
+                    ForEach(Array(filteredCards.enumerated()), id: \.element.id) { i, card in
+                        Button {
+                            selectedCard = card
+                        } label: {
+                            CardTile(card: card, rank: i)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 20)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                Task { await vm.deleteCard(workspaceId: workspaceId, cardId: card.id) }
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                    }
+                }
+                Spacer().frame(height: 100)
             }
-            Spacer().frame(height: 100)
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
+            .padding(.top, 8)
         }
-        .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .refreshable { await vm.load(workspaceId: workspaceId) }
     }
@@ -146,72 +221,19 @@ struct CardsView: View {
 
 private struct CardTile: View {
     let card: CreditCard
+    let rank: Int
     @State private var appeared = false
 
-    private var gradientColors: [Color] {
-        switch card.network?.lowercased() {
-        case "visa":       return [Color(hex: "#1a1f71"), Color(hex: "#2d3561")]
-        case "mastercard": return [Color(hex: "#1a0000"), Color(hex: "#3d0000")]
-        case "amex":       return [Color(hex: "#003366"), Color(hex: "#005599")]
-        default:           return [Color(hex: "#1c1f23"), Color(hex: "#23262b")]
-        }
-    }
-
-    private var networkLabel: String {
-        switch card.network?.lowercased() {
-        case "visa":       return "VISA"
-        case "mastercard": return "Mastercard"
-        case "amex":       return "AMEX"
-        default:           return ""
-        }
-    }
-
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 20)
-                .fill(LinearGradient(colors: gradientColors, startPoint: .topLeading, endPoint: .bottomTrailing))
-                .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.white.opacity(0.07), lineWidth: 1))
-                .frame(height: 160)
-
-            VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    Text(card.label)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
-                    Spacer()
-                    if !networkLabel.isEmpty {
-                        Text(networkLabel)
-                            .font(.system(size: 13, weight: .bold))
-                            .tracking(1.5)
-                            .foregroundStyle(.white.opacity(0.6))
-                    }
-                }
-
-                Spacer()
-
-                Text(card.lastFour.map { "•••• •••• •••• \($0)" } ?? "•••• •••• •••• ••••")
-                    .font(.system(size: 18, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.white.opacity(card.lastFour != nil ? 0.85 : 0.3))
-
-                if let limit = card.creditLimitCents {
-                    Spacer().frame(height: 10)
-                    HStack(spacing: 4) {
-                        Text("Limit")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.45))
-                        AmountLabel(cents: limit, font: .system(size: 13, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.65))
-                    }
+        VirtualCardFace(card: card, style: .compact)
+            .opacity(appeared ? 1 : 0)
+            .offset(y: appeared ? 0 : 14)
+            .onAppear {
+                let delay = Double(rank) * 0.06
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.8).delay(delay)) {
+                    appeared = true
                 }
             }
-            .padding(22)
-            .frame(height: 160)
-        }
-        .opacity(appeared ? 1 : 0)
-        .offset(y: appeared ? 0 : 16)
-        .onAppear {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { appeared = true }
-        }
     }
 }
 
@@ -276,8 +298,13 @@ private struct CreateCardSheet: View {
                             Task { await vm.createCard(workspaceId: workspaceId) }
                         } label: {
                             Group {
-                                if vm.isCreating { ProgressView().tint(Color(hex: "#0e0f11")) }
-                                else { Text("Add Card").font(.system(size: 16, weight: .semibold)).foregroundStyle(Color(hex: "#0e0f11")) }
+                                if vm.isCreating {
+                                    ProgressView().tint(Color(hex: "#0e0f11"))
+                                } else {
+                                    Text("Add Card")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundStyle(Color(hex: "#0e0f11"))
+                                }
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
@@ -332,13 +359,21 @@ private struct CardsEmptyView: View {
     let onAdd: () -> Void
     var body: some View {
         VStack(spacing: 20) {
-            Image(systemName: "creditcard").font(.system(size: 48)).foregroundStyle(Color(hex: "#5a5d63"))
+            Image(systemName: "creditcard")
+                .font(.system(size: 48))
+                .foregroundStyle(Color(hex: "#5a5d63"))
             VStack(spacing: 8) {
-                Text("No cards yet").font(.system(size: 18, weight: .semibold)).foregroundStyle(Color(hex: "#ecedee"))
-                Text("Add a credit card to track spending").font(.system(size: 14)).foregroundStyle(Color(hex: "#8e9197"))
+                Text("No cards yet")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Color(hex: "#ecedee"))
+                Text("Add a credit card to track spending")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color(hex: "#8e9197"))
             }
             Button(action: onAdd) {
-                Text("Add Card").font(.system(size: 15, weight: .semibold)).foregroundStyle(Color(hex: "#0e0f11"))
+                Text("Add Card")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Color(hex: "#0e0f11"))
                     .padding(.horizontal, 28).padding(.vertical, 12)
                     .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: "#c8ff5a")))
             }
@@ -348,13 +383,22 @@ private struct CardsEmptyView: View {
 }
 
 private struct CardsErrorView: View {
-    let message: String; let onRetry: () -> Void
+    let message: String
+    let onRetry: () -> Void
     var body: some View {
         VStack(spacing: 14) {
-            Image(systemName: "exclamationmark.triangle").font(.system(size: 32)).foregroundStyle(Color(hex: "#ffb547"))
-            Text(message).font(.system(size: 14)).foregroundStyle(Color(hex: "#8e9197")).multilineTextAlignment(.center)
-            Button("Retry", action: onRetry).foregroundStyle(Color(hex: "#c8ff5a")).font(.system(size: 15, weight: .semibold))
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 32))
+                .foregroundStyle(Color(hex: "#ffb547"))
+            Text(message)
+                .font(.system(size: 14))
+                .foregroundStyle(Color(hex: "#8e9197"))
+                .multilineTextAlignment(.center)
+            Button("Retry", action: onRetry)
+                .foregroundStyle(Color(hex: "#c8ff5a"))
+                .font(.system(size: 15, weight: .semibold))
         }
-        .padding(.horizontal, 32).frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

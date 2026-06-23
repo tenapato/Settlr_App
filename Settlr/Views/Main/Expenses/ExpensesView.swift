@@ -28,6 +28,7 @@ struct FilterChip<Content: View>: View {
                     .fill(isActive ? Color(hex: "#c8ff5a") : Color(hex: "#1c1f23"))
                     .overlay(Capsule().strokeBorder(isActive ? Color.clear : Color(hex: "#2a2d32"), lineWidth: 1))
             )
+            .animation(.spring(duration: 0.2), value: isActive)
         }
     }
 }
@@ -38,6 +39,8 @@ struct ExpensesView: View {
     let workspaceId: String
     @Binding var showForm: Bool
     @State private var vm = ExpensesVM()
+    @State private var selectedExpense: Expense?
+    @State private var expenseToDelete: Expense?
 
     var body: some View {
         NavigationStack {
@@ -85,6 +88,35 @@ struct ExpensesView: View {
                     Task { await vm.create(workspaceId: workspaceId, body: body) }
                 }
             }
+            .sheet(item: $selectedExpense) { expense in
+                ExpenseDetailSheet(
+                    workspaceId: workspaceId,
+                    expense: expense,
+                    categories: vm.categories,
+                    cards: vm.cards,
+                    onUpdated: { updated in
+                        if let idx = vm.expenses.firstIndex(where: { $0.id == updated.id }) {
+                            vm.expenses[idx] = updated
+                        }
+                        selectedExpense = updated
+                    }
+                )
+            }
+            .overlay {
+                if let expense = expenseToDelete {
+                    DeleteConfirmDialog(
+                        title: "Delete Expense?",
+                        itemName: expense.description,
+                        onConfirm: {
+                            Task { await vm.delete(workspaceId: workspaceId, expenseId: expense.id) }
+                            expenseToDelete = nil
+                        },
+                        onCancel: { expenseToDelete = nil }
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                }
+            }
+            .animation(.easeOut(duration: 0.2), value: expenseToDelete != nil)
         }
         .preferredColorScheme(.dark)
         .task { await vm.load(workspaceId: workspaceId) }
@@ -160,13 +192,18 @@ struct ExpensesView: View {
     private var expenseList: some View {
         List {
             ForEach(vm.filteredExpenses) { expense in
-                ExpenseRow(expense: expense, vm: vm)
-                    .listRowBackground(Color(hex: "#15171a"))
-                    .listRowSeparatorTint(Color(hex: "#2a2d32"))
-                    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                Button {
+                    selectedExpense = expense
+                } label: {
+                    ExpenseRow(expense: expense, vm: vm)
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(Color(hex: "#15171a"))
+                .listRowSeparatorTint(Color(hex: "#2a2d32"))
+                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                         Button(role: .destructive) {
-                            Task { await vm.delete(workspaceId: workspaceId, expenseId: expense.id) }
+                            expenseToDelete = expense
                         } label: {
                             Label("Delete", systemImage: "trash")
                         }
@@ -313,15 +350,24 @@ private struct ExpenseRow: View {
             }
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(expense.description)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Color(hex: "#ecedee"))
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(expense.description)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Color(hex: "#ecedee"))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+
+                    ExpenseMarkerTags(expense: expense)
+                }
 
                 HStack(spacing: 6) {
                     Text(expense.displayDate)
                         .font(.system(size: 12))
                         .foregroundStyle(Color(hex: "#5a5d63"))
+
+                    if let channel = expense.channelTagLabel {
+                        LedgerTag(text: channel, tone: expense.paymentChannel == "credit_card" ? .accent : .neutral)
+                    }
 
                     if let cat = category {
                         CategoryBadge(name: cat.name, color: cat.color)

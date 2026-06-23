@@ -59,7 +59,7 @@ final class CategoriesVM {
         do {
             async let catsTask: CategoriesResponse = api.fetch(Endpoints.categories(workspaceId))
             async let summaryTask: SummaryResponse = api.fetch(
-                Endpoints.summary(workspaceId) + "?month=\(selectedMonth)"
+                Endpoints.summary(workspaceId) + MonthRangeQuery.summaryQuery(month: selectedMonth)
             )
             let (catsResp, summaryResp) = try await (catsTask, summaryTask)
             categories = catsResp.categories
@@ -87,7 +87,7 @@ final class CategoriesVM {
             categories = resp.categories
             // Reload summary so totals refresh
             let summary: SummaryResponse = try await api.fetch(
-                Endpoints.summary(workspaceId) + "?month=\(selectedMonth)"
+                Endpoints.summary(workspaceId) + MonthRangeQuery.summaryQuery(month: selectedMonth)
             )
             summaryItems = summary.expensesByCategory
         } catch {

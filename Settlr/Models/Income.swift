@@ -8,10 +8,12 @@ struct Income: Codable, Identifiable {
     let occurredAt: String
     let categoryId: String?
     let source: String?
+    let recurringSeriesId: String?
 
     var amount: Double { Double(amountCents) / 100.0 }
 
     var displayDate: String { formatIncomeDate(occurredAt) }
+    var isRecurring: Bool { recurringSeriesId != nil && !(recurringSeriesId?.isEmpty ?? true) }
 }
 
 private func formatIncomeDate(_ raw: String) -> String {

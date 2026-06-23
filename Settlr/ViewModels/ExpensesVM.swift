@@ -62,7 +62,7 @@ final class ExpensesVM {
         isLoading = true
         defer { isLoading = false }
         async let expTask: ExpensesResponse = api.fetch(
-            Endpoints.expenses(workspaceId) + monthQuery()
+            Endpoints.expenses(workspaceId) + MonthRangeQuery.ledgerQuery(month: selectedMonth)
         )
         async let catTask: CategoriesResponse = api.fetch(
             Endpoints.categories(workspaceId) + "?scope=expense"
@@ -95,6 +95,25 @@ final class ExpensesVM {
     }
 
     @MainActor
+    @discardableResult
+    func update(workspaceId: String, expenseId: String, body: CreateExpenseBody) async -> Expense? {
+        do {
+            let response: CreateExpenseResponse = try await api.fetch(
+                Endpoints.expense(workspaceId, expenseId),
+                method: "PATCH",
+                body: body
+            )
+            if let idx = expenses.firstIndex(where: { $0.id == expenseId }) {
+                expenses[idx] = response.expense
+            }
+            return response.expense
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
+    @MainActor
     func delete(workspaceId: String, expenseId: String) async {
         do {
             try await api.send(Endpoints.expense(workspaceId, expenseId), method: "DELETE")
@@ -102,25 +121,6 @@ final class ExpensesVM {
         } catch {
             errorMessage = error.localizedDescription
         }
-    }
-
-    private func monthQuery() -> String {
-        let parts = selectedMonth.split(separator: "-")
-        guard parts.count == 2,
-              let year = Int(parts[0]),
-              let month = Int(parts[1]) else { return "" }
-        let from = String(format: "%04d-%02d-01", year, month)
-        let lastDay = lastDayOfMonth(year: year, month: month)
-        let to = String(format: "%04d-%02d-%02d", year, month, lastDay)
-        return "?from=\(from)&to=\(to)"
-    }
-
-    private func lastDayOfMonth(year: Int, month: Int) -> Int {
-        var comps = DateComponents()
-        comps.year = year; comps.month = month + 1; comps.day = 0
-        return Calendar.current.date(from: comps).map {
-            Calendar.current.component(.day, from: $0)
-        } ?? 30
     }
 
     private func matchesAmount(_ q: String, cents: Int) -> Bool {

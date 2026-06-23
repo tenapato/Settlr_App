@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <rect width="200" height="200" fill="#111110"/>
+  <rect x="28" y="28" width="144" height="144" rx="28" fill="#1c1c1a"/>
+  <!-- 3 bars forming an abstract S:
+       top bar: full width, left-aligned
+       mid bar: full width, right-aligned (shifts right)
+       bot bar: full width, left-aligned again -->
+  <rect x="50" y="66" width="76" height="13" rx="5" fill="#caff3a"/>
+  <rect x="74" y="93" width="76" height="13" rx="5" fill="#caff3a"/>
+  <rect x="50" y="120" width="76" height="13" rx="5" fill="#caff3a"/>
+</svg>
