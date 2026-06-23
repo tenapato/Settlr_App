@@ -5,6 +5,7 @@ struct IncomeView: View {
     @Binding var showForm: Bool
     @State private var vm = IncomeVM()
     @State private var selectedIncome: Income?
+    @State private var incomeToEdit: Income?
     @State private var incomeToDelete: Income?
 
     var body: some View {
@@ -65,6 +66,11 @@ struct IncomeView: View {
                         selectedIncome = updated
                     }
                 )
+            }
+            .sheet(item: $incomeToEdit) { income in
+                IncomeFormSheet(workspaceId: workspaceId, categories: vm.categories, income: income) { body in
+                    Task { await vm.update(workspaceId: workspaceId, incomeId: income.id, body: body) }
+                }
             }
             .overlay {
                 if let income = incomeToDelete {
@@ -137,12 +143,19 @@ struct IncomeView: View {
                 .listRowSeparatorTint(Color(hex: "#2a2d32"))
                 .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button(role: .destructive) {
-                            incomeToDelete = item
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
+                    Button {
+                        incomeToEdit = item
+                    } label: {
+                        Label("Edit", systemImage: "pencil")
                     }
+                    .tint(Color(hex: "#c8ff5a"))
+
+                    Button(role: .destructive) {
+                        incomeToDelete = item
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
             }
 
             // Footer: count + total

@@ -40,6 +40,7 @@ struct ExpensesView: View {
     @Binding var showForm: Bool
     @State private var vm = ExpensesVM()
     @State private var selectedExpense: Expense?
+    @State private var expenseToEdit: Expense?
     @State private var expenseToDelete: Expense?
 
     var body: some View {
@@ -101,6 +102,11 @@ struct ExpensesView: View {
                         selectedExpense = updated
                     }
                 )
+            }
+            .sheet(item: $expenseToEdit) { expense in
+                ExpenseFormSheet(workspaceId: workspaceId, categories: vm.categories, expense: expense) { body in
+                    Task { await vm.update(workspaceId: workspaceId, expenseId: expense.id, body: body) }
+                }
             }
             .overlay {
                 if let expense = expenseToDelete {
@@ -202,12 +208,19 @@ struct ExpensesView: View {
                 .listRowSeparatorTint(Color(hex: "#2a2d32"))
                 .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button(role: .destructive) {
-                            expenseToDelete = expense
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
+                    Button {
+                        expenseToEdit = expense
+                    } label: {
+                        Label("Edit", systemImage: "pencil")
                     }
+                    .tint(Color(hex: "#c8ff5a"))
+
+                    Button(role: .destructive) {
+                        expenseToDelete = expense
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
             }
 
             // Footer: count + total
