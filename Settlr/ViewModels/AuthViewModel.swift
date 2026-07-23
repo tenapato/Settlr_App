@@ -1,3 +1,4 @@
+import AuthenticationServices
 import Foundation
 import Observation
 
@@ -53,6 +54,28 @@ final class AuthViewModel {
         do {
             let user = try await api.signInWithGoogle()
             appState.currentUser = user
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    func signInWithApple(result: Result<ASAuthorization, Error>, appState: AppState) async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            switch result {
+            case .failure(let err):
+                if let e = err as? ASAuthorizationError, e.code == .canceled { return }
+                throw err
+            case .success(let auth):
+                guard let credential = auth.credential as? ASAuthorizationAppleIDCredential else {
+                    throw APIError.server("Apple sign-in: unexpected credential type")
+                }
+                let user = try await api.signInWithApple(credential: credential)
+                appState.currentUser = user
+            }
         } catch {
             errorMessage = error.localizedDescription
         }

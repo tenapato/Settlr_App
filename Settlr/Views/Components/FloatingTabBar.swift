@@ -7,8 +7,8 @@ enum Tab: CaseIterable {
         switch self {
         case .home: return "house.fill"
         case .cards: return "creditcard.fill"
-        case .expenses: return "arrow.down.circle.fill"
-        case .income: return "arrow.up.circle.fill"
+        case .expenses: return "arrow.up.circle.fill"
+        case .income: return "arrow.down.circle.fill"
         case .categories: return "tag.fill"
         }
     }

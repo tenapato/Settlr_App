@@ -1,5 +1,10 @@
 import Foundation
 
+struct ExpensesByChannel: Decodable {
+    let cashCents: Int
+    let creditCardCents: Int
+}
+
 struct SummaryResponse: Decodable {
     let incomeCents: Int
     let expenseCents: Int
@@ -8,6 +13,7 @@ struct SummaryResponse: Decodable {
     let expenseCount: Int
     let transactionCount: Int
     let expensesByCategory: [CategorySummary]
+    let expensesByChannel: ExpensesByChannel
 
     var income: Double { Double(incomeCents) / 100.0 }
     var expenses: Double { Double(expenseCents) / 100.0 }
@@ -23,12 +29,14 @@ struct SummaryResponse: Decodable {
         let total = try container.decodeIfPresent(Int.self, forKey: .transactionCount)
         transactionCount = total ?? (incomeCount + expenseCount)
         expensesByCategory = try container.decodeIfPresent([CategorySummary].self, forKey: .expensesByCategory) ?? []
+        expensesByChannel = try container.decodeIfPresent(ExpensesByChannel.self, forKey: .expensesByChannel)
+            ?? ExpensesByChannel(cashCents: 0, creditCardCents: expenseCents)
     }
 
     private enum CodingKeys: String, CodingKey {
         case incomeCents, expenseCents, netCents
         case incomeCount, expenseCount, transactionCount
-        case expensesByCategory
+        case expensesByCategory, expensesByChannel
     }
 }
 

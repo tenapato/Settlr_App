@@ -36,17 +36,18 @@ final class CardsVM {
         let label = newLabel.trimmingCharacters(in: .whitespaces)
         guard !label.isEmpty else { return }
         isCreating = true
+        errorMessage = nil
         defer { isCreating = false }
         let lastFour = newLastFour.trimmingCharacters(in: .whitespaces).isEmpty ? nil : newLastFour
         let network = newNetwork.isEmpty ? nil : newNetwork
         let limitCents: Int? = Int(newLimitStr.replacingOccurrences(of: ",", with: "")).map { $0 * 100 }
         do {
-            let resp: CreditCardsResponse = try await api.fetch(
+            let resp: CreditCardResponse = try await api.fetch(
                 Endpoints.creditCards(workspaceId),
                 method: "POST",
                 body: CreateCreditCardBody(label: label, lastFour: lastFour, network: network, creditLimitCents: limitCents)
             )
-            cards = resp.creditCards
+            cards.append(resp.creditCard)
             resetForm()
             showCreateSheet = false
         } catch {
@@ -242,7 +243,11 @@ private struct CardTile: View {
 private struct CreateCardSheet: View {
     let vm: CardsVM
     let workspaceId: String
-    @FocusState private var focused: Bool
+    @FocusState private var focusedField: Field?
+
+    private enum Field: Hashable {
+        case name, lastFour, limit
+    }
 
     private let networks = [("", "None"), ("visa", "Visa"), ("mastercard", "MC"), ("amex", "Amex"), ("other", "Other")]
 
@@ -254,13 +259,14 @@ private struct CreateCardSheet: View {
                     VStack(spacing: 18) {
                         CardFormField(label: "Card Name *") {
                             TextField("e.g. Chase Sapphire", text: Binding(get: { vm.newLabel }, set: { vm.newLabel = $0 }))
-                                .focused($focused)
+                                .focused($focusedField, equals: .name)
                                 .foregroundStyle(Color(hex: "#ecedee"))
                         }
 
                         CardFormField(label: "Last 4 Digits") {
                             TextField("1234", text: Binding(get: { vm.newLastFour }, set: { vm.newLastFour = String($0.prefix(4)) }))
                                 .keyboardType(.numberPad)
+                                .focused($focusedField, equals: .lastFour)
                                 .foregroundStyle(Color(hex: "#ecedee"))
                         }
 
@@ -291,7 +297,15 @@ private struct CreateCardSheet: View {
                         CardFormField(label: "Credit Limit (optional)") {
                             TextField("e.g. 50000", text: Binding(get: { vm.newLimitStr }, set: { vm.newLimitStr = $0 }))
                                 .keyboardType(.numberPad)
+                                .focused($focusedField, equals: .limit)
                                 .foregroundStyle(Color(hex: "#ecedee"))
+                        }
+
+                        if let err = vm.errorMessage {
+                            Text(err)
+                                .font(.system(size: 13))
+                                .foregroundStyle(Color(hex: "#ff6b6b"))
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
                         Button {
@@ -315,20 +329,27 @@ private struct CreateCardSheet: View {
                     }
                     .padding(24)
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
             .navigationTitle("New Card")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { vm.showCreateSheet = false; vm.resetForm() }
+                    Button("Cancel") { vm.showCreateSheet = false; vm.resetForm(); vm.errorMessage = nil }
                         .foregroundStyle(Color(hex: "#8e9197"))
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { focusedField = nil }
+                        .foregroundStyle(Color(hex: "#c8ff5a"))
+                        .fontWeight(.semibold)
                 }
             }
         }
         .presentationDetents([.large])
         .presentationBackground(Color(hex: "#0e0f11"))
         .presentationCornerRadius(24)
-        .onAppear { focused = true }
+        .onAppear { focusedField = .name; vm.errorMessage = nil }
     }
 }
 

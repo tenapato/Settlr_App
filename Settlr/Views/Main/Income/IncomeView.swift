@@ -132,31 +132,38 @@ struct IncomeView: View {
 
     private var incomeList: some View {
         List {
-            ForEach(vm.filteredIncomes) { item in
-                LedgerSwipeRow(
-                    onTap: { selectedIncome = item },
-                    onEdit: { incomeToEdit = item },
-                    onDelete: { incomeToDelete = item }
-                ) {
-                    IncomeRow(item: item, categories: vm.categories)
+            ForEach(groupByDay(vm.filteredIncomes, date: { $0.occurredAt }, cents: { $0.amountCents })) { section in
+                Section {
+                    ForEach(section.items) { item in
+                        LedgerSwipeRow(
+                            onTap: { selectedIncome = item },
+                            onEdit: { incomeToEdit = item },
+                            onDelete: { incomeToDelete = item }
+                        ) {
+                            IncomeRow(item: item, categories: vm.categories)
+                        }
+                        .listRowBackground(Theme.surface)
+                        .listRowSeparatorTint(Theme.line)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                    }
+                } header: {
+                    DaySectionHeader(title: section.title, subtotalCents: section.subtotalCents, tint: Theme.income)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
                 }
-                .listRowBackground(Color(hex: "#15171a"))
-                .listRowSeparatorTint(Color(hex: "#2a2d32"))
-                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
             }
 
-            // Footer: count + total
+            // Footer: count + grand total
             HStack {
                 let count = vm.filteredIncomes.count
                 Text("\(count) income entr\(count == 1 ? "y" : "ies")")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Color(hex: "#5a5d63"))
+                    .foregroundStyle(Theme.faint)
                 Spacer()
                 AmountLabel(
                     cents: vm.filteredIncomes.reduce(0) { $0 + $1.amountCents },
                     font: .system(size: 12, weight: .semibold)
                 )
-                .foregroundStyle(Color(hex: "#5ddf8a"))
+                .foregroundStyle(Theme.income)
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 10)
@@ -229,42 +236,44 @@ private struct IncomeRow: View {
         return categories.first { $0.id == id }
     }
 
+    private var hasMeta: Bool {
+        (item.source.map { !$0.isEmpty } ?? false) || category != nil
+    }
+
     var body: some View {
         HStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(Color(hex: "#5ddf8a").opacity(0.12))
+                    .fill(Theme.income.opacity(0.12))
                     .frame(width: 40, height: 40)
-                Image(systemName: "arrow.up.circle.fill")
+                Image(systemName: "arrow.down.circle.fill")
                     .font(.system(size: 16))
-                    .foregroundStyle(Color(hex: "#5ddf8a"))
+                    .foregroundStyle(Theme.income)
             }
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(item.description)
                         .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(Color(hex: "#ecedee"))
+                        .foregroundStyle(Theme.ink)
                         .lineLimit(1)
                         .truncationMode(.tail)
 
                     IncomeMarkerTags(income: item)
                 }
 
-                HStack(spacing: 6) {
-                    Text(item.displayDate)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color(hex: "#5a5d63"))
+                if hasMeta {
+                    HStack(spacing: 6) {
+                        if let source = item.source, !source.isEmpty {
+                            Text(source)
+                                .font(.system(size: 11))
+                                .foregroundStyle(Theme.faint)
+                                .lineLimit(1)
+                        }
 
-                    if let source = item.source, !source.isEmpty {
-                        Text(source)
-                            .font(.system(size: 11))
-                            .foregroundStyle(Color(hex: "#5a5d63"))
-                            .lineLimit(1)
-                    }
-
-                    if let cat = category {
-                        CategoryBadge(name: cat.name, color: cat.color)
+                        if let cat = category {
+                            CategoryBadge(name: cat.name, color: cat.color)
+                        }
                     }
                 }
             }
@@ -272,11 +281,11 @@ private struct IncomeRow: View {
             Spacer()
 
             AmountLabel(cents: item.amountCents, font: .system(size: 15, weight: .semibold))
-                .foregroundStyle(Color(hex: "#5ddf8a"))
+                .foregroundStyle(Theme.income)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
-        .background(Color(hex: "#15171a"))
+        .background(Theme.surface)
     }
 }
 

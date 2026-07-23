@@ -13,6 +13,8 @@ struct IncomeFormSheet: View {
     @State private var selectedDate: Date
     @State private var selectedCategoryId: String?
     @State private var errorMessage: String?
+    @FocusState private var amountFocused: Bool
+    @FocusState private var descriptionFocused: Bool
 
     private var isEditing: Bool { income != nil }
 
@@ -47,94 +49,101 @@ struct IncomeFormSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(hex: "#0e0f11").ignoresSafeArea()
+                Theme.bg.ignoresSafeArea()
 
                 ScrollView {
-                    VStack(spacing: 16) {
-                        StyledTextField(placeholder: "Description", text: $description)
+                    VStack(spacing: 20) {
+                        HeroAmountField(amountText: $amountText, tint: Theme.income, focus: $amountFocused)
 
-                        HStack {
-                            Text("MXN $")
-                                .foregroundStyle(Color(hex: "#8e9197"))
-                                .font(.system(size: 16))
-                            TextField("0.00", text: $amountText)
-                                .keyboardType(.decimalPad)
-                                .foregroundStyle(Color(hex: "#ecedee"))
-                                .font(.system(size: 16))
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color(hex: "#15171a"))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1)
-                                )
-                        )
-
-                        DatePicker("Date", selection: $selectedDate, displayedComponents: .date)
-                            .foregroundStyle(Color(hex: "#ecedee"))
-                            .tint(Color(hex: "#c8ff5a"))
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color(hex: "#15171a"))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1)
-                                    )
-                            )
-
-                        if !incomeCategories.isEmpty {
-                            Picker("Category", selection: $selectedCategoryId) {
-                                Text("No category").tag(String?.none)
-                                ForEach(incomeCategories) { cat in
-                                    Text(cat.name).tag(Optional(cat.id))
-                                }
+                        FormCard {
+                            FormTextRow(label: "Description", placeholder: "Where from?", text: $description, focus: $descriptionFocused)
+                            FormRowDivider()
+                            dateRow
+                            if !incomeCategories.isEmpty {
+                                FormRowDivider()
+                                categoryRow
                             }
-                            .foregroundStyle(Color(hex: "#ecedee"))
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color(hex: "#15171a"))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1)
-                                    )
-                            )
                         }
 
                         if let error = errorMessage {
                             Text(error)
                                 .font(.system(size: 13))
-                                .foregroundStyle(Color(hex: "#ff6b6b"))
+                                .foregroundStyle(Theme.expense)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
+
+                        Button(isEditing ? "Save Changes" : "Add Income") { save() }
+                            .buttonStyle(PrimaryButtonStyle())
+                            .disabled(!isValid)
+                            .padding(.top, 4)
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 16)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
                     .padding(.bottom, 40)
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
             .navigationTitle(isEditing ? "Edit Income" : "Add Income")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
-                        .foregroundStyle(Color(hex: "#8e9197"))
+                        .foregroundStyle(Theme.muted)
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }
-                        .foregroundStyle(Color(hex: "#c8ff5a"))
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { amountFocused = false; descriptionFocused = false }
+                        .foregroundStyle(Theme.accent)
                         .fontWeight(.semibold)
                 }
             }
         }
         .preferredColorScheme(.dark)
+        .onAppear { if !isEditing { amountFocused = true } }
     }
+
+    // MARK: - Rows
+
+    private var dateRow: some View {
+        HStack(spacing: 12) {
+            Text("Date")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Theme.muted)
+            Spacer()
+            DatePicker("", selection: $selectedDate, displayedComponents: .date)
+                .labelsHidden()
+                .datePickerStyle(.compact)
+                .tint(Theme.accent)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 9)
+    }
+
+    private var categoryRow: some View {
+        FormMenuRow(label: "Category", value: categoryValueLabel, isPlaceholder: selectedCategoryId == nil) {
+            Button("No category") { selectedCategoryId = nil }
+            ForEach(incomeCategories) { cat in
+                Button(cat.name) { selectedCategoryId = cat.id }
+            }
+        }
+    }
+
+    // MARK: - Derived values
+
+    private var isValid: Bool {
+        let hasDescription = !description.trimmingCharacters(in: .whitespaces).isEmpty
+        let normalized = amountText.replacingOccurrences(of: ",", with: ".")
+        let hasAmount = (Double(normalized) ?? 0) > 0
+        return hasDescription && hasAmount
+    }
+
+    private var categoryValueLabel: String {
+        guard let id = selectedCategoryId,
+              let cat = incomeCategories.first(where: { $0.id == id }) else { return "None" }
+        return cat.name
+    }
+
+    // MARK: - Save
 
     private func save() {
         guard !description.trimmingCharacters(in: .whitespaces).isEmpty else {

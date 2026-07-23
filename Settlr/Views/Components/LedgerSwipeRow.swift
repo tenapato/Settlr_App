@@ -46,6 +46,7 @@ struct LedgerSwipeRow<Content: View>: View {
 
             actionOverlay
         }
+        .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
         .clipped()
         .contentShape(Rectangle())

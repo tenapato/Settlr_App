@@ -27,7 +27,7 @@ final class APIClient {
 
     private let baseURL: String = {
         #if DEBUG
-        return "https://api.settlr.cash"
+        return "https://api-dev.settlr.cash"
         #else
         return "https://api.settlr.cash"
         #endif
@@ -37,7 +37,7 @@ final class APIClient {
     /// set on this host — not on `api.*`. Using the API host for Google sign-in yields `no_session`.
     private let authBaseURL: String = {
         #if DEBUG
-        return "https://web.settlr.cash"
+        return "https://settlr-api-dev.deamon.workers.dev"
         #else
         return "https://web.settlr.cash"
         #endif
@@ -144,6 +144,44 @@ final class APIClient {
         return me.user
     }
 
+    func signInWithApple(credential: ASAuthorizationAppleIDCredential) async throws -> MeUser {
+        guard let tokenData = credential.identityToken,
+              let identityToken = String(data: tokenData, encoding: .utf8) else {
+            throw APIError.server("Apple Sign-In: missing identity token")
+        }
+        struct AppleBody: Encodable {
+            let provider: String
+            let idToken: IdToken
+            struct IdToken: Encodable { let token: String }
+        }
+        let req = try makeRequest(
+            "/api/auth/sign-in/social",
+            method: "POST",
+            body: AppleBody(provider: "apple", idToken: .init(token: identityToken)),
+            origin: authBaseURL
+        )
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse else { throw APIError.server("No response") }
+        if !(200..<300).contains(http.statusCode) {
+            let msg = (try? decoder.decode(APIErrorBody.self, from: data))?.error ?? "Apple sign-in failed"
+            throw APIError.server(msg)
+        }
+        // Better Auth's bearer plugin sets set-auth-token; the idToken branch also returns { token } in the JSON body.
+        struct AppleSignInResponse: Decodable { let token: String? }
+        let sessionToken = http.value(forHTTPHeaderField: "set-auth-token")
+            ?? (try? decoder.decode(AppleSignInResponse.self, from: data))?.token
+        guard let sessionToken, !sessionToken.isEmpty else {
+            throw APIError.server("Apple sign-in: no session token returned")
+        }
+        TokenStore.save(sessionToken)
+        let me: MeResponse = try await fetch(Endpoints.me)
+        return me.user
+    }
+
+    func deleteAccount() async throws {
+        try await send(Endpoints.me, method: "DELETE")
+    }
+
     func signInWithGoogle() async throws -> MeUser {
         // Step 1: ask better-auth for the Google OAuth URL without auto-redirect
         struct SocialBody: Encodable {
@@ -202,7 +240,7 @@ final class APIClient {
     }
 }
 
-// MARK: - OAuth helper
+// MARK: - OAuth helpers
 
 private class WebAuthCoordinator: NSObject, ASWebAuthenticationPresentationContextProviding {
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {

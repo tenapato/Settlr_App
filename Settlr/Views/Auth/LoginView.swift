@@ -1,3 +1,4 @@
+import AuthenticationServices
 import SwiftUI
 
 struct LoginView: View {
@@ -71,6 +72,20 @@ struct LoginView: View {
                                 .fill(Color(hex: "#2a2d32"))
                                 .frame(height: 1)
                         }
+
+                        SignInWithAppleButton(.signIn) { request in
+                            request.requestedScopes = [.fullName, .email]
+                        } onCompletion: { result in
+                            Task { await vm.signInWithApple(result: result, appState: appState) }
+                        }
+                        .signInWithAppleButtonStyle(.black)
+                        .frame(height: 50)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1)
+                        )
+                        .disabled(vm.isLoading)
 
                         Button {
                             Task { await vm.signInWithGoogle(appState: appState) }

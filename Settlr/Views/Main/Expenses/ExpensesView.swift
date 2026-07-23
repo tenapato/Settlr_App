@@ -17,6 +17,7 @@ struct FilterChip<Content: View>: View {
                 Text(isActive ? "\(label): \(value)" : label)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(isActive ? Color(hex: "#0e0f11") : Color(hex: "#8e9197"))
+                    .lineLimit(1)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(isActive ? Color(hex: "#0e0f11").opacity(0.6) : Color(hex: "#5a5d63"))
@@ -28,7 +29,7 @@ struct FilterChip<Content: View>: View {
                     .fill(isActive ? Color(hex: "#c8ff5a") : Color(hex: "#1c1f23"))
                     .overlay(Capsule().strokeBorder(isActive ? Color.clear : Color(hex: "#2a2d32"), lineWidth: 1))
             )
-            .animation(.spring(duration: 0.2), value: isActive)
+            .fixedSize(horizontal: true, vertical: false)
         }
     }
 }
@@ -197,31 +198,38 @@ struct ExpensesView: View {
 
     private var expenseList: some View {
         List {
-            ForEach(vm.filteredExpenses) { expense in
-                LedgerSwipeRow(
-                    onTap: { selectedExpense = expense },
-                    onEdit: { expenseToEdit = expense },
-                    onDelete: { expenseToDelete = expense }
-                ) {
-                    ExpenseRow(expense: expense, vm: vm)
+            ForEach(groupByDay(vm.filteredExpenses, date: { $0.occurredAt }, cents: { $0.amountCents })) { section in
+                Section {
+                    ForEach(section.items) { expense in
+                        LedgerSwipeRow(
+                            onTap: { selectedExpense = expense },
+                            onEdit: { expenseToEdit = expense },
+                            onDelete: { expenseToDelete = expense }
+                        ) {
+                            ExpenseRow(expense: expense, vm: vm)
+                        }
+                        .listRowBackground(Theme.surface)
+                        .listRowSeparatorTint(Theme.line)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                    }
+                } header: {
+                    DaySectionHeader(title: section.title, subtotalCents: section.subtotalCents)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
                 }
-                .listRowBackground(Color(hex: "#15171a"))
-                .listRowSeparatorTint(Color(hex: "#2a2d32"))
-                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
             }
 
-            // Footer: count + total
+            // Footer: count + grand total
             HStack {
                 let count = vm.filteredExpenses.count
                 Text("\(count) expense\(count == 1 ? "" : "s")")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Color(hex: "#5a5d63"))
+                    .foregroundStyle(Theme.faint)
                 Spacer()
                 AmountLabel(
                     cents: vm.filteredExpenses.reduce(0) { $0 + $1.amountCents },
                     font: .system(size: 12, weight: .semibold)
                 )
-                .foregroundStyle(Color(hex: "#8e9197"))
+                .foregroundStyle(Theme.muted)
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 10)
@@ -342,33 +350,25 @@ private struct ExpenseRow: View {
         HStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(Color(hex: "#ff6b6b").opacity(0.12))
+                    .fill(Theme.expense.opacity(0.12))
                     .frame(width: 40, height: 40)
                 Image(systemName: expense.paymentChannel == "credit_card" ? "creditcard.fill" : "banknote.fill")
                     .font(.system(size: 16))
-                    .foregroundStyle(Color(hex: "#ff6b6b"))
+                    .foregroundStyle(Theme.expense)
             }
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(expense.description)
                         .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(Color(hex: "#ecedee"))
+                        .foregroundStyle(Theme.ink)
                         .lineLimit(1)
                         .truncationMode(.tail)
 
                     ExpenseMarkerTags(expense: expense)
                 }
 
-                HStack(spacing: 6) {
-                    Text(expense.displayDate)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color(hex: "#5a5d63"))
-
-                    if let channel = expense.channelTagLabel {
-                        LedgerTag(text: channel, tone: expense.paymentChannel == "credit_card" ? .accent : .neutral)
-                    }
-
+                HStack(spacing: 8) {
                     if let cat = category {
                         CategoryBadge(name: cat.name, color: cat.color)
                     }
@@ -377,7 +377,7 @@ private struct ExpenseRow: View {
                        let lf = card?.lastFour {
                         Text("····\(lf)")
                             .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(Color(hex: "#5a5d63"))
+                            .foregroundStyle(Theme.faint)
                     }
                 }
             }
@@ -385,11 +385,11 @@ private struct ExpenseRow: View {
             Spacer()
 
             AmountLabel(cents: expense.amountCents, font: .system(size: 15, weight: .semibold))
-                .foregroundStyle(Color(hex: "#ecedee"))
+                .foregroundStyle(Theme.ink)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
-        .background(Color(hex: "#15171a"))
+        .background(Theme.surface)
     }
 }
 

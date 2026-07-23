@@ -96,7 +96,7 @@ struct MainTabView: View {
 
     private var quickActions: [QuickAction] {
         [
-            QuickAction(label: "Add Expense", icon: "arrow.down", color: Color(hex: "#ff6b6b")) {
+            QuickAction(label: "Add Expense", icon: "arrow.up", color: Color(hex: "#ff6b6b")) {
                 setFabOpen(false)
                 selectedTab = .expenses
                 Task {
@@ -104,7 +104,7 @@ struct MainTabView: View {
                     showExpenseForm = true
                 }
             },
-            QuickAction(label: "Add Income", icon: "arrow.up", color: Color(hex: "#5ddf8a")) {
+            QuickAction(label: "Add Income", icon: "arrow.down", color: Color(hex: "#5ddf8a")) {
                 setFabOpen(false)
                 selectedTab = .income
                 Task {

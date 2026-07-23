@@ -4,6 +4,7 @@ struct DashboardView: View {
     let workspaceId: String
     @Environment(AppState.self) private var appState
     @State private var vm = DashboardVM()
+    @State private var annualVM = AnnualDashboardVM()
     @State private var showSettings = false
 
     var body: some View {
@@ -48,11 +49,22 @@ struct DashboardView: View {
                         }
                         .animation(.easeOut(duration: 0.25), value: vm.isLoading)
 
+                        AnnualEvolutionChart(months: annualVM.months, isLoading: annualVM.isLoading && annualVM.months.isEmpty)
+                            .padding(.horizontal, 24)
+
+                        FinancialHealthCard()
+                            .padding(.horizontal, 24)
+
                         Spacer().frame(height: 100)
                     }
                     .padding(.top, 8)
                 }
-                .refreshable { await vm.load(workspaceId: workspaceId) }
+                .refreshable {
+                    await vm.load(workspaceId: workspaceId)
+                    annualVM.invalidate()
+                    let year = Int(vm.selectedMonth.prefix(4)) ?? Calendar.current.component(.year, from: .now)
+                    await annualVM.load(workspaceId: workspaceId, year: year)
+                }
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
@@ -67,9 +79,17 @@ struct DashboardView: View {
             .sheet(isPresented: $showSettings) { SettingsView() }
         }
         .preferredColorScheme(.dark)
-        .task { await vm.load(workspaceId: workspaceId) }
+        .task {
+            await vm.load(workspaceId: workspaceId)
+            let year = Int(vm.selectedMonth.prefix(4)) ?? Calendar.current.component(.year, from: .now)
+            await annualVM.load(workspaceId: workspaceId, year: year)
+        }
         .onChange(of: vm.selectedMonth) { _, _ in
-            Task { await vm.load(workspaceId: workspaceId) }
+            Task {
+                await vm.load(workspaceId: workspaceId)
+                let year = Int(vm.selectedMonth.prefix(4)) ?? Calendar.current.component(.year, from: .now)
+                await annualVM.load(workspaceId: workspaceId, year: year)
+            }
         }
     }
 }
@@ -294,9 +314,9 @@ private struct FlowSummary: View {
     var body: some View {
         VStack(spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
-                FlowCard(label: "Income",   cents: summary.incomeCents,  icon: "arrow.up",   color: Color(hex: "#5ddf8a"))
+                FlowCard(label: "Income",   cents: summary.incomeCents,  icon: "arrow.down", color: Color(hex: "#5ddf8a"))
                     .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
-                FlowCard(label: "Expenses", cents: summary.expenseCents, icon: "arrow.down", color: Color(hex: "#ff6b6b"))
+                FlowCard(label: "Expenses", cents: summary.expenseCents, icon: "arrow.up",   color: Color(hex: "#ff6b6b"))
                     .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
             }
 

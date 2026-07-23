@@ -5,15 +5,15 @@ struct CategoryBadge: View {
     var color: String?
 
     var body: some View {
-        Text(name)
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(badgeColor.opacity(0.9))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(
-                Capsule()
-                    .fill(badgeColor.opacity(0.15))
-            )
+        HStack(spacing: 5) {
+            Circle()
+                .fill(badgeColor)
+                .frame(width: 6, height: 6)
+            Text(name)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Color(hex: "#8e9197"))
+                .lineLimit(1)
+        }
     }
 
     private var badgeColor: Color {

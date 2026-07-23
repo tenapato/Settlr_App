@@ -16,6 +16,8 @@ struct ExpenseFormSheet: View {
     @State private var creditCards: [CreditCard] = []
     @State private var selectedCreditCardId: String?
     @State private var errorMessage: String?
+    @FocusState private var amountFocused: Bool
+    @FocusState private var descriptionFocused: Bool
 
     private var isEditing: Bool { expense != nil }
 
@@ -54,47 +56,61 @@ struct ExpenseFormSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(hex: "#0e0f11").ignoresSafeArea()
+                Theme.bg.ignoresSafeArea()
 
                 ScrollView {
-                    VStack(spacing: 16) {
-                        StyledTextField(placeholder: "Description", text: $description)
-                        amountField
-                        dateField
-                        paymentChannelPicker
-                        creditCardPicker
-                        categoryPicker
+                    VStack(spacing: 20) {
+                        HeroAmountField(amountText: $amountText, tint: Theme.expense, focus: $amountFocused)
+
+                        FormCard {
+                            FormTextRow(label: "Description", placeholder: "What was it for?", text: $description, focus: $descriptionFocused)
+                            FormRowDivider()
+                            dateRow
+                            if !expenseCategories.isEmpty {
+                                FormRowDivider()
+                                categoryRow
+                            }
+                        }
+
+                        paymentSection
+                        cardSection
 
                         if let error = errorMessage {
                             Text(error)
                                 .font(.system(size: 13))
-                                .foregroundStyle(Color(hex: "#ff6b6b"))
+                                .foregroundStyle(Theme.expense)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
-                        Spacer()
+                        Button(isEditing ? "Save Changes" : "Add Expense") { save() }
+                            .buttonStyle(PrimaryButtonStyle())
+                            .disabled(!isValid)
+                            .padding(.top, 4)
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 16)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
                     .padding(.bottom, 40)
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
             .navigationTitle(isEditing ? "Edit Expense" : "Add Expense")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
-                        .foregroundStyle(Color(hex: "#8e9197"))
+                        .foregroundStyle(Theme.muted)
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }
-                        .foregroundStyle(Color(hex: "#c8ff5a"))
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { amountFocused = false; descriptionFocused = false }
+                        .foregroundStyle(Theme.accent)
                         .fontWeight(.semibold)
                 }
             }
         }
         .preferredColorScheme(.dark)
         .task { await loadCreditCards() }
+        .onAppear { if !isEditing { amountFocused = true } }
         .onChange(of: paymentChannel) { _, newValue in
             if newValue == "credit_card" {
                 ensureDefaultCreditCard()
@@ -104,67 +120,93 @@ struct ExpenseFormSheet: View {
         }
     }
 
-    private var amountField: some View {
-        HStack {
-            Text("MXN $")
-                .foregroundStyle(Color(hex: "#8e9197"))
-                .font(.system(size: 16))
-            TextField("0.00", text: $amountText)
-                .keyboardType(.decimalPad)
-                .foregroundStyle(Color(hex: "#ecedee"))
-                .font(.system(size: 16))
+    // MARK: - Rows
+
+    private var dateRow: some View {
+        HStack(spacing: 12) {
+            Text("Date")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Theme.muted)
+            Spacer()
+            DatePicker("", selection: $selectedDate, displayedComponents: .date)
+                .labelsHidden()
+                .datePickerStyle(.compact)
+                .tint(Theme.accent)
         }
-        .formFieldStyle(verticalPadding: 14)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 9)
     }
 
-    private var dateField: some View {
-        DatePicker("Date", selection: $selectedDate, displayedComponents: .date)
-            .foregroundStyle(Color(hex: "#ecedee"))
-            .tint(Color(hex: "#c8ff5a"))
-            .formFieldStyle(verticalPadding: 12)
+    private var categoryRow: some View {
+        FormMenuRow(label: "Category", value: categoryValueLabel, isPlaceholder: selectedCategoryId == nil) {
+            Button("No category") { selectedCategoryId = nil }
+            ForEach(expenseCategories) { cat in
+                Button(cat.name) { selectedCategoryId = cat.id }
+            }
+        }
     }
 
-    private var paymentChannelPicker: some View {
-        Picker("Payment", selection: $paymentChannel) {
-            Text("Cash").tag("cash")
-            Text("Credit Card").tag("credit_card")
+    private var paymentSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionEyebrow("Payment Method")
+                .padding(.leading, 4)
+            SegmentedToggle(
+                selection: $paymentChannel,
+                options: [
+                    ToggleOption(value: "cash", label: "Cash", icon: "banknote.fill"),
+                    ToggleOption(value: "credit_card", label: "Credit Card", icon: "creditcard.fill")
+                ]
+            )
         }
-        .pickerStyle(.segmented)
-        .tint(Color(hex: "#c8ff5a"))
     }
 
     @ViewBuilder
-    private var creditCardPicker: some View {
+    private var cardSection: some View {
         if paymentChannel == "credit_card" {
             if creditCards.isEmpty {
-                Text("No cards in workspace")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color(hex: "#ffb020"))
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("No cards in this workspace — add one in Cards first.")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .foregroundStyle(Theme.warning)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 4)
             } else {
-                Picker("Card", selection: $selectedCreditCardId) {
-                    ForEach(creditCards) { card in
-                        Text(cardOptionLabel(card)).tag(Optional(card.id))
+                FormCard {
+                    FormMenuRow(label: "Card", value: cardValueLabel, isPlaceholder: selectedCreditCardId == nil) {
+                        ForEach(creditCards) { card in
+                            Button(cardOptionLabel(card)) { selectedCreditCardId = card.id }
+                        }
                     }
                 }
-                .foregroundStyle(Color(hex: "#ecedee"))
-                .formFieldStyle()
             }
         }
     }
 
-    @ViewBuilder
-    private var categoryPicker: some View {
-        if !expenseCategories.isEmpty {
-            Picker("Category", selection: $selectedCategoryId) {
-                Text("No category").tag(String?.none)
-                ForEach(expenseCategories) { cat in
-                    Text(cat.name).tag(Optional(cat.id))
-                }
-            }
-            .foregroundStyle(Color(hex: "#ecedee"))
-            .formFieldStyle()
+    // MARK: - Derived values
+
+    private var isValid: Bool {
+        let hasDescription = !description.trimmingCharacters(in: .whitespaces).isEmpty
+        let normalized = amountText.replacingOccurrences(of: ",", with: ".")
+        let hasAmount = (Double(normalized) ?? 0) > 0
+        let cardOK = paymentChannel != "credit_card" || selectedCreditCardId != nil
+        return hasDescription && hasAmount && cardOK
+    }
+
+    private var categoryValueLabel: String {
+        guard let id = selectedCategoryId,
+              let cat = expenseCategories.first(where: { $0.id == id }) else { return "None" }
+        return cat.name
+    }
+
+    private var cardValueLabel: String {
+        guard let id = selectedCreditCardId,
+              let card = creditCards.first(where: { $0.id == id }) else {
+            return creditCards.isEmpty ? "No cards" : "Select card"
         }
+        return cardOptionLabel(card)
     }
 
     private func cardOptionLabel(_ card: CreditCard) -> String {
@@ -173,6 +215,8 @@ struct ExpenseFormSheet: View {
         }
         return card.label
     }
+
+    // MARK: - Data + save
 
     @MainActor
     private func loadCreditCards() async {
@@ -235,20 +279,5 @@ struct ExpenseFormSheet: View {
             if let date = f.date(from: raw) { return date }
         }
         return Date()
-    }
-}
-
-private extension View {
-    func formFieldStyle(verticalPadding: CGFloat = 8) -> some View {
-        padding(.horizontal, 16)
-            .padding(.vertical, verticalPadding)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(hex: "#15171a"))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1)
-                    )
-            )
     }
 }

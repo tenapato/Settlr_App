@@ -1,3 +1,4 @@
+import AuthenticationServices
 import SwiftUI
 
 struct SignupView: View {
@@ -52,6 +53,28 @@ struct SignupView: View {
                         .background(Color(hex: "#c8ff5a"))
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
+                    .disabled(vm.isLoading)
+
+                    HStack(spacing: 12) {
+                        Rectangle()
+                            .fill(Color(hex: "#2a2d32"))
+                            .frame(height: 1)
+                        Text("or")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Color(hex: "#5a5d63"))
+                        Rectangle()
+                            .fill(Color(hex: "#2a2d32"))
+                            .frame(height: 1)
+                    }
+
+                    SignInWithAppleButton(.signUp) { request in
+                        request.requestedScopes = [.fullName, .email]
+                    } onCompletion: { result in
+                        Task { await vm.signInWithApple(result: result, appState: appState) }
+                    }
+                    .signInWithAppleButtonStyle(.white)
+                    .frame(height: 50)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
                     .disabled(vm.isLoading)
                 }
                 .padding(.horizontal, 24)

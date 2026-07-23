@@ -4,6 +4,9 @@ struct SettingsView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
     @State private var showSignOutConfirm = false
+    @State private var showDeleteAccountConfirm = false
+    @State private var isDeletingAccount = false
+    @State private var deleteAccountError: String?
 
     var body: some View {
         NavigationStack {
@@ -128,6 +131,41 @@ struct SettingsView: View {
                             }
                         }
 
+                        // Delete account
+                        SectionCard {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Danger Zone")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(Color(hex: "#8e9197"))
+                                    .textCase(.uppercase)
+                                    .tracking(0.8)
+
+                                if let error = deleteAccountError {
+                                    Text(error)
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(Color(hex: "#ff6b6b"))
+                                }
+
+                                Button {
+                                    showDeleteAccountConfirm = true
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "person.crop.circle.badge.minus")
+                                            .font(.system(size: 16))
+                                        Text("Delete Account")
+                                            .font(.system(size: 16, weight: .medium))
+                                        Spacer()
+                                        if isDeletingAccount {
+                                            ProgressView().tint(Color(hex: "#ff6b6b"))
+                                        }
+                                    }
+                                    .foregroundStyle(Color(hex: "#ff6b6b"))
+                                }
+                                .disabled(isDeletingAccount)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
                         Spacer().frame(height: 60)
                     }
                     .padding(.horizontal, 24)
@@ -149,6 +187,23 @@ struct SettingsView: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("You'll need to sign in again to access your workspaces.")
+            }
+            .confirmationDialog("Delete Account", isPresented: $showDeleteAccountConfirm, titleVisibility: .visible) {
+                Button("Delete My Account", role: .destructive) {
+                    Task {
+                        isDeletingAccount = true
+                        deleteAccountError = nil
+                        do {
+                            try await appState.deleteAccount()
+                        } catch {
+                            isDeletingAccount = false
+                            deleteAccountError = error.localizedDescription
+                        }
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This permanently deletes your account and all workspaces you own. This cannot be undone.")
             }
         }
         .preferredColorScheme(.dark)

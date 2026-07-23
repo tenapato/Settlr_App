@@ -70,6 +70,15 @@ final class AppState {
     }
 
     @MainActor
+    func deleteAccount() async throws {
+        try await api.deleteAccount()
+        TokenStore.delete()
+        LastWorkspaceStore.delete()
+        currentUser = nil
+        activeWorkspace = nil
+    }
+
+    @MainActor
     func select(_ workspace: WorkspaceWithRole) {
         activeWorkspace = workspace
         LastWorkspaceStore.save(workspace.id)

@@ -239,7 +239,7 @@ struct IncomeDetailSheet: View {
             ScrollView {
                 VStack(spacing: 20) {
                     header(
-                        icon: "arrow.up.circle.fill",
+                        icon: "arrow.down.circle.fill",
                         tint: Color(hex: "#5ddf8a"),
                         amountCents: income.amountCents,
                         amountColor: Color(hex: "#5ddf8a")

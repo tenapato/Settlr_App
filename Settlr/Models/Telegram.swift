@@ -5,8 +5,3 @@ struct TelegramStatusResponse: Decodable {
     let telegramUsername: String?
     let connectedAt: String?
 }
-
-struct TelegramGenerateLinkResponse: Decodable {
-    let url: String
-    let expiresAt: String?
-}

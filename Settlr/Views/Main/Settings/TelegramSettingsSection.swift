@@ -60,10 +60,6 @@ struct TelegramSettingsSection: View {
         .task {
             await vm.load(workspaceId: workspaceId)
         }
-        .task(id: vm.pendingConnect) {
-            guard vm.pendingConnect else { return }
-            await vm.pollWhilePending(workspaceId: workspaceId)
-        }
         .confirmationDialog("Disconnect Telegram?", isPresented: $showDisconnectConfirm) {
             Button("Disconnect", role: .destructive) {
                 Task { await vm.disconnect(workspaceId: workspaceId) }
@@ -151,103 +147,9 @@ struct TelegramSettingsSection: View {
 
     @ViewBuilder
     private var disconnectedContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Generate a one-time link, open it in Telegram, and tap Start on the bot. The link expires in 24 hours.")
-                .font(.system(size: 13))
-                .foregroundStyle(Color(hex: "#8e9197"))
-
-            if let connectUrl = vm.connectUrl {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("WAITING FOR CONNECTION")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Color(hex: "#5a5d63"))
-                        .tracking(0.8)
-
-                    Text(connectUrl)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(Color(hex: "#8e9197"))
-                        .lineLimit(3)
-
-                    HStack(spacing: 10) {
-                        Button {
-                            UIPasteboard.general.string = connectUrl
-                        } label: {
-                            secondaryButtonLabel(title: "Copy link", icon: "doc.on.doc")
-                        }
-                        .buttonStyle(.plain)
-
-                        Button {
-                            Task { await vm.openConnectUrl() }
-                        } label: {
-                            secondaryButtonLabel(title: "Open Telegram", icon: "arrow.up.right")
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(12)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(hex: "#1c1f23"))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1)
-                        )
-                )
-            }
-
-            if canManage {
-                Button {
-                    Task { await vm.connect(workspaceId: workspaceId) }
-                } label: {
-                    HStack(spacing: 8) {
-                        if vm.isConnecting {
-                            ProgressView()
-                                .tint(Color(hex: "#0e0f11"))
-                                .scaleEffect(0.85)
-                        } else {
-                            Image(systemName: "paperplane.fill")
-                                .font(.system(size: 14, weight: .semibold))
-                        }
-                        Text(vm.connectUrl == nil ? "Connect Telegram" : "Link generated")
-                            .font(.system(size: 15, weight: .semibold))
-                    }
-                    .foregroundStyle(Color(hex: "#0e0f11"))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(hex: "#c8ff5a"))
-                    )
-                }
-                .buttonStyle(.plain)
-                .disabled(vm.isConnecting || (vm.pendingConnect && vm.connectUrl != nil))
-            } else {
-                Text("Members can connect Telegram for this workspace.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color(hex: "#5a5d63"))
-            }
-        }
-    }
-
-    private func secondaryButtonLabel(title: String, icon: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .semibold))
-            Text(title)
-                .font(.system(size: 13, weight: .medium))
-        }
-        .foregroundStyle(Color(hex: "#ecedee"))
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color(hex: "#15171a"))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .strokeBorder(Color(hex: "#3a3d44"), lineWidth: 1)
-                )
-        )
+        Text("Connect Telegram from the Settlr web panel to log expenses and income by chat.")
+            .font(.system(size: 13))
+            .foregroundStyle(Color(hex: "#8e9197"))
     }
 }
 

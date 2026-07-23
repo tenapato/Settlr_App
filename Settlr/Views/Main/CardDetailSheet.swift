@@ -17,6 +17,11 @@ struct CardDetailSheet: View {
     @State private var notes: String
     @State private var isSaving = false
     @State private var errorMessage: String?
+    @FocusState private var focusedField: Field?
+
+    private enum Field: Hashable {
+        case name, lastFour, issuer, limit, cutoff, due, notes
+    }
 
     private let networks = [("", "None"), ("visa", "Visa"), ("mastercard", "MC"), ("amex", "Amex"), ("other", "Other")]
 
@@ -64,12 +69,14 @@ struct CardDetailSheet: View {
                         VStack(spacing: 18) {
                             CardFormField(label: "Card Name *") {
                                 TextField("e.g. Amex Platinum", text: $label)
+                                    .focused($focusedField, equals: .name)
                                     .foregroundStyle(Color(hex: "#ecedee"))
                             }
 
                             CardFormField(label: "Last 4 Digits") {
                                 TextField("1234", text: $lastFour)
                                     .keyboardType(.numberPad)
+                                    .focused($focusedField, equals: .lastFour)
                                     .foregroundStyle(Color(hex: "#ecedee"))
                                     .onChange(of: lastFour) { _, newValue in
                                         lastFour = String(newValue.filter(\.isNumber).prefix(4))
@@ -80,12 +87,14 @@ struct CardDetailSheet: View {
 
                             CardFormField(label: "Issuer (optional)") {
                                 TextField("e.g. American Express", text: $issuer)
+                                    .focused($focusedField, equals: .issuer)
                                     .foregroundStyle(Color(hex: "#ecedee"))
                             }
 
                             CardFormField(label: "Credit Limit (optional)") {
                                 TextField("e.g. 50000", text: $limitStr)
                                     .keyboardType(.numberPad)
+                                    .focused($focusedField, equals: .limit)
                                     .foregroundStyle(Color(hex: "#ecedee"))
                             }
 
@@ -93,6 +102,7 @@ struct CardDetailSheet: View {
                                 CardFormField(label: "Cutoff Day") {
                                     TextField("1–31", text: $cutoffDayStr)
                                         .keyboardType(.numberPad)
+                                        .focused($focusedField, equals: .cutoff)
                                         .foregroundStyle(Color(hex: "#ecedee"))
                                         .onChange(of: cutoffDayStr) { _, newValue in
                                             cutoffDayStr = String(newValue.filter(\.isNumber).prefix(2))
@@ -102,6 +112,7 @@ struct CardDetailSheet: View {
                                 CardFormField(label: "Due Day") {
                                     TextField("1–31", text: $dueDayStr)
                                         .keyboardType(.numberPad)
+                                        .focused($focusedField, equals: .due)
                                         .foregroundStyle(Color(hex: "#ecedee"))
                                         .onChange(of: dueDayStr) { _, newValue in
                                             dueDayStr = String(newValue.filter(\.isNumber).prefix(2))
@@ -111,6 +122,7 @@ struct CardDetailSheet: View {
 
                             CardFormField(label: "Notes (optional)") {
                                 TextField("Optional notes", text: $notes, axis: .vertical)
+                                    .focused($focusedField, equals: .notes)
                                     .lineLimit(3...5)
                                     .foregroundStyle(Color(hex: "#ecedee"))
                             }
@@ -128,6 +140,7 @@ struct CardDetailSheet: View {
                     .padding(.bottom, 24)
                 }
                 .contentMargins(.bottom, 24, for: .scrollContent)
+                .scrollDismissesKeyboard(.interactively)
             }
             .navigationTitle("Card Details")
             .navigationBarTitleDisplayMode(.inline)
@@ -149,6 +162,12 @@ struct CardDetailSheet: View {
                         }
                     }
                     .disabled(isSaving || label.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { focusedField = nil }
+                        .foregroundStyle(Color(hex: "#c8ff5a"))
+                        .fontWeight(.semibold)
                 }
             }
         }
