@@ -546,65 +546,6 @@ struct InsightTicker: View {
 
 // Note: `oneCycle` puts a `TickerDot()` after every insight, including the last one in the sequence — this is deliberate. When `repeatCount` copies of `oneCycle` sit back-to-back in the outer `HStack`, that trailing dot becomes the separator between the last item of one copy and the first item of the next, so the loop seam gets a dot too, indistinguishable from every other gap.
 
-// MARK: - Insight tile
-
-struct InsightTile: View {
-    let insight: SpendingInsight
-    var onTap: () -> Void = {}
-
-    var body: some View {
-        Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(insight.eyebrow)
-                    .font(.system(size: 9, weight: .semibold))
-                    .tracking(1.0)
-                    .textCase(.uppercase)
-                    .foregroundStyle(Theme.muted)
-                    .lineLimit(1)
-
-                HStack(spacing: 5) {
-                    if let swatch = insight.swatch {
-                        Circle().fill(swatch).frame(width: 6, height: 6)
-                    }
-                    Text(insight.title)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Theme.ink)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
-
-                Text(insight.value)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(insight.tone.color)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-
-                if let detail = insight.detail {
-                    Text(detail)
-                        .font(.system(size: 11))
-                        .foregroundStyle(Theme.faint)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(12)
-            .frame(width: 148, height: 84, alignment: .topLeading)
-            .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(Theme.surface)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .strokeBorder(Theme.line, lineWidth: 1)
-                    )
-            )
-        }
-        .buttonStyle(.plain)
-    }
-}
-
 // MARK: - Assembled strip
 
 struct SpendingInsightsStrip: View {
@@ -656,20 +597,10 @@ struct SpendingInsightsStrip: View {
     }
 
     private var tilesRow: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 10) {
-                ForEach(Array(insights.enumerated()), id: \.element.id) { i, insight in
-                    InsightTile(insight: insight, onTap: onTap)
-                        .opacity(appeared ? 1 : 0)
-                        .offset(y: appeared ? 0 : 12)
-                        .animation(
-                            .spring(response: 0.6, dampingFraction: 0.8).delay(0.15 + Double(i) * 0.07),
-                            value: appeared
-                        )
-                }
-            }
-        }
-        .scrollIndicators(.hidden)
-        .contentMargins(.horizontal, 24, for: .scrollContent)
+        InsightTicker(insights: insights, onTap: onTap)
+            .padding(.horizontal, 24)
+            .opacity(appeared ? 1 : 0)
+            .offset(y: appeared ? 0 : 12)
+            .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.15), value: appeared)
     }
 }
