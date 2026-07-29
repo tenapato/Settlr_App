@@ -8,6 +8,7 @@ import SwiftUI
 final class CategoriesVM {
     var categories: [Category] = []
     var summaryItems: [CategorySummary] = []
+    var summary: SummaryResponse?
     var isLoading = false
     var isCreating = false
     var errorMessage: String?
@@ -63,6 +64,7 @@ final class CategoriesVM {
             )
             let (catsResp, summaryResp) = try await (catsTask, summaryTask)
             categories = catsResp.categories
+            summary = summaryResp
             summaryItems = summaryResp.expensesByCategory
         } catch {
             errorMessage = error.localizedDescription
@@ -86,10 +88,11 @@ final class CategoriesVM {
             showCreateSheet = false
             categories = resp.categories
             // Reload summary so totals refresh
-            let summary: SummaryResponse = try await api.fetch(
+            let refreshed: SummaryResponse = try await api.fetch(
                 Endpoints.summary(workspaceId) + MonthRangeQuery.summaryQuery(month: selectedMonth)
             )
-            summaryItems = summary.expensesByCategory
+            summary = refreshed
+            summaryItems = refreshed.expensesByCategory
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -175,6 +178,11 @@ struct CategoriesView: View {
     private var categoryList: some View {
         ScrollView {
             VStack(spacing: 20) {
+                if let summary = vm.summary {
+                    SpendingBreakdownCard(summary: summary)
+                        .padding(.horizontal, 24)
+                }
+
                 // Summary card
                 let total = vm.merged.reduce(0) { $0 + $1.totalCents }
                 if total > 0 {

@@ -21,6 +21,7 @@
 		AA000000000000000000BB51 /* AnnualDashboardVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR52 /* AnnualDashboardVM.swift */; };
 		AA000000000000000000BB52 /* AnnualEvolutionChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR53 /* AnnualEvolutionChart.swift */; };
 		AA000000000000000000BB53 /* FinancialHealthCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR54 /* FinancialHealthCard.swift */; };
+		AA000000000000000000BB54 /* SpendingInsightsStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR55 /* SpendingInsightsStrip.swift */; };
 		AA000000000000000000BB11 /* DashboardSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR11 /* DashboardSummary.swift */; };
 		AA000000000000000000BB12 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR12 /* AppState.swift */; };
 		AA000000000000000000BB13 /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR13 /* AuthViewModel.swift */; };
@@ -77,6 +78,7 @@
 		AA000000000000000000FR52 /* AnnualDashboardVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnualDashboardVM.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR53 /* AnnualEvolutionChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnualEvolutionChart.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR54 /* FinancialHealthCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialHealthCard.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR55 /* SpendingInsightsStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendingInsightsStrip.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR11 /* DashboardSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardSummary.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR12 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR13 /* AuthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
@@ -246,6 +248,7 @@
 				AA000000000000000000FR22 /* DashboardView.swift */,
 				AA000000000000000000FR53 /* AnnualEvolutionChart.swift */,
 				AA000000000000000000FR54 /* FinancialHealthCard.swift */,
+				AA000000000000000000FR55 /* SpendingInsightsStrip.swift */,
 			);
 			path = Dashboard;
 			sourceTree = "<group>";
@@ -433,6 +436,7 @@
 				AA000000000000000000BB51 /* AnnualDashboardVM.swift in Sources */,
 				AA000000000000000000BB52 /* AnnualEvolutionChart.swift in Sources */,
 				AA000000000000000000BB53 /* FinancialHealthCard.swift in Sources */,
+				AA000000000000000000BB54 /* SpendingInsightsStrip.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -377,13 +377,6 @@ struct SpendingCompositionBar: View {
 
 // MARK: - Insight Ticker building blocks
 
-private struct TickerWidthKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
-
 private struct TickerDot: View {
     var body: some View {
         Text("·")
@@ -430,7 +423,29 @@ struct InsightTicker: View {
 
     private let speed: CGFloat = 30
     private let itemSpacing: CGFloat = 16
-    private let repeatCount = 8
+
+    /// Copies of `oneCycle` needed to seamlessly cover the visible viewport at any offset,
+    /// derived from the measured width rather than a fixed constant. A fixed count large enough
+    /// for a wide viewport becomes a runaway total width for rich insight data (many insights,
+    /// long category names) — one real case produced a single ~18,865pt-wide composited layer,
+    /// which exceeded the platform's texture size limit and corrupted rendering of sibling
+    /// dashboard views sharing the same window.
+    ///
+    /// The offset always sits in `(-contentWidth, 0]`, so covering the viewport in the worst case
+    /// needs `ceil(viewport / contentWidth) + 1` copies. The upper clamp is a hard backstop against
+    /// ever rebuilding an oversized layer, even if `contentWidth` comes back implausibly small.
+    private func repeatCount(for viewportWidth: CGFloat) -> Int {
+        guard contentWidth > 0 else { return 2 }
+        let needed = Int((viewportWidth / contentWidth).rounded(.up)) + 1
+        return min(8, max(2, needed))
+    }
+
+    private func setContentWidth(_ measured: CGFloat) {
+        guard measured > 0 else { return }
+        let next = measured + itemSpacing
+        guard abs(next - contentWidth) > 0.5 else { return }
+        contentWidth = next
+    }
 
     var body: some View {
         Group {
@@ -472,28 +487,17 @@ struct InsightTicker: View {
     }
 
     private var animatedRow: some View {
-        TimelineView(.animation) { timeline in
-            HStack(spacing: itemSpacing) {
-                ForEach(0..<repeatCount, id: \.self) { _ in oneCycle }
+        // The outer `GeometryReader` reports the PARENT's proposed width (not the very wide
+        // repeated content), which is what lets `repeatCount(for:)` bound the rendered width.
+        GeometryReader { outerGeo in
+            ZStack(alignment: .leading) {
+                measuringCopy
+                scrollingContent(viewportWidth: outerGeo.size.width)
             }
-            .offset(x: contentWidth > 0 ? currentOffset(at: timeline.date) : 0)
+            .frame(width: outerGeo.size.width, height: 20, alignment: .leading)
+            .clipped()
         }
         .frame(height: 20)
-        .clipped()
-        .background(
-            oneCycle
-                .opacity(0)
-                .accessibilityHidden(true)
-                .background(
-                    GeometryReader { geo in
-                        Color.clear.preference(key: TickerWidthKey.self, value: geo.size.width)
-                    }
-                )
-        )
-        .onPreferenceChange(TickerWidthKey.self) { raw in
-            guard raw > 0 else { return }
-            contentWidth = raw + itemSpacing
-        }
         .contentShape(Rectangle())
         .gesture(dragGesture)
         .onAppear {
@@ -526,6 +530,38 @@ struct InsightTicker: View {
         .accessibilityLabel(insights.map { "\($0.title) \($0.value)" }.joined(separator: ", "))
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { onTap() }
+    }
+
+    /// A single, hidden, natural-width copy used purely to measure one cycle.
+    ///
+    /// This deliberately sits OUTSIDE the `TimelineView` so it is laid out once (and again only
+    /// when the text actually changes) rather than on every animation frame, and it reports its
+    /// width via `onAppear`/`onChange` rather than a `PreferenceKey`. An earlier preference-based
+    /// version left `contentWidth` permanently at 0 — which the offset math reads as "not measured
+    /// yet" and correctly freezes on — so the ticker never moved. `.hidden()` keeps it in the
+    /// layout pass (so it still measures) while never rendering, so it costs no texture memory.
+    private var measuringCopy: some View {
+        oneCycle
+            .fixedSize()
+            .hidden()
+            .background(
+                GeometryReader { geo in
+                    Color.clear
+                        .onAppear { setContentWidth(geo.size.width) }
+                        .onChange(of: geo.size.width) { _, width in setContentWidth(width) }
+                }
+            )
+    }
+
+    private func scrollingContent(viewportWidth: CGFloat) -> some View {
+        TimelineView(.animation) { timeline in
+            HStack(spacing: itemSpacing) {
+                ForEach(0..<repeatCount(for: viewportWidth), id: \.self) { _ in
+                    oneCycle
+                }
+            }
+            .offset(x: contentWidth > 0 ? currentOffset(at: timeline.date) : 0)
+        }
     }
 
     private func currentOffset(at date: Date) -> CGFloat {
@@ -582,19 +618,12 @@ struct InsightTicker: View {
     }
 }
 
-// MARK: - Assembled strip
+// MARK: - Spending Breakdown Card (composition bar — lives on the Categories tab)
 
-struct SpendingInsightsStrip: View {
+struct SpendingBreakdownCard: View {
     let summary: SummaryResponse
-    let previous: SummaryResponse?
-    let months: [MonthDataPoint]
-    var onTap: () -> Void = {}
 
     @State private var appeared = false
-
-    private var insights: [SpendingInsight] {
-        SpendingInsights.build(current: summary, previous: previous, months: months)
-    }
 
     var body: some View {
         if summary.expenseCents == 0 || summary.sortedCategories.isEmpty {
@@ -602,12 +631,7 @@ struct SpendingInsightsStrip: View {
         } else {
             VStack(alignment: .leading, spacing: 14) {
                 header
-                    .padding(.horizontal, 24)
-
                 SpendingCompositionBar(summary: summary, appeared: appeared)
-                    .padding(.horizontal, 24)
-
-                tilesRow
             }
             .onAppear { reveal() }
             .onChange(of: summary.expenseCents) { _, _ in
@@ -631,12 +655,42 @@ struct SpendingInsightsStrip: View {
                 .foregroundStyle(Theme.muted)
         }
     }
+}
 
-    private var tilesRow: some View {
-        InsightTicker(insights: insights, onTap: onTap)
-            .padding(.horizontal, 24)
-            .opacity(appeared ? 1 : 0)
-            .offset(y: appeared ? 0 : 12)
-            .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.15), value: appeared)
+// MARK: - Spending Insights Ticker (carousel — lives on the Dashboard)
+
+struct SpendingInsightsTicker: View {
+    let summary: SummaryResponse
+    let previous: SummaryResponse?
+    let months: [MonthDataPoint]
+    var onTap: () -> Void = {}
+
+    @State private var appeared = false
+
+    private var insights: [SpendingInsight] {
+        SpendingInsights.build(current: summary, previous: previous, months: months)
+    }
+
+    var body: some View {
+        if summary.expenseCents == 0 || summary.sortedCategories.isEmpty {
+            EmptyView()
+        } else {
+            InsightTicker(insights: insights, onTap: onTap)
+                .padding(.horizontal, 24)
+                .opacity(appeared ? 1 : 0)
+                .offset(y: appeared ? 0 : 12)
+                .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.15), value: appeared)
+                .onAppear { reveal() }
+                .onChange(of: summary.expenseCents) { _, _ in
+                    appeared = false
+                    reveal()
+                }
+        }
+    }
+
+    private func reveal() {
+        withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.15)) {
+            appeared = true
+        }
     }
 }

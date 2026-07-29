@@ -165,7 +165,7 @@ struct MainTabView: View {
     private var tabContent: some View {
         let wsId = appState.activeWorkspace?.id ?? ""
         switch selectedTab {
-        case .home:       DashboardView(workspaceId: wsId)
+        case .home:       DashboardView(workspaceId: wsId, onOpenCategories: { selectedTab = .categories })
         case .cards:      CardsView(workspaceId: wsId)
         case .expenses:   ExpensesView(workspaceId: wsId, showForm: $showExpenseForm)
         case .income:     IncomeView(workspaceId: wsId, showForm: $showIncomeForm)

@@ -19,6 +19,11 @@ struct SummaryResponse: Decodable {
     var expenses: Double { Double(expenseCents) / 100.0 }
     var net: Double { Double(netCents) / 100.0 }
 
+    /// The API does not sort `expensesByCategory`; always read through this.
+    var sortedCategories: [CategorySummary] {
+        expensesByCategory.sorted { $0.totalCents > $1.totalCents }
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         incomeCents = try container.decodeIfPresent(Int.self, forKey: .incomeCents) ?? 0

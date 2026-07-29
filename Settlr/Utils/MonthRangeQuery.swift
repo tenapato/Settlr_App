@@ -41,6 +41,29 @@ enum MonthRangeQuery {
         return (from: isoFormatter.string(from: start), to: isoFormatter.string(from: end))
     }
 
+    /// `"yyyy-MM"` for the calendar month immediately before `yyyyMm`. `nil` on malformed input.
+    static func previousMonth(_ yyyyMm: String) -> String? {
+        let trimmed = yyyyMm.trimmingCharacters(in: .whitespaces)
+        let parts = trimmed.split(separator: "-")
+        guard parts.count == 2,
+              let year = Int(parts[0]),
+              let month = Int(parts[1]),
+              month >= 1, month <= 12 else { return nil }
+
+        var comps = DateComponents()
+        comps.year = year
+        comps.month = month
+        comps.day = 1
+
+        let calendar = Calendar.current
+        guard let date = calendar.date(from: comps),
+              let previous = calendar.date(byAdding: .month, value: -1, to: date) else { return nil }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM"
+        return formatter.string(from: previous)
+    }
+
     static func summaryQuery(month: String) -> String {
         guard let range = localMonthRangeIso(month) else {
             return queryString([URLQueryItem(name: "month", value: month)])

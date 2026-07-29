@@ -18,6 +18,13 @@ enum Theme {
     static let income    = Color(hex: "#5ddf8a") // positive
     static let expense   = Color(hex: "#ff6b6b") // negative
     static let warning   = Color(hex: "#ffb547") // caution
+
+    /// Categorical palette for charts, ordered by rank.
+    static let categoryPalette: [Color] = [
+        Color(hex: "#ff6b6b"), Color(hex: "#ffb547"), Color(hex: "#c8ff5a"),
+        Color(hex: "#5ddf8a"), Color(hex: "#4db8ff"), Color(hex: "#b47ef5"),
+    ]
+    static let categoryOther = Color(hex: "#3a3d43") // the "Otros" remainder segment
 }
 
 // MARK: - Form field surface
