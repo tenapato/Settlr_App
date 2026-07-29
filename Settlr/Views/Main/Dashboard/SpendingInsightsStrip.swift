@@ -412,6 +412,98 @@ private struct TickerLineView: View {
     }
 }
 
+// MARK: - Insight Ticker
+
+struct InsightTicker: View {
+    let insights: [SpendingInsight]
+    var onTap: () -> Void = {}
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    @State private var contentWidth: CGFloat = 0
+    @State private var baseOffset: CGFloat = 0
+    @State private var baseTime: Date?
+
+    private let speed: CGFloat = 30
+    private let itemSpacing: CGFloat = 16
+    private let repeatCount = 8
+
+    var body: some View {
+        Group {
+            if reduceMotion {
+                staticRow
+            } else {
+                animatedRow
+            }
+        }
+    }
+
+    private var oneCycle: some View {
+        HStack(spacing: itemSpacing) {
+            ForEach(insights) { insight in
+                TickerLineView(insight: insight)
+                TickerDot()
+            }
+        }
+    }
+
+    private var staticRow: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: itemSpacing) {
+                ForEach(Array(insights.enumerated()), id: \.element.id) { i, insight in
+                    Button(action: onTap) {
+                        TickerLineView(insight: insight)
+                    }
+                    .buttonStyle(.plain)
+                    if i < insights.count - 1 { TickerDot() }
+                }
+            }
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    private var animatedRow: some View {
+        TimelineView(.animation) { timeline in
+            HStack(spacing: itemSpacing) {
+                ForEach(0..<repeatCount, id: \.self) { _ in oneCycle }
+            }
+            .offset(x: contentWidth > 0 ? currentOffset(at: timeline.date) : 0)
+        }
+        .frame(height: 20)
+        .clipped()
+        .background(
+            oneCycle
+                .opacity(0)
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(key: TickerWidthKey.self, value: geo.size.width)
+                    }
+                )
+        )
+        .onPreferenceChange(TickerWidthKey.self) { contentWidth = $0 + itemSpacing }
+        .onAppear {
+            baseOffset = 0
+            baseTime = Date()
+        }
+    }
+
+    private func currentOffset(at date: Date) -> CGFloat {
+        guard contentWidth > 0 else { return 0 }
+        let elapsed: CGFloat
+        if let baseTime {
+            elapsed = CGFloat(date.timeIntervalSince(baseTime))
+        } else {
+            elapsed = 0
+        }
+        let raw = baseOffset - elapsed * speed
+        var wrapped = raw.truncatingRemainder(dividingBy: contentWidth)
+        if wrapped > 0 { wrapped -= contentWidth }
+        return wrapped
+    }
+}
+
+// Note: `oneCycle` puts a `TickerDot()` after every insight, including the last one in the sequence — this is deliberate. When `repeatCount` copies of `oneCycle` sit back-to-back in the outer `HStack`, that trailing dot becomes the separator between the last item of one copy and the first item of the next, so the loop seam gets a dot too, indistinguishable from every other gap.
+
 // MARK: - Insight tile
 
 struct InsightTile: View {
