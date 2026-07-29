@@ -518,6 +518,7 @@ struct InsightTicker: View {
             } else {
                 baseOffset += lastTranslation
                 lastTranslation = 0
+                touchStart = nil
                 scheduleResume()
             }
         }
@@ -549,7 +550,14 @@ struct InsightTicker: View {
                 state = true
             }
             .onChanged { value in
-                if touchStart == nil {
+                // `translation == .zero` only ever occurs on the very first onChanged
+                // call of a fresh touch-down (minimumDistance: 0 means recognition
+                // starts immediately at that zero-translation instant). Re-stamping on
+                // that signal — rather than gating on "touchStart == nil" — makes each
+                // new gesture self-heal a stale touchStart left behind by a prior
+                // gesture that was cancelled before onEnded/onChange(of: touching)
+                // could clear it.
+                if value.translation == .zero {
                     touchStart = Date()
                 }
                 lastTranslation = value.translation.width
