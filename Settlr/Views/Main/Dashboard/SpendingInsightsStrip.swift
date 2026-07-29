@@ -423,6 +423,9 @@ struct InsightTicker: View {
     @State private var contentWidth: CGFloat = 0
     @State private var baseOffset: CGFloat = 0
     @State private var baseTime: Date?
+    @State private var isDragging = false
+    @State private var dragTranslation: CGFloat = 0
+    @State private var resumeTask: DispatchWorkItem?
 
     private let speed: CGFloat = 30
     private let itemSpacing: CGFloat = 16
@@ -481,7 +484,16 @@ struct InsightTicker: View {
                 )
         )
         .onPreferenceChange(TickerWidthKey.self) { contentWidth = $0 + itemSpacing }
+        .contentShape(Rectangle())
+        .gesture(dragGesture)
         .onAppear {
+            baseOffset = 0
+            baseTime = Date()
+        }
+        .onChange(of: insights.map(\.id)) { _, _ in
+            resumeTask?.cancel()
+            isDragging = false
+            dragTranslation = 0
             baseOffset = 0
             baseTime = Date()
         }
@@ -489,16 +501,46 @@ struct InsightTicker: View {
 
     private func currentOffset(at date: Date) -> CGFloat {
         guard contentWidth > 0 else { return 0 }
-        let elapsed: CGFloat
-        if let baseTime {
-            elapsed = CGFloat(date.timeIntervalSince(baseTime))
+        let raw: CGFloat
+        if isDragging {
+            raw = baseOffset + dragTranslation
+        } else if let baseTime {
+            raw = baseOffset - CGFloat(date.timeIntervalSince(baseTime)) * speed
         } else {
-            elapsed = 0
+            raw = baseOffset
         }
-        let raw = baseOffset - elapsed * speed
         var wrapped = raw.truncatingRemainder(dividingBy: contentWidth)
         if wrapped > 0 { wrapped -= contentWidth }
         return wrapped
+    }
+
+    private var dragGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                if !isDragging {
+                    let frozen = currentOffset(at: Date())
+                    resumeTask?.cancel()
+                    baseOffset = frozen
+                    baseTime = nil
+                    isDragging = true
+                }
+                dragTranslation = value.translation.width
+            }
+            .onEnded { value in
+                baseOffset += value.translation.width
+                dragTranslation = 0
+                isDragging = false
+                scheduleResume()
+                if abs(value.translation.width) < 5 && abs(value.translation.height) < 5 {
+                    onTap()
+                }
+            }
+    }
+
+    private func scheduleResume() {
+        let task = DispatchWorkItem { baseTime = Date() }
+        resumeTask = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5, execute: task)
     }
 }
 
