@@ -387,7 +387,7 @@ private struct TickerWidthKey: PreferenceKey {
 private struct TickerDot: View {
     var body: some View {
         Text("·")
-            .font(.system(size: 13, weight: .semibold))
+            .font(.system(size: 13, weight: .semibold, design: .rounded))
             .foregroundStyle(Theme.faint)
     }
 }
@@ -423,8 +423,9 @@ struct InsightTicker: View {
     @State private var contentWidth: CGFloat = 0
     @State private var baseOffset: CGFloat = 0
     @State private var baseTime: Date?
-    @State private var isDragging = false
-    @State private var dragTranslation: CGFloat = 0
+    @GestureState private var touching = false
+    @State private var lastTranslation: CGFloat = 0
+    @State private var touchStart: Date?
     @State private var resumeTask: DispatchWorkItem?
 
     private let speed: CGFloat = 30
@@ -441,6 +442,11 @@ struct InsightTicker: View {
         }
     }
 
+    // `oneCycle` puts a `TickerDot()` after every insight, including the last one in the
+    // sequence — this is deliberate. When `repeatCount` copies of `oneCycle` sit back-to-back
+    // in the outer `HStack`, that trailing dot becomes the separator between the last item of
+    // one copy and the first item of the next, so the loop seam gets a dot too, indistinguishable
+    // from every other gap.
     private var oneCycle: some View {
         HStack(spacing: itemSpacing) {
             ForEach(insights) { insight in
@@ -477,33 +483,55 @@ struct InsightTicker: View {
         .background(
             oneCycle
                 .opacity(0)
+                .accessibilityHidden(true)
                 .background(
                     GeometryReader { geo in
                         Color.clear.preference(key: TickerWidthKey.self, value: geo.size.width)
                     }
                 )
         )
-        .onPreferenceChange(TickerWidthKey.self) { contentWidth = $0 + itemSpacing }
+        .onPreferenceChange(TickerWidthKey.self) { raw in
+            guard raw > 0 else { return }
+            contentWidth = raw + itemSpacing
+        }
         .contentShape(Rectangle())
         .gesture(dragGesture)
         .onAppear {
             baseOffset = 0
             baseTime = Date()
         }
+        .onDisappear {
+            resumeTask?.cancel()
+        }
         .onChange(of: insights.map(\.id)) { _, _ in
             resumeTask?.cancel()
-            isDragging = false
-            dragTranslation = 0
+            lastTranslation = 0
             baseOffset = 0
             baseTime = Date()
         }
+        .onChange(of: touching) { _, isTouching in
+            if isTouching {
+                resumeTask?.cancel()
+                baseOffset = currentOffset(at: Date())
+                baseTime = nil
+                lastTranslation = 0
+            } else {
+                baseOffset += lastTranslation
+                lastTranslation = 0
+                scheduleResume()
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(insights.map { "\($0.title) \($0.value)" }.joined(separator: ", "))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { onTap() }
     }
 
     private func currentOffset(at date: Date) -> CGFloat {
         guard contentWidth > 0 else { return 0 }
         let raw: CGFloat
-        if isDragging {
-            raw = baseOffset + dragTranslation
+        if touching {
+            raw = baseOffset + lastTranslation
         } else if let baseTime {
             raw = baseOffset - CGFloat(date.timeIntervalSince(baseTime)) * speed
         } else {
@@ -516,25 +544,27 @@ struct InsightTicker: View {
 
     private var dragGesture: some Gesture {
         DragGesture(minimumDistance: 0)
+            .updating($touching) { value, state, _ in
+                guard isHorizontalDrag(value.translation) else { return }
+                state = true
+            }
             .onChanged { value in
-                if !isDragging {
-                    let frozen = currentOffset(at: Date())
-                    resumeTask?.cancel()
-                    baseOffset = frozen
-                    baseTime = nil
-                    isDragging = true
+                if touchStart == nil {
+                    touchStart = Date()
                 }
-                dragTranslation = value.translation.width
+                lastTranslation = value.translation.width
             }
             .onEnded { value in
-                baseOffset += value.translation.width
-                dragTranslation = 0
-                isDragging = false
-                scheduleResume()
-                if abs(value.translation.width) < 5 && abs(value.translation.height) < 5 {
-                    onTap()
-                }
+                let isTap = abs(value.translation.width) < 5
+                    && abs(value.translation.height) < 5
+                    && Date().timeIntervalSince(touchStart ?? Date()) < 0.35
+                touchStart = nil
+                if isTap { onTap() }
             }
+    }
+
+    private func isHorizontalDrag(_ translation: CGSize) -> Bool {
+        abs(translation.width) > abs(translation.height)
     }
 
     private func scheduleResume() {
@@ -543,8 +573,6 @@ struct InsightTicker: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.5, execute: task)
     }
 }
-
-// Note: `oneCycle` puts a `TickerDot()` after every insight, including the last one in the sequence — this is deliberate. When `repeatCount` copies of `oneCycle` sit back-to-back in the outer `HStack`, that trailing dot becomes the separator between the last item of one copy and the first item of the next, so the loop seam gets a dot too, indistinguishable from every other gap.
 
 // MARK: - Assembled strip
 
