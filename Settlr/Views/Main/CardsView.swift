@@ -87,6 +87,7 @@ final class CardsVM {
 
 struct CardsView: View {
     let workspaceId: String
+    var embedded: Bool = false
     @State private var vm = CardsVM()
     @State private var searchText = ""
     @State private var selectedCard: CreditCard?
@@ -101,52 +102,62 @@ struct CardsView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color(hex: "#0e0f11").ignoresSafeArea()
-
-                ZStack {
-                    if vm.isLoading {
-                        ProgressView()
-                            .tint(Color(hex: "#c8ff5a"))
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .transition(.opacity)
-                    } else if let err = vm.errorMessage {
-                        CardsErrorView(message: err) {
-                            Task { await vm.load(workspaceId: workspaceId) }
-                        }
-                        .transition(.opacity)
-                    } else if vm.cards.isEmpty {
-                        CardsEmptyView { vm.showCreateSheet = true }
-                            .transition(.opacity)
-                    } else {
-                        cardList.transition(.opacity)
-                    }
-                }
-                .animation(.easeOut(duration: 0.22), value: vm.isLoading)
-            }
-            .navigationTitle("Cards")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { vm.showCreateSheet = true } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#c8ff5a"))
-                    }
-                }
-            }
-            .sheet(isPresented: $vm.showCreateSheet) {
-                CreateCardSheet(vm: vm, workspaceId: workspaceId)
-            }
-            .sheet(item: $selectedCard) { card in
-                CardDetailSheet(workspaceId: workspaceId, card: card) { body in
-                    try await vm.updateCard(workspaceId: workspaceId, cardId: card.id, body: body)
+        Group {
+            if embedded {
+                cardsBody
+            } else {
+                NavigationStack {
+                    cardsBody
+                        .navigationTitle("Cards")
+                        .navigationBarTitleDisplayMode(.large)
                 }
             }
         }
         .preferredColorScheme(.dark)
         .task { await vm.load(workspaceId: workspaceId) }
+    }
+
+    private var cardsBody: some View {
+        ZStack {
+            Color(hex: "#0e0f11").ignoresSafeArea()
+
+            ZStack {
+                if vm.isLoading {
+                    ProgressView()
+                        .tint(Color(hex: "#c8ff5a"))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .transition(.opacity)
+                } else if let err = vm.errorMessage {
+                    CardsErrorView(message: err) {
+                        Task { await vm.load(workspaceId: workspaceId) }
+                    }
+                    .transition(.opacity)
+                } else if vm.cards.isEmpty {
+                    CardsEmptyView { vm.showCreateSheet = true }
+                        .transition(.opacity)
+                } else {
+                    cardList.transition(.opacity)
+                }
+            }
+            .animation(.easeOut(duration: 0.22), value: vm.isLoading)
+        }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button { vm.showCreateSheet = true } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Color(hex: "#c8ff5a"))
+                }
+            }
+        }
+        .sheet(isPresented: $vm.showCreateSheet) {
+            CreateCardSheet(vm: vm, workspaceId: workspaceId)
+        }
+        .sheet(item: $selectedCard) { card in
+            CardDetailSheet(workspaceId: workspaceId, card: card) { body in
+                try await vm.updateCard(workspaceId: workspaceId, cardId: card.id, body: body)
+            }
+        }
     }
 
     private var cardList: some View {

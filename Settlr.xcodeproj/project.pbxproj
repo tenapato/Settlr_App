@@ -22,6 +22,9 @@
 		AA000000000000000000BB52 /* AnnualEvolutionChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR53 /* AnnualEvolutionChart.swift */; };
 		AA000000000000000000BB53 /* FinancialHealthCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR54 /* FinancialHealthCard.swift */; };
 		AA000000000000000000BB54 /* SpendingInsightsStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR55 /* SpendingInsightsStrip.swift */; };
+		AA000000000000000000BB56 /* CardPaymentsSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR56 /* CardPaymentsSummary.swift */; };
+		AA000000000000000000BB57 /* CardPaymentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR57 /* CardPaymentsView.swift */; };
+		AA000000000000000000BB58 /* CardPaymentFortnight.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR58 /* CardPaymentFortnight.swift */; };
 		AA000000000000000000BB11 /* DashboardSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR11 /* DashboardSummary.swift */; };
 		AA000000000000000000BB12 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR12 /* AppState.swift */; };
 		AA000000000000000000BB13 /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR13 /* AuthViewModel.swift */; };
@@ -61,6 +64,16 @@
 		AA000000000000000000BB47 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR48 /* DesignSystem.swift */; };
 		AA000000000000000000BB48 /* FormControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR49 /* FormControls.swift */; };
 		AA000000000000000000BB49 /* LedgerDayGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR50 /* LedgerDayGroup.swift */; };
+		AA000000000000000000BB60 /* Savings.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR60 /* Savings.swift */; };
+		AA000000000000000000BB61 /* SavingsVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR61 /* SavingsVM.swift */; };
+		AA000000000000000000BB62 /* SavingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR62 /* SavingsView.swift */; };
+		AA000000000000000000BB63 /* SavingsEntryFormSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR63 /* SavingsEntryFormSheet.swift */; };
+		AA000000000000000000BB64 /* SavingsAccountsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR64 /* SavingsAccountsSheet.swift */; };
+		AA000000000000000000BB65 /* CardsAndCategoriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR65 /* CardsAndCategoriesView.swift */; };
+		AA000000000000000000BB66 /* SavingsRecurringSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR66 /* SavingsRecurringSheet.swift */; };
+		AA000000000000000000BB67 /* ActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR67 /* ActivityView.swift */; };
+		AA000000000000000000BB68 /* IncomeRecurringSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR68 /* IncomeRecurringSheet.swift */; };
+		AA000000000000000000BB69 /* Recurrence.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR69 /* Recurrence.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -79,6 +92,9 @@
 		AA000000000000000000FR53 /* AnnualEvolutionChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnualEvolutionChart.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR54 /* FinancialHealthCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialHealthCard.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR55 /* SpendingInsightsStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendingInsightsStrip.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR56 /* CardPaymentsSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardPaymentsSummary.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR57 /* CardPaymentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardPaymentsView.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR58 /* CardPaymentFortnight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardPaymentFortnight.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR11 /* DashboardSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardSummary.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR12 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR13 /* AuthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
@@ -119,6 +135,16 @@
 		AA000000000000000000FR48 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR49 /* FormControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormControls.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR50 /* LedgerDayGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerDayGroup.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR60 /* Savings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Savings.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR61 /* SavingsVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavingsVM.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR62 /* SavingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavingsView.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR63 /* SavingsEntryFormSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavingsEntryFormSheet.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR64 /* SavingsAccountsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavingsAccountsSheet.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR65 /* CardsAndCategoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardsAndCategoriesView.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR66 /* SavingsRecurringSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavingsRecurringSheet.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR67 /* ActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityView.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR68 /* IncomeRecurringSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IncomeRecurringSheet.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR69 /* Recurrence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Recurrence.swift; sourceTree = "<group>"; };
 		AA000000000000000000PROD /* Settlr.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Settlr.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -176,11 +202,14 @@
 				AA000000000000000000FR07 /* Workspace.swift */,
 				AA000000000000000000FR08 /* Expense.swift */,
 				AA000000000000000000FR09 /* Income.swift */,
+				AA000000000000000000FR69 /* Recurrence.swift */,
 				AA000000000000000000FR10 /* Category.swift */,
 				AA000000000000000000FR11 /* DashboardSummary.swift */,
 				AA000000000000000000FR35 /* CreditCard.swift */,
 				AA000000000000000000FR43 /* Telegram.swift */,
 				AA000000000000000000FR51 /* AnnualSummary.swift */,
+				AA000000000000000000FR56 /* CardPaymentsSummary.swift */,
+				AA000000000000000000FR60 /* Savings.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -232,11 +261,15 @@
 			children = (
 				AA000000000000000000FR21 /* MainTabView.swift */,
 				AA000000000000000000GP09 /* Dashboard */,
+				AA000000000000000000GP10 /* Activity */,
 				AA000000000000000000GP0A /* Expenses */,
 				AA000000000000000000GP0B /* Income */,
+				AA000000000000000000GP0F /* Savings */,
 				AA000000000000000000GP0D /* Settings */,
 				AA000000000000000000FR33 /* CategoriesView.swift */,
 				AA000000000000000000FR34 /* CardsView.swift */,
+				AA000000000000000000FR65 /* CardsAndCategoriesView.swift */,
+				AA000000000000000000FR57 /* CardPaymentsView.swift */,
 				AA000000000000000000FR40 /* CardDetailSheet.swift */,
 			);
 			path = Main;
@@ -253,6 +286,14 @@
 			path = Dashboard;
 			sourceTree = "<group>";
 		};
+		AA000000000000000000GP10 /* Activity */ = {
+			isa = PBXGroup;
+			children = (
+				AA000000000000000000FR67 /* ActivityView.swift */,
+			);
+			path = Activity;
+			sourceTree = "<group>";
+		};
 		AA000000000000000000GP0A /* Expenses */ = {
 			isa = PBXGroup;
 			children = (
@@ -267,8 +308,21 @@
 			children = (
 				AA000000000000000000FR25 /* IncomeView.swift */,
 				AA000000000000000000FR26 /* IncomeFormSheet.swift */,
+				AA000000000000000000FR68 /* IncomeRecurringSheet.swift */,
 			);
 			path = Income;
+			sourceTree = "<group>";
+		};
+		AA000000000000000000GP0F /* Savings */ = {
+			isa = PBXGroup;
+			children = (
+				AA000000000000000000FR61 /* SavingsVM.swift */,
+				AA000000000000000000FR62 /* SavingsView.swift */,
+				AA000000000000000000FR63 /* SavingsEntryFormSheet.swift */,
+				AA000000000000000000FR64 /* SavingsAccountsSheet.swift */,
+				AA000000000000000000FR66 /* SavingsRecurringSheet.swift */,
+			);
+			path = Savings;
 			sourceTree = "<group>";
 		};
 		AA000000000000000000GP0C /* Components */ = {
@@ -303,6 +357,7 @@
 				AA000000000000000000FR41 /* MonthRangeQuery.swift */,
 				AA000000000000000000FR46 /* LedgerTags.swift */,
 				AA000000000000000000FR50 /* LedgerDayGroup.swift */,
+				AA000000000000000000FR58 /* CardPaymentFortnight.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -418,6 +473,8 @@
 				AA000000000000000000BB31 /* SectionCard.swift in Sources */,
 				AA000000000000000000BB33 /* CategoriesView.swift in Sources */,
 				AA000000000000000000BB34 /* CardsView.swift in Sources */,
+				AA000000000000000000BB57 /* CardPaymentsView.swift in Sources */,
+				AA000000000000000000BB56 /* CardPaymentsSummary.swift in Sources */,
 				AA000000000000000000BB36 /* TransactionDetailSheet.swift in Sources */,
 				AA000000000000000000BB37 /* DeleteConfirmDialog.swift in Sources */,
 				AA000000000000000000BB38 /* VirtualCardFace.swift in Sources */,
@@ -432,11 +489,22 @@
 				AA000000000000000000BB47 /* DesignSystem.swift in Sources */,
 				AA000000000000000000BB48 /* FormControls.swift in Sources */,
 				AA000000000000000000BB49 /* LedgerDayGroup.swift in Sources */,
+				AA000000000000000000BB58 /* CardPaymentFortnight.swift in Sources */,
 				AA000000000000000000BB50 /* AnnualSummary.swift in Sources */,
 				AA000000000000000000BB51 /* AnnualDashboardVM.swift in Sources */,
 				AA000000000000000000BB52 /* AnnualEvolutionChart.swift in Sources */,
 				AA000000000000000000BB53 /* FinancialHealthCard.swift in Sources */,
 				AA000000000000000000BB54 /* SpendingInsightsStrip.swift in Sources */,
+				AA000000000000000000BB60 /* Savings.swift in Sources */,
+				AA000000000000000000BB61 /* SavingsVM.swift in Sources */,
+				AA000000000000000000BB62 /* SavingsView.swift in Sources */,
+				AA000000000000000000BB63 /* SavingsEntryFormSheet.swift in Sources */,
+				AA000000000000000000BB64 /* SavingsAccountsSheet.swift in Sources */,
+				AA000000000000000000BB65 /* CardsAndCategoriesView.swift in Sources */,
+				AA000000000000000000BB66 /* SavingsRecurringSheet.swift in Sources */,
+				AA000000000000000000BB67 /* ActivityView.swift in Sources */,
+				AA000000000000000000BB68 /* IncomeRecurringSheet.swift in Sources */,
+				AA000000000000000000BB69 /* Recurrence.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -581,7 +649,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = cash.settlr.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -612,7 +680,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = cash.settlr.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

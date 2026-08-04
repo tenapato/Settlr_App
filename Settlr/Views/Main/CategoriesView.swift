@@ -114,64 +114,75 @@ final class CategoriesVM {
 
 struct CategoriesView: View {
     let workspaceId: String
+    var embedded: Bool = false
     @State private var vm = CategoriesVM()
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color(hex: "#0e0f11").ignoresSafeArea()
-
-                VStack(spacing: 0) {
-                    CatMonthPicker(selectedMonth: $vm.selectedMonth) {
-                        Task { await vm.load(workspaceId: workspaceId) }
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 8)
-
-                    ZStack {
-                        if vm.isLoading {
-                            ProgressView()
-                                .tint(Color(hex: "#c8ff5a"))
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .transition(.opacity)
-                        } else if let err = vm.errorMessage {
-                            CatErrorView(message: err) {
-                                Task { await vm.load(workspaceId: workspaceId) }
-                            }
-                            .transition(.opacity)
-                        } else if vm.categories.isEmpty {
-                            CatEmptyView()
-                                .transition(.opacity)
-                        } else {
-                            categoryList
-                                .transition(.opacity)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .animation(.easeOut(duration: 0.22), value: vm.isLoading)
+        Group {
+            if embedded {
+                categoriesBody
+            } else {
+                NavigationStack {
+                    categoriesBody
+                        .navigationTitle("Categories")
+                        .navigationBarTitleDisplayMode(.large)
                 }
-            }
-            .navigationTitle("Categories")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        vm.showCreateSheet = true
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#c8ff5a"))
-                    }
-                }
-            }
-            .sheet(isPresented: $vm.showCreateSheet) {
-                CreateCategorySheet(vm: vm, workspaceId: workspaceId)
             }
         }
         .preferredColorScheme(.dark)
         .task { await vm.load(workspaceId: workspaceId) }
         .onChange(of: vm.selectedMonth) { _, _ in
             Task { await vm.load(workspaceId: workspaceId) }
+        }
+    }
+
+    private var categoriesBody: some View {
+        ZStack {
+            Color(hex: "#0e0f11").ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                CatMonthPicker(selectedMonth: $vm.selectedMonth) {
+                    Task { await vm.load(workspaceId: workspaceId) }
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 8)
+
+                ZStack {
+                    if vm.isLoading {
+                        ProgressView()
+                            .tint(Color(hex: "#c8ff5a"))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .transition(.opacity)
+                    } else if let err = vm.errorMessage {
+                        CatErrorView(message: err) {
+                            Task { await vm.load(workspaceId: workspaceId) }
+                        }
+                        .transition(.opacity)
+                    } else if vm.categories.isEmpty {
+                        CatEmptyView()
+                            .transition(.opacity)
+                    } else {
+                        categoryList
+                            .transition(.opacity)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .animation(.easeOut(duration: 0.22), value: vm.isLoading)
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    vm.showCreateSheet = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Color(hex: "#c8ff5a"))
+                }
+            }
+        }
+        .sheet(isPresented: $vm.showCreateSheet) {
+            CreateCategorySheet(vm: vm, workspaceId: workspaceId)
         }
     }
 

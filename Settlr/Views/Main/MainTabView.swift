@@ -3,9 +3,15 @@ import SwiftUI
 struct MainTabView: View {
     @Environment(AppState.self) private var appState
     @State private var selectedTab: Tab = .home
+    @State private var cardsSegment: CardsCategoriesSegment = .cards
+    @State private var activitySegment: ActivitySegment = .expenses
+    // Held here, not in the leaf views, so the selected month survives navigation.
+    @State private var expensesVM = ExpensesVM()
+    @State private var incomeVM = IncomeVM()
     @State private var fabOpen = false
     @State private var showExpenseForm = false
     @State private var showIncomeForm = false
+    @State private var showSavingsForm = false
 
     private let fabSpring = Animation.spring(response: 0.44, dampingFraction: 0.78)
     private let fabCloseSpring = Animation.spring(response: 0.36, dampingFraction: 0.86)
@@ -98,7 +104,8 @@ struct MainTabView: View {
         [
             QuickAction(label: "Add Expense", icon: "arrow.up", color: Color(hex: "#ff6b6b")) {
                 setFabOpen(false)
-                selectedTab = .expenses
+                selectedTab = .activity
+                activitySegment = .expenses
                 Task {
                     try? await Task.sleep(nanoseconds: 320_000_000)
                     showExpenseForm = true
@@ -106,10 +113,20 @@ struct MainTabView: View {
             },
             QuickAction(label: "Add Income", icon: "arrow.down", color: Color(hex: "#5ddf8a")) {
                 setFabOpen(false)
-                selectedTab = .income
+                selectedTab = .activity
+                activitySegment = .income
                 Task {
                     try? await Task.sleep(nanoseconds: 320_000_000)
                     showIncomeForm = true
+                }
+            },
+            QuickAction(label: "Add Savings", icon: "banknote", color: Color(hex: "#22c55e")) {
+                setFabOpen(false)
+                selectedTab = .activity
+                activitySegment = .savings
+                Task {
+                    try? await Task.sleep(nanoseconds: 320_000_000)
+                    showSavingsForm = true
                 }
             },
         ]
@@ -165,11 +182,25 @@ struct MainTabView: View {
     private var tabContent: some View {
         let wsId = appState.activeWorkspace?.id ?? ""
         switch selectedTab {
-        case .home:       DashboardView(workspaceId: wsId, onOpenCategories: { selectedTab = .categories })
-        case .cards:      CardsView(workspaceId: wsId)
-        case .expenses:   ExpensesView(workspaceId: wsId, showForm: $showExpenseForm)
-        case .income:     IncomeView(workspaceId: wsId, showForm: $showIncomeForm)
-        case .categories: CategoriesView(workspaceId: wsId)
+        case .home:
+            DashboardView(workspaceId: wsId, onOpenCategories: {
+                cardsSegment = .categories
+                selectedTab = .cards
+            })
+        case .activity:
+            ActivityView(
+                workspaceId: wsId,
+                selectedSegment: $activitySegment,
+                showExpenseForm: $showExpenseForm,
+                showIncomeForm: $showIncomeForm,
+                showSavingsForm: $showSavingsForm,
+                expensesVM: expensesVM,
+                incomeVM: incomeVM
+            )
+        case .cards:
+            CardsAndCategoriesView(workspaceId: wsId, selectedSegment: $cardsSegment)
+        case .payments:
+            CardPaymentsView(workspaceId: wsId)
         }
     }
 }

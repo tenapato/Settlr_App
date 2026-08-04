@@ -16,6 +16,9 @@ enum LedgerDate {
             f.dateFormat = fmt
             if let d = f.date(from: raw) { return d }
         }
+        if let ms = Double(raw), ms > 1_000_000_000_000 {
+            return Date(timeIntervalSince1970: ms / 1000)
+        }
         return nil
     }
 }

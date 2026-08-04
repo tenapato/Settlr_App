@@ -4,7 +4,9 @@ struct IncomeFormSheet: View {
     let workspaceId: String
     let categories: [Category]
     var income: Income?
-    let onSave: (CreateIncomeBody) -> Void
+    /// A non-nil cadence creates a recurring rule instead of a single row. Only
+    /// ever set when creating; edits never change a rule.
+    let onSave: (_ body: CreateIncomeBody, _ repeatEvery: RecurrenceFrequency?) -> Void
 
     @Environment(\.dismiss) private var dismiss
 
@@ -12,6 +14,8 @@ struct IncomeFormSheet: View {
     @State private var amountText: String
     @State private var selectedDate: Date
     @State private var selectedCategoryId: String?
+    @State private var repeats = false
+    @State private var frequency: RecurrenceFrequency = .monthly
     @State private var errorMessage: String?
     @FocusState private var amountFocused: Bool
     @FocusState private var descriptionFocused: Bool
@@ -22,7 +26,7 @@ struct IncomeFormSheet: View {
         workspaceId: String,
         categories: [Category],
         income: Income? = nil,
-        onSave: @escaping (CreateIncomeBody) -> Void
+        onSave: @escaping (_ body: CreateIncomeBody, _ repeatEvery: RecurrenceFrequency?) -> Void
     ) {
         self.workspaceId = workspaceId
         self.categories = categories
@@ -63,6 +67,26 @@ struct IncomeFormSheet: View {
                                 FormRowDivider()
                                 categoryRow
                             }
+                            if !isEditing {
+                                FormRowDivider()
+                                FormToggleRow(
+                                    label: "Repeat",
+                                    caption: "Adds this automatically from the date above.",
+                                    isOn: $repeats
+                                )
+                                if repeats {
+                                    FormRowDivider()
+                                    FormMenuRow(
+                                        label: "Repeats",
+                                        value: frequency.label,
+                                        isPlaceholder: false
+                                    ) {
+                                        ForEach(RecurrenceFrequency.allCases, id: \.self) { option in
+                                            Button(option.label) { frequency = option }
+                                        }
+                                    }
+                                }
+                            }
                         }
 
                         if let error = errorMessage {
@@ -72,7 +96,7 @@ struct IncomeFormSheet: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
-                        Button(isEditing ? "Save Changes" : "Add Income") { save() }
+                        Button(isEditing ? "Save Changes" : (repeats ? "Create Recurring Income" : "Add Income")) { save() }
                             .buttonStyle(PrimaryButtonStyle())
                             .disabled(!isValid)
                             .padding(.top, 4)
@@ -158,12 +182,15 @@ struct IncomeFormSheet: View {
         let cents = Int((amount * 100).rounded())
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
-        onSave(CreateIncomeBody(
-            description: description,
-            amountCents: cents,
-            occurredAt: f.string(from: selectedDate),
-            categoryId: selectedCategoryId
-        ))
+        onSave(
+            CreateIncomeBody(
+                description: description,
+                amountCents: cents,
+                occurredAt: f.string(from: selectedDate),
+                categoryId: selectedCategoryId
+            ),
+            repeats && !isEditing ? frequency : nil
+        )
         dismiss()
     }
 

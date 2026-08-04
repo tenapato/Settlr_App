@@ -301,7 +301,7 @@ struct IncomeDetailSheet: View {
                 workspaceId: workspaceId,
                 categories: categories,
                 income: income
-            ) { body in
+            ) { body, _ in
                 Task {
                     if let updated = await updateIncome(body) {
                         income = updated

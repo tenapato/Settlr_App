@@ -8,6 +8,7 @@ struct AnnualEvolutionChart: View {
     private let incomeColor  = Color(hex: "#5ddf8a")
     private let expenseColor = Color(hex: "#ff6b6b")
     private let balanceColor = Color(hex: "#7b9cff")
+    private let savingsColor = Color(hex: "#c8ff5a")
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -41,6 +42,7 @@ struct AnnualEvolutionChart: View {
             legendDot(color: incomeColor,  label: "Ingresos")
             legendDot(color: expenseColor, label: "Gastos")
             legendDot(color: balanceColor, label: "Balance")
+            legendDot(color: savingsColor, label: "Ahorros")
             Spacer()
         }
     }
@@ -63,6 +65,7 @@ struct AnnualEvolutionChart: View {
             let maxVal = max(
                 data.map(\.incomeCents).max() ?? 0,
                 data.map(\.expenseCents).max() ?? 0,
+                data.map { max(0, $0.savingsNetCents) }.max() ?? 0,
                 1
             )
 
@@ -78,6 +81,8 @@ struct AnnualEvolutionChart: View {
                          keyPath: \.expenseCents, color: expenseColor, width: 2)
                 drawLine(ctx: ctx, w: w, h: h, maxVal: maxVal, data: data,
                          keyPath: \.netCents, color: balanceColor, width: 1.5, dash: [5, 4])
+                drawLine(ctx: ctx, w: w, h: h, maxVal: maxVal, data: data,
+                         keyPath: \.savingsNetCents, color: savingsColor, width: 1.5, dash: [2, 3])
             }
         }
     }

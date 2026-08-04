@@ -5,6 +5,7 @@ import Observation
 final class IncomeVM {
     var incomes: [Income] = []
     var categories: [Category] = []
+    var recurring: [RecurringIncome] = []
     var isLoading = false
     var errorMessage: String?
 
@@ -21,6 +22,10 @@ final class IncomeVM {
 
     var hasActiveFilter: Bool {
         !searchText.isEmpty || filterCategoryId != nil
+    }
+
+    var activeRecurringCount: Int {
+        recurring.filter(\.active).count
     }
 
     var filteredIncomes: [Income] {
@@ -54,6 +59,11 @@ final class IncomeVM {
         async let catsTask: CategoriesResponse = api.fetch(
             Endpoints.categories(workspaceId) + "?scope=income"
         )
+        // Recurring rules are supplementary: the endpoint may be absent on a given
+        // deployment, and losing them must not blank out the ledger.
+        async let recurringTask: RecurringIncomeListResponse? = try? await api.fetch(
+            Endpoints.recurringIncome(workspaceId)
+        )
         do {
             let (incResp, catResp) = try await (incomeTask, catsTask)
             incomes = incResp.income
@@ -61,6 +71,7 @@ final class IncomeVM {
         } catch {
             errorMessage = error.localizedDescription
         }
+        recurring = await recurringTask?.recurringIncome ?? []
     }
 
     @MainActor
@@ -101,6 +112,57 @@ final class IncomeVM {
         do {
             try await api.send(Endpoints.incomeItem(workspaceId, incomeId), method: "DELETE")
             incomes.removeAll { $0.id == incomeId }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    // MARK: - Recurring income rules
+
+    @MainActor
+    func createRecurring(workspaceId: String, body: CreateRecurringIncomeBody) async -> Bool {
+        do {
+            let _: RecurringIncomeResponse = try await api.fetch(
+                Endpoints.recurringIncome(workspaceId),
+                method: "POST",
+                body: body
+            )
+            await load(workspaceId: workspaceId)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    @MainActor
+    func updateRecurring(
+        workspaceId: String,
+        ruleId: String,
+        body: UpdateRecurringIncomeBody
+    ) async -> Bool {
+        do {
+            let _: RecurringIncomeResponse = try await api.fetch(
+                Endpoints.recurringIncomeRule(workspaceId, ruleId),
+                method: "PATCH",
+                body: body
+            )
+            await load(workspaceId: workspaceId)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    @MainActor
+    func deleteRecurring(workspaceId: String, ruleId: String) async {
+        do {
+            try await api.send(
+                Endpoints.recurringIncomeRule(workspaceId, ruleId),
+                method: "DELETE"
+            )
+            await load(workspaceId: workspaceId)
         } catch {
             errorMessage = error.localizedDescription
         }

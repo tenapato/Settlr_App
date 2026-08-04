@@ -3,45 +3,73 @@ import SwiftUI
 struct IncomeView: View {
     let workspaceId: String
     @Binding var showForm: Bool
-    @State private var vm = IncomeVM()
+    var embedded: Bool = false
+    /// Owned by MainTabView so the selected month and filters survive tab and segment
+    /// switches — this view is destroyed and recreated on every navigation.
+    @Bindable var vm: IncomeVM
     @State private var selectedIncome: Income?
     @State private var incomeToEdit: Income?
     @State private var incomeToDelete: Income?
+    @State private var showRecurring = false
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color(hex: "#0e0f11").ignoresSafeArea()
+        Group {
+            if embedded {
+                incomeBody
+            } else {
+                NavigationStack {
+                    incomeBody
+                        .navigationTitle("Income")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+        .task { await vm.load(workspaceId: workspaceId) }
+        .onChange(of: vm.selectedMonth) { _, _ in
+            Task { await vm.load(workspaceId: workspaceId) }
+        }
+    }
 
-                VStack(spacing: 0) {
-                    IncomeMonthSelectorBar(selectedMonth: $vm.selectedMonth) {
-                        Task { await vm.load(workspaceId: workspaceId) }
-                    }
+    private var incomeBody: some View {
+        ZStack {
+            Color(hex: "#0e0f11").ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                IncomeMonthSelectorBar(selectedMonth: $vm.selectedMonth) {
+                    Task { await vm.load(workspaceId: workspaceId) }
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 8)
+
+                SearchBar(text: $vm.searchText, placeholder: "Search income…")
                     .padding(.horizontal, 24)
                     .padding(.bottom, 8)
 
-                    SearchBar(text: $vm.searchText, placeholder: "Search income…")
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 8)
+                incomeFilterChipsRow
+                    .padding(.bottom, 8)
 
-                    incomeFilterChipsRow
-                        .padding(.bottom, 8)
-
-                    if vm.isLoading {
-                        Spacer()
-                        ProgressView().tint(Color(hex: "#c8ff5a"))
-                        Spacer()
-                    } else if vm.filteredIncomes.isEmpty {
-                        incomeEmptyState
-                    } else {
-                        incomeList
-                    }
+                if vm.isLoading {
+                    Spacer()
+                    ProgressView().tint(Color(hex: "#c8ff5a"))
+                    Spacer()
+                } else if vm.filteredIncomes.isEmpty {
+                    incomeEmptyState
+                } else {
+                    incomeList
                 }
             }
-            .navigationTitle("Income")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+        }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                HStack(spacing: 16) {
+                    Button { showRecurring = true } label: {
+                        Image(systemName: vm.activeRecurringCount > 0
+                            ? "arrow.trianglehead.2.clockwise.rotate.90.circle.fill"
+                            : "arrow.trianglehead.2.clockwise.rotate.90")
+                            .foregroundStyle(Color(hex: "#c8ff5a"))
+                            .font(.system(size: 16, weight: .semibold))
+                    }
                     Button { showForm = true } label: {
                         Image(systemName: "plus")
                             .foregroundStyle(Color(hex: "#c8ff5a"))
@@ -49,50 +77,63 @@ struct IncomeView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showForm) {
-                IncomeFormSheet(workspaceId: workspaceId, categories: vm.categories) { body in
-                    Task { await vm.create(workspaceId: workspaceId, body: body) }
-                }
-            }
-            .sheet(item: $selectedIncome) { income in
-                IncomeDetailSheet(
-                    workspaceId: workspaceId,
-                    income: income,
-                    categories: vm.categories,
-                    onUpdated: { updated in
-                        if let idx = vm.incomes.firstIndex(where: { $0.id == updated.id }) {
-                            vm.incomes[idx] = updated
-                        }
-                        selectedIncome = updated
+        }
+        .sheet(isPresented: $showForm) {
+            IncomeFormSheet(workspaceId: workspaceId, categories: vm.categories) { body, repeatEvery in
+                Task {
+                    if let repeatEvery {
+                        _ = await vm.createRecurring(
+                            workspaceId: workspaceId,
+                            body: CreateRecurringIncomeBody(
+                                amountCents: body.amountCents,
+                                description: body.description,
+                                frequency: repeatEvery.rawValue,
+                                startDate: body.occurredAt,
+                                categoryId: body.categoryId
+                            )
+                        )
+                    } else {
+                        await vm.create(workspaceId: workspaceId, body: body)
                     }
+                }
+            }
+        }
+        .sheet(isPresented: $showRecurring) {
+            IncomeRecurringSheet(workspaceId: workspaceId, vm: vm)
+        }
+        .sheet(item: $selectedIncome) { income in
+            IncomeDetailSheet(
+                workspaceId: workspaceId,
+                income: income,
+                categories: vm.categories,
+                onUpdated: { updated in
+                    if let idx = vm.incomes.firstIndex(where: { $0.id == updated.id }) {
+                        vm.incomes[idx] = updated
+                    }
+                    selectedIncome = updated
+                }
+            )
+        }
+        .sheet(item: $incomeToEdit) { income in
+            IncomeFormSheet(workspaceId: workspaceId, categories: vm.categories, income: income) { body, _ in
+                Task { await vm.update(workspaceId: workspaceId, incomeId: income.id, body: body) }
+            }
+        }
+        .overlay {
+            if let income = incomeToDelete {
+                DeleteConfirmDialog(
+                    title: "Delete Income?",
+                    itemName: income.description,
+                    onConfirm: {
+                        Task { await vm.delete(workspaceId: workspaceId, incomeId: income.id) }
+                        incomeToDelete = nil
+                    },
+                    onCancel: { incomeToDelete = nil }
                 )
+                .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
-            .sheet(item: $incomeToEdit) { income in
-                IncomeFormSheet(workspaceId: workspaceId, categories: vm.categories, income: income) { body in
-                    Task { await vm.update(workspaceId: workspaceId, incomeId: income.id, body: body) }
-                }
-            }
-            .overlay {
-                if let income = incomeToDelete {
-                    DeleteConfirmDialog(
-                        title: "Delete Income?",
-                        itemName: income.description,
-                        onConfirm: {
-                            Task { await vm.delete(workspaceId: workspaceId, incomeId: income.id) }
-                            incomeToDelete = nil
-                        },
-                        onCancel: { incomeToDelete = nil }
-                    )
-                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
-                }
-            }
-            .animation(.easeOut(duration: 0.2), value: incomeToDelete != nil)
         }
-        .preferredColorScheme(.dark)
-        .task { await vm.load(workspaceId: workspaceId) }
-        .onChange(of: vm.selectedMonth) { _, _ in
-            Task { await vm.load(workspaceId: workspaceId) }
-        }
+        .animation(.easeOut(duration: 0.2), value: incomeToDelete != nil)
     }
 
     // MARK: - Filter chips

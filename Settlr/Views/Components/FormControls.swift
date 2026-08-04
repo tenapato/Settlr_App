@@ -108,6 +108,35 @@ struct FormTextRow: View {
     }
 }
 
+/// Label-left / switch-right row, with optional explanatory caption under the label.
+struct FormToggleRow: View {
+    let label: String
+    var caption: String? = nil
+    @Binding var isOn: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(label)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Theme.muted)
+                if let caption {
+                    Text(caption)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.faint)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 16)
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .tint(Theme.accent)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+}
+
 /// Label-left / value-right row that opens a `Menu` (styled dropdown).
 struct FormMenuRow<MenuContent: View>: View {
     let label: String

@@ -39,97 +39,110 @@ struct FilterChip<Content: View>: View {
 struct ExpensesView: View {
     let workspaceId: String
     @Binding var showForm: Bool
-    @State private var vm = ExpensesVM()
+    var embedded: Bool = false
+    /// Owned by MainTabView so the selected month and filters survive tab and segment
+    /// switches — this view is destroyed and recreated on every navigation.
+    @Bindable var vm: ExpensesVM
     @State private var selectedExpense: Expense?
     @State private var expenseToEdit: Expense?
     @State private var expenseToDelete: Expense?
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color(hex: "#0e0f11").ignoresSafeArea()
-
-                VStack(spacing: 0) {
-                    ExpenseMonthSelectorBar(selectedMonth: $vm.selectedMonth) {
-                        Task { await vm.load(workspaceId: workspaceId) }
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 8)
-
-                    SearchBar(text: $vm.searchText, placeholder: "Search expenses…")
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 8)
-
-                    filterChipsRow
-                        .padding(.bottom, 8)
-
-                    if vm.isLoading {
-                        Spacer()
-                        ProgressView().tint(Color(hex: "#c8ff5a"))
-                        Spacer()
-                    } else if vm.filteredExpenses.isEmpty {
-                        expenseEmptyState
-                    } else {
-                        expenseList
-                    }
+        Group {
+            if embedded {
+                expensesBody
+            } else {
+                NavigationStack {
+                    expensesBody
+                        .navigationTitle("Expenses")
+                        .navigationBarTitleDisplayMode(.large)
                 }
             }
-            .navigationTitle("Expenses")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { showForm = true } label: {
-                        Image(systemName: "plus")
-                            .foregroundStyle(Color(hex: "#c8ff5a"))
-                            .font(.system(size: 18, weight: .semibold))
-                    }
-                }
-            }
-            .sheet(isPresented: $showForm) {
-                ExpenseFormSheet(workspaceId: workspaceId, categories: vm.categories) { body in
-                    Task { await vm.create(workspaceId: workspaceId, body: body) }
-                }
-            }
-            .sheet(item: $selectedExpense) { expense in
-                ExpenseDetailSheet(
-                    workspaceId: workspaceId,
-                    expense: expense,
-                    categories: vm.categories,
-                    cards: vm.cards,
-                    onUpdated: { updated in
-                        if let idx = vm.expenses.firstIndex(where: { $0.id == updated.id }) {
-                            vm.expenses[idx] = updated
-                        }
-                        selectedExpense = updated
-                    }
-                )
-            }
-            .sheet(item: $expenseToEdit) { expense in
-                ExpenseFormSheet(workspaceId: workspaceId, categories: vm.categories, expense: expense) { body in
-                    Task { await vm.update(workspaceId: workspaceId, expenseId: expense.id, body: body) }
-                }
-            }
-            .overlay {
-                if let expense = expenseToDelete {
-                    DeleteConfirmDialog(
-                        title: "Delete Expense?",
-                        itemName: expense.description,
-                        onConfirm: {
-                            Task { await vm.delete(workspaceId: workspaceId, expenseId: expense.id) }
-                            expenseToDelete = nil
-                        },
-                        onCancel: { expenseToDelete = nil }
-                    )
-                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
-                }
-            }
-            .animation(.easeOut(duration: 0.2), value: expenseToDelete != nil)
         }
         .preferredColorScheme(.dark)
         .task { await vm.load(workspaceId: workspaceId) }
         .onChange(of: vm.selectedMonth) { _, _ in
             Task { await vm.load(workspaceId: workspaceId) }
         }
+    }
+
+    private var expensesBody: some View {
+        ZStack {
+            Color(hex: "#0e0f11").ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                ExpenseMonthSelectorBar(selectedMonth: $vm.selectedMonth) {
+                    Task { await vm.load(workspaceId: workspaceId) }
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 8)
+
+                SearchBar(text: $vm.searchText, placeholder: "Search expenses…")
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 8)
+
+                filterChipsRow
+                    .padding(.bottom, 8)
+
+                if vm.isLoading {
+                    Spacer()
+                    ProgressView().tint(Color(hex: "#c8ff5a"))
+                    Spacer()
+                } else if vm.filteredExpenses.isEmpty {
+                    expenseEmptyState
+                } else {
+                    expenseList
+                }
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button { showForm = true } label: {
+                    Image(systemName: "plus")
+                        .foregroundStyle(Color(hex: "#c8ff5a"))
+                        .font(.system(size: 18, weight: .semibold))
+                }
+            }
+        }
+        .sheet(isPresented: $showForm) {
+            ExpenseFormSheet(workspaceId: workspaceId, categories: vm.categories) { body in
+                Task { await vm.create(workspaceId: workspaceId, body: body) }
+            }
+        }
+        .sheet(item: $selectedExpense) { expense in
+            ExpenseDetailSheet(
+                workspaceId: workspaceId,
+                expense: expense,
+                categories: vm.categories,
+                cards: vm.cards,
+                onUpdated: { updated in
+                    if let idx = vm.expenses.firstIndex(where: { $0.id == updated.id }) {
+                        vm.expenses[idx] = updated
+                    }
+                    selectedExpense = updated
+                }
+            )
+        }
+        .sheet(item: $expenseToEdit) { expense in
+            ExpenseFormSheet(workspaceId: workspaceId, categories: vm.categories, expense: expense) { body in
+                Task { await vm.update(workspaceId: workspaceId, expenseId: expense.id, body: body) }
+            }
+        }
+        .overlay {
+            if let expense = expenseToDelete {
+                DeleteConfirmDialog(
+                    title: "Delete Expense?",
+                    itemName: expense.description,
+                    onConfirm: {
+                        Task { await vm.delete(workspaceId: workspaceId, expenseId: expense.id) }
+                        expenseToDelete = nil
+                    },
+                    onCancel: { expenseToDelete = nil }
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.96)))
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: expenseToDelete != nil)
     }
 
     // MARK: - Filter chips

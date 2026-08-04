@@ -13,6 +13,8 @@ enum Endpoints {
     static func expense(_ wsId: String, _ id: String) -> String { "/api/workspaces/\(wsId)/expenses/\(id)" }
     static func income(_ wsId: String) -> String { "/api/workspaces/\(wsId)/income" }
     static func incomeItem(_ wsId: String, _ id: String) -> String { "/api/workspaces/\(wsId)/income/\(id)" }
+    static func recurringIncome(_ wsId: String) -> String { "/api/workspaces/\(wsId)/recurring-income" }
+    static func recurringIncomeRule(_ wsId: String, _ id: String) -> String { "/api/workspaces/\(wsId)/recurring-income/\(id)" }
     static func categories(_ wsId: String) -> String { "/api/workspaces/\(wsId)/categories" }
     static func category(_ wsId: String, _ id: String) -> String { "/api/workspaces/\(wsId)/categories/\(id)" }
     static func summary(_ wsId: String) -> String { "/api/workspaces/\(wsId)/summary" }
@@ -23,4 +25,20 @@ enum Endpoints {
 
     static func creditCards(_ wsId: String) -> String { "/api/workspaces/\(wsId)/credit-cards" }
     static func creditCard(_ wsId: String, _ id: String) -> String { "/api/workspaces/\(wsId)/credit-cards/\(id)" }
+    static func cardPaymentsSummary(_ wsId: String) -> String { "/api/workspaces/\(wsId)/card-payments/summary" }
+    static func markCardPaid(_ wsId: String, _ cardId: String) -> String { "/api/workspaces/\(wsId)/card-payments/cards/\(cardId)/mark-paid" }
+    static func unmarkCardPaid(_ wsId: String, _ cardId: String) -> String { "/api/workspaces/\(wsId)/card-payments/cards/\(cardId)/unmark-paid" }
+
+    static func savingsAccounts(_ wsId: String) -> String { "/api/workspaces/\(wsId)/savings/accounts" }
+    static func savingsAccount(_ wsId: String, _ id: String) -> String { "/api/workspaces/\(wsId)/savings/accounts/\(id)" }
+    static func savingsEntries(_ wsId: String, accountId: String? = nil) -> String {
+        var path = "/api/workspaces/\(wsId)/savings/entries"
+        if let accountId {
+            path += "?accountId=\(accountId)"
+        }
+        return path
+    }
+    static func savingsEntry(_ wsId: String, _ id: String) -> String { "/api/workspaces/\(wsId)/savings/entries/\(id)" }
+    static func recurringSavings(_ wsId: String) -> String { "/api/workspaces/\(wsId)/savings/recurring" }
+    static func recurringSavingsRule(_ wsId: String, _ id: String) -> String { "/api/workspaces/\(wsId)/savings/recurring/\(id)" }
 }
