@@ -4,7 +4,8 @@ struct ContentView: View {
     @Environment(AppState.self) private var appState
 
     var body: some View {
-        Group {
+        @Bindable var appState = appState
+        return Group {
             if appState.isLoading {
                 SplashView()
             } else if !appState.isAuthenticated {
@@ -25,6 +26,19 @@ struct ContentView: View {
         .onChange(of: appState.isAuthenticated) { _, authenticated in
             if authenticated {
                 Task { await appState.restoreLastWorkspaceIfNeeded() }
+            }
+        }
+        // A shared split belongs to someone else's workspace, so it opens over
+        // whatever is on screen rather than inside the workspace navigation.
+        .sheet(
+            isPresented: Binding(
+                get: { appState.pendingSplitShareToken != nil },
+                set: { if !$0 { appState.pendingSplitShareToken = nil } }
+            )
+        ) {
+            if let token = appState.pendingSplitShareToken {
+                PublicSplitClaimView(shareToken: token)
+                    .environment(appState)
             }
         }
     }

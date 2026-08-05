@@ -14,6 +14,9 @@ struct Expense: Codable, Identifiable {
     let msiCount: Int?
     let deferredInstallment: Int?
     let deferredCount: Int?
+    /// Set when this expense mirrors a bill split. Optional so older server
+    /// builds (and any payload without the join) still decode.
+    let billSplitId: String?
 
     var amount: Double { Double(amountCents) / 100.0 }
     var displayDate: String { formatExpenseDate(occurredAt) }

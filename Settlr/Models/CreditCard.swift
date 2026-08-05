@@ -10,6 +10,12 @@ struct CreditCard: Codable, Identifiable {
     let statementCutoffDay: Int?
     let paymentDueDay: Int?
     let notes: String?
+    /// Set when the card was deactivated. The list endpoint still returns those
+    /// rows so history keeps rendering; pickers for new charges filter them out.
+    /// Defaults to nil so locally-built preview cards stay easy to construct.
+    var archivedAt: String? = nil
+
+    var isArchived: Bool { archivedAt != nil }
 }
 
 struct CreditCardsResponse: Decodable {

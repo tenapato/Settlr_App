@@ -12,6 +12,9 @@ struct MainTabView: View {
     @State private var showExpenseForm = false
     @State private var showIncomeForm = false
     @State private var showSavingsForm = false
+    @State private var showSplitList = false
+    @State private var showSplitScan = false
+    @State private var createdSplitId: String?
 
     private let fabSpring = Animation.spring(response: 0.44, dampingFraction: 0.78)
     private let fabCloseSpring = Animation.spring(response: 0.36, dampingFraction: 0.86)
@@ -24,15 +27,29 @@ struct MainTabView: View {
             fabBackdrop
 
             fabMenu
-                .padding(.trailing, 16)
-                .padding(.bottom, 16 + 58 + 20)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                .padding(.trailing, 16)
+                .padding(.bottom, 16 + 58 + 14)
 
             bottomBar
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
         }
         .background(Color(hex: "#0e0f11"))
+        // Splitting starts at the camera, not at a form.
+        .fullScreenCover(isPresented: $showSplitScan) {
+            SplitScanFlow(workspaceId: appState.activeWorkspace?.id ?? "") { created in
+                createdSplitId = created.id
+                showSplitList = true
+            }
+        }
+        .sheet(isPresented: $showSplitList) {
+            SplitListView(
+                workspaceId: appState.activeWorkspace?.id ?? "",
+                initialSplitId: createdSplitId
+            )
+            .onDisappear { createdSplitId = nil }
+        }
     }
 
     private var fabBackdrop: some View {
@@ -47,9 +64,9 @@ struct MainTabView: View {
     private var fabMenu: some View {
         actionItems
             .opacity(fabOpen ? 1 : 0)
-            .scaleEffect(fabOpen ? 1 : 0.88, anchor: .bottomTrailing)
-            .offset(y: fabOpen ? 0 : 18)
-            .blur(radius: fabOpen ? 0 : 6)
+            .scaleEffect(fabOpen ? 1 : 0.7, anchor: .bottomTrailing)
+            .offset(y: fabOpen ? 0 : 12)
+            .blur(radius: fabOpen ? 0 : 4)
             .allowsHitTesting(fabOpen)
             .accessibilityHidden(!fabOpen)
             .animation(fabOpen ? fabSpring : fabCloseSpring, value: fabOpen)
@@ -63,20 +80,38 @@ struct MainTabView: View {
 
     // MARK: - Action items
 
+    /// One card, hairline dividers, a tinted glyph per row — the same surface
+    /// treatment as every other card in the app, rather than a bespoke widget.
+    /// Tiles-inside-a-card double-boxed each action and looked foreign here.
     private var actionItems: some View {
-        VStack(alignment: .trailing, spacing: 20) {
-            ForEach(Array(quickActions.reversed().enumerated()), id: \.offset) { idx, action in
-                ActionRow(
+        VStack(spacing: 0) {
+            ForEach(Array(quickActions.enumerated()), id: \.offset) { idx, action in
+                if idx > 0 {
+                    Rectangle()
+                        .fill(Color(hex: "#2a2d32"))
+                        .frame(height: 1)
+                        .padding(.leading, 56)
+                }
+                PaletteActionRow(
                     label: action.label,
                     icon: action.icon,
                     color: action.color,
                     index: idx,
-                    totalCount: quickActions.count,
                     fabOpen: fabOpen,
                     onTap: action.handler
                 )
             }
         }
+        .frame(width: 216)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(hex: "#15171a"))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.55), radius: 24, y: 10)
+        )
     }
 
     private var fabButton: some View {
@@ -95,14 +130,35 @@ struct MainTabView: View {
 
     private struct QuickAction {
         let label: String
+        /// One word, so labels don't collide along the arc.
+        let shortLabel: String
         let icon: String
         let color: Color
         let handler: () -> Void
     }
 
     private var quickActions: [QuickAction] {
+        var actions: [QuickAction] = []
+        // Bill splitting lives only here — it is a one-off action, not a place
+        // you navigate to, so it stays out of the tab bar.
+        if appState.currentUser?.hasFeature("bill_splits") ?? false {
+            actions.append(
+                QuickAction(label: "Split a Bill", shortLabel: "Split", icon: "doc.viewfinder", color: Color(hex: "#c8ff5a")) {
+                    setFabOpen(false)
+                    Task {
+                        try? await Task.sleep(nanoseconds: 320_000_000)
+                        showSplitScan = true
+                    }
+                }
+            )
+        }
+        actions.append(contentsOf: ledgerActions)
+        return actions
+    }
+
+    private var ledgerActions: [QuickAction] {
         [
-            QuickAction(label: "Add Expense", icon: "arrow.up", color: Color(hex: "#ff6b6b")) {
+            QuickAction(label: "Add Expense", shortLabel: "Expense", icon: "arrow.up", color: Color(hex: "#ff6b6b")) {
                 setFabOpen(false)
                 selectedTab = .activity
                 activitySegment = .expenses
@@ -111,7 +167,7 @@ struct MainTabView: View {
                     showExpenseForm = true
                 }
             },
-            QuickAction(label: "Add Income", icon: "arrow.down", color: Color(hex: "#5ddf8a")) {
+            QuickAction(label: "Add Income", shortLabel: "Income", icon: "arrow.down", color: Color(hex: "#5ddf8a")) {
                 setFabOpen(false)
                 selectedTab = .activity
                 activitySegment = .income
@@ -120,7 +176,7 @@ struct MainTabView: View {
                     showIncomeForm = true
                 }
             },
-            QuickAction(label: "Add Savings", icon: "banknote", color: Color(hex: "#22c55e")) {
+            QuickAction(label: "Add Savings", shortLabel: "Savings", icon: "banknote", color: Color(hex: "#22c55e")) {
                 setFabOpen(false)
                 selectedTab = .activity
                 activitySegment = .savings
@@ -205,66 +261,58 @@ struct MainTabView: View {
     }
 }
 
-// MARK: - Action Row
+// MARK: - Palette row
 
-private struct ActionRow: View {
+/// One action in the FAB palette. Glyph in a tinted disc, label beside it, the
+/// whole row tappable — matching the card rows used elsewhere in the app.
+private struct PaletteActionRow: View {
     let label: String
     let icon: String
     let color: Color
     let index: Int
-    let totalCount: Int
     let fabOpen: Bool
     let onTap: () -> Void
 
-    // Bottom item (closest to FAB) leads on open; top item leads on close.
-    private var openDelay: Double { Double(totalCount - 1 - index) * 0.06 }
-    private var closeDelay: Double { Double(index) * 0.05 }
+    @State private var pressed = false
 
-    private var rowAnimation: Animation {
-        if fabOpen {
-            return .spring(response: 0.46, dampingFraction: 0.74).delay(openDelay)
-        }
-        return .spring(response: 0.34, dampingFraction: 0.88).delay(closeDelay)
+    // Top row leads on open so the palette unrolls downward toward the thumb.
+    private var animation: Animation {
+        fabOpen
+            ? .spring(response: 0.34, dampingFraction: 0.78).delay(Double(index) * 0.03)
+            : .spring(response: 0.24, dampingFraction: 0.92)
     }
-
-    private var labelOffset: CGFloat { fabOpen ? 0 : 28 }
-    private var buttonOffset: CGFloat { fabOpen ? 0 : CGFloat(index + 1) * 22 + 12 }
-    private var buttonScale: CGFloat { fabOpen ? 1 : 0.45 }
 
     var body: some View {
-        HStack(spacing: 16) {
-            Text(label)
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(.white)
-                .opacity(fabOpen ? 1 : 0)
-                .offset(x: labelOffset)
-                .animation(rowAnimation, value: fabOpen)
-
-            actionButton
-                .scaleEffect(buttonScale, anchor: .center)
-                .opacity(fabOpen ? 1 : 0)
-                .offset(y: buttonOffset)
-                .animation(rowAnimation, value: fabOpen)
-        }
-        .allowsHitTesting(fabOpen)
-    }
-
-    @ViewBuilder
-    private var actionButton: some View {
-        legacyActionButton
-    }
-
-    private var legacyActionButton: some View {
         Button(action: onTap) {
-            ZStack {
-                Circle()
-                    .fill(color.opacity(0.18))
-                    .frame(width: 58, height: 58)
-                    .overlay(Circle().strokeBorder(color.opacity(0.35), lineWidth: 1))
-                Image(systemName: icon)
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(color)
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(color.opacity(0.16))
+                        .frame(width: 30, height: 30)
+                    Image(systemName: icon)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(color)
+                }
+                Text(label)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Color(hex: "#ecedee"))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
             }
+            .padding(.horizontal, 13)
+            .padding(.vertical, 11)
+            .background(pressed ? Color(hex: "#1c1f23") : .clear)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in pressed = true }
+                .onEnded { _ in pressed = false }
+        )
+        .opacity(fabOpen ? 1 : 0)
+        .offset(y: fabOpen ? 0 : -6)
+        .animation(animation, value: fabOpen)
+        .accessibilityLabel(label)
     }
 }

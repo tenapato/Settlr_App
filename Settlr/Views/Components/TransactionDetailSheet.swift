@@ -152,6 +152,12 @@ struct ExpenseDetailSheet: View {
                             TransactionDetailRow(label: "Notes", value: notes)
                         }
                     }
+
+                    // This expense is the whole bill; the split says how much of
+                    // it is actually yours.
+                    if let splitId = expense.billSplitId {
+                        ExpenseSplitSection(workspaceId: workspaceId, splitId: splitId)
+                    }
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 8)

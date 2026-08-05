@@ -33,6 +33,12 @@
 	<true/>
 	<key>NSAccentColorName</key>
 	<string>AccentColor</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Settlr uses the camera to scan a receipt so you can split the bill. The photo is read on your device and never uploaded.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Settlr opens a receipt photo you already took so you can split the bill. The photo is read on your device and never uploaded.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Settlr can save a scanned receipt back to your photo library.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

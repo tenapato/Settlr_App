@@ -41,4 +41,22 @@ enum Endpoints {
     static func savingsEntry(_ wsId: String, _ id: String) -> String { "/api/workspaces/\(wsId)/savings/entries/\(id)" }
     static func recurringSavings(_ wsId: String) -> String { "/api/workspaces/\(wsId)/savings/recurring" }
     static func recurringSavingsRule(_ wsId: String, _ id: String) -> String { "/api/workspaces/\(wsId)/savings/recurring/\(id)" }
+
+    // Bill splits — organizer side
+    static func billSplits(_ wsId: String) -> String { "/api/workspaces/\(wsId)/bill-splits" }
+    static func billSplit(_ wsId: String, _ id: String) -> String { "/api/workspaces/\(wsId)/bill-splits/\(id)" }
+    static func billSplitItems(_ wsId: String, _ id: String) -> String { "/api/workspaces/\(wsId)/bill-splits/\(id)/items" }
+    static func billSplitClaims(_ wsId: String, _ id: String) -> String { "/api/workspaces/\(wsId)/bill-splits/\(id)/claims" }
+    static func billSplitParticipant(_ wsId: String, _ id: String, _ participantId: String) -> String {
+        "/api/workspaces/\(wsId)/bill-splits/\(id)/participants/\(participantId)"
+    }
+    static func billSplitSettle(_ wsId: String, _ id: String, _ participantId: String) -> String {
+        "/api/workspaces/\(wsId)/bill-splits/\(id)/participants/\(participantId)/settle"
+    }
+    static func billSplitScanReceipt(_ wsId: String) -> String { "/api/workspaces/\(wsId)/bill-splits/scan-receipt" }
+
+    // Bill splits — public share link (no session; see APIClient.publicSplit*)
+    static func publicSplit(_ shareToken: String) -> String { "/api/split/\(shareToken)" }
+    static func publicSplitJoin(_ shareToken: String) -> String { "/api/split/\(shareToken)/join" }
+    static func publicSplitClaims(_ shareToken: String) -> String { "/api/split/\(shareToken)/claims" }
 }

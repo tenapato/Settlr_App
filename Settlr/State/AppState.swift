@@ -8,8 +8,20 @@ final class AppState {
     var isLoading = true
     var isRestoringWorkspace = false
     var signOutTrigger = false
+    /// Share token from a `settlr://split/<token>` deep link, held until the app
+    /// has finished loading and can present the claim screen over the UI.
+    var pendingSplitShareToken: String?
 
     var isAuthenticated: Bool { currentUser != nil }
+
+    /// Extracts the share token from a Settlr deep link, or nil if it is some
+    /// other `settlr://` URL (OAuth callbacks come back on the same scheme).
+    static func splitShareToken(from url: URL) -> String? {
+        guard url.scheme == "settlr", url.host == "split" else { return nil }
+        let token = url.pathComponents.filter { $0 != "/" }.first
+        guard let token, !token.isEmpty else { return nil }
+        return token
+    }
 
     private let api = APIClient.shared
 

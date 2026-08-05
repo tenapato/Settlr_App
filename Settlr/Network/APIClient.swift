@@ -55,7 +55,8 @@ final class APIClient {
         _ path: String,
         method: String = "GET",
         body: (any Encodable)? = nil,
-        origin: String? = nil
+        origin: String? = nil,
+        headers: [String: String] = [:]
     ) throws -> URLRequest {
         let apiOrigin = origin ?? baseURL
         guard let url = URL(string: apiOrigin + path) else {
@@ -68,6 +69,9 @@ final class APIClient {
         if let token = TokenStore.get() {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
+        for (key, value) in headers {
+            req.setValue(value, forHTTPHeaderField: key)
+        }
         if let body {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try encoder.encode(body)
@@ -79,9 +83,10 @@ final class APIClient {
         _ path: String,
         method: String = "GET",
         body: (any Encodable)? = nil,
-        origin: String? = nil
+        origin: String? = nil,
+        headers: [String: String] = [:]
     ) async throws -> T {
-        let req = try makeRequest(path, method: method, body: body, origin: origin)
+        let req = try makeRequest(path, method: method, body: body, origin: origin, headers: headers)
         let (data, response) = try await URLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse else { throw APIError.server("No response") }
 
