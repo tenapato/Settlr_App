@@ -13,6 +13,7 @@
 		AA000000000000000000BB04 /* Endpoints.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR04 /* Endpoints.swift */; };
 		AA000000000000000000BB05 /* TokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR05 /* TokenStore.swift */; };
 		AA000000000000000000BB06 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR06 /* User.swift */; };
+		AA000000000000000000BB85 /* FeatureAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR85 /* FeatureAccess.swift */; };
 		AA000000000000000000BB07 /* Workspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR07 /* Workspace.swift */; };
 		AA000000000000000000BB08 /* Expense.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR08 /* Expense.swift */; };
 		AA000000000000000000BB09 /* Income.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR09 /* Income.swift */; };
@@ -33,6 +34,7 @@
 		AA000000000000000000BB16 /* ExpensesVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR16 /* ExpensesVM.swift */; };
 		AA000000000000000000BB17 /* IncomeVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR17 /* IncomeVM.swift */; };
 		AA000000000000000000BB18 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR18 /* LoginView.swift */; };
+		AA000000000000000000BB86 /* AccountDeactivatedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR86 /* AccountDeactivatedView.swift */; };
 		AA000000000000000000BB19 /* SignupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR19 /* SignupView.swift */; };
 		AA000000000000000000BB20 /* WorkspacePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR20 /* WorkspacePickerView.swift */; };
 		AA000000000000000000BB21 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR21 /* MainTabView.swift */; };
@@ -56,6 +58,7 @@
 		AA000000000000000000BB39 /* CardDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR40 /* CardDetailSheet.swift */; };
 		AA000000000000000000BB40 /* MonthRangeQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR41 /* MonthRangeQuery.swift */; };
 		AA000000000000000000BB41 /* LastWorkspaceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR42 /* LastWorkspaceStore.swift */; };
+		AA000000000000000000BB84 /* PendingSplitQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR84 /* PendingSplitQueue.swift */; };
 		AA000000000000000000BB42 /* Telegram.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR43 /* Telegram.swift */; };
 		AA000000000000000000BB43 /* TelegramSettingsVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR44 /* TelegramSettingsVM.swift */; };
 		AA000000000000000000BB44 /* TelegramSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR45 /* TelegramSettingsSection.swift */; };
@@ -84,6 +87,10 @@
 		AA000000000000000000BB77 /* ReceiptCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR77 /* ReceiptCaptureView.swift */; };
 		AA000000000000000000BB78 /* SplitScanFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR78 /* SplitScanFlow.swift */; };
 		AA000000000000000000BB79 /* OnDeviceReceiptParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR79 /* OnDeviceReceiptParser.swift */; };
+		AA000000000000000000BB80 /* ReceiptReconciler.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR80 /* ReceiptReconciler.swift */; };
+		AA000000000000000000BB81 /* SplitQRSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR81 /* SplitQRSheet.swift */; };
+		AA000000000000000000BB82 /* SplitPassAroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR82 /* SplitPassAroundView.swift */; };
+		AA000000000000000000BB83 /* SplitResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR83 /* SplitResultView.swift */; };
 		AA000000000000000000BB7A /* ScanningOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR7A /* ScanningOverlay.swift */; };
 		AA000000000000000000BB7B /* ExpenseSplitSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR7B /* ExpenseSplitSection.swift */; };
 /* End PBXBuildFile section */
@@ -95,6 +102,7 @@
 		AA000000000000000000FR04 /* Endpoints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Endpoints.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR05 /* TokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenStore.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR06 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR85 /* FeatureAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureAccess.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR07 /* Workspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Workspace.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR08 /* Expense.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Expense.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR09 /* Income.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Income.swift; sourceTree = "<group>"; };
@@ -115,6 +123,7 @@
 		AA000000000000000000FR16 /* ExpensesVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpensesVM.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR17 /* IncomeVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IncomeVM.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR18 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR86 /* AccountDeactivatedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountDeactivatedView.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR19 /* SignupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignupView.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR20 /* WorkspacePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspacePickerView.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR21 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
@@ -139,6 +148,7 @@
 		AA000000000000000000FR40 /* CardDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardDetailSheet.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR41 /* MonthRangeQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthRangeQuery.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR42 /* LastWorkspaceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LastWorkspaceStore.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR84 /* PendingSplitQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingSplitQueue.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR43 /* Telegram.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Telegram.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR44 /* TelegramSettingsVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelegramSettingsVM.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR45 /* TelegramSettingsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelegramSettingsSection.swift; sourceTree = "<group>"; };
@@ -167,6 +177,10 @@
 		AA000000000000000000FR77 /* ReceiptCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptCaptureView.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR78 /* SplitScanFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitScanFlow.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR79 /* OnDeviceReceiptParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnDeviceReceiptParser.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR80 /* ReceiptReconciler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptReconciler.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR81 /* SplitQRSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitQRSheet.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR82 /* SplitPassAroundView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitPassAroundView.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR83 /* SplitResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitResultView.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR7A /* ScanningOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanningOverlay.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR7B /* ExpenseSplitSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpenseSplitSection.swift; sourceTree = "<group>"; };
 		AA000000000000000000PROD /* Settlr.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Settlr.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -215,6 +229,7 @@
 				AA000000000000000000FR04 /* Endpoints.swift */,
 				AA000000000000000000FR05 /* TokenStore.swift */,
 				AA000000000000000000FR42 /* LastWorkspaceStore.swift */,
+				AA000000000000000000FR84 /* PendingSplitQueue.swift */,
 			);
 			path = Network;
 			sourceTree = "<group>";
@@ -223,6 +238,7 @@
 			isa = PBXGroup;
 			children = (
 				AA000000000000000000FR06 /* User.swift */,
+				AA000000000000000000FR85 /* FeatureAccess.swift */,
 				AA000000000000000000FR07 /* Workspace.swift */,
 				AA000000000000000000FR08 /* Expense.swift */,
 				AA000000000000000000FR09 /* Income.swift */,
@@ -277,6 +293,7 @@
 			isa = PBXGroup;
 			children = (
 				AA000000000000000000FR18 /* LoginView.swift */,
+				AA000000000000000000FR86 /* AccountDeactivatedView.swift */,
 				AA000000000000000000FR19 /* SignupView.swift */,
 			);
 			path = Auth;
@@ -363,6 +380,10 @@
 				AA000000000000000000FR77 /* ReceiptCaptureView.swift */,
 				AA000000000000000000FR78 /* SplitScanFlow.swift */,
 				AA000000000000000000FR79 /* OnDeviceReceiptParser.swift */,
+				AA000000000000000000FR80 /* ReceiptReconciler.swift */,
+				AA000000000000000000FR81 /* SplitQRSheet.swift */,
+				AA000000000000000000FR82 /* SplitPassAroundView.swift */,
+				AA000000000000000000FR83 /* SplitResultView.swift */,
 				AA000000000000000000FR7A /* ScanningOverlay.swift */,
 				AA000000000000000000FR7B /* ExpenseSplitSection.swift */,
 			);
@@ -489,6 +510,7 @@
 				AA000000000000000000BB04 /* Endpoints.swift in Sources */,
 				AA000000000000000000BB05 /* TokenStore.swift in Sources */,
 				AA000000000000000000BB06 /* User.swift in Sources */,
+				AA000000000000000000BB85 /* FeatureAccess.swift in Sources */,
 				AA000000000000000000BB07 /* Workspace.swift in Sources */,
 				AA000000000000000000BB08 /* Expense.swift in Sources */,
 				AA000000000000000000BB09 /* Income.swift in Sources */,
@@ -502,6 +524,7 @@
 				AA000000000000000000BB16 /* ExpensesVM.swift in Sources */,
 				AA000000000000000000BB17 /* IncomeVM.swift in Sources */,
 				AA000000000000000000BB18 /* LoginView.swift in Sources */,
+				AA000000000000000000BB86 /* AccountDeactivatedView.swift in Sources */,
 				AA000000000000000000BB19 /* SignupView.swift in Sources */,
 				AA000000000000000000BB20 /* WorkspacePickerView.swift in Sources */,
 				AA000000000000000000BB21 /* MainTabView.swift in Sources */,
@@ -525,6 +548,7 @@
 				AA000000000000000000BB39 /* CardDetailSheet.swift in Sources */,
 				AA000000000000000000BB40 /* MonthRangeQuery.swift in Sources */,
 				AA000000000000000000BB41 /* LastWorkspaceStore.swift in Sources */,
+				AA000000000000000000BB84 /* PendingSplitQueue.swift in Sources */,
 				AA000000000000000000BB42 /* Telegram.swift in Sources */,
 				AA000000000000000000BB43 /* TelegramSettingsVM.swift in Sources */,
 				AA000000000000000000BB44 /* TelegramSettingsSection.swift in Sources */,
@@ -559,6 +583,10 @@
 				AA000000000000000000BB77 /* ReceiptCaptureView.swift in Sources */,
 				AA000000000000000000BB78 /* SplitScanFlow.swift in Sources */,
 				AA000000000000000000BB79 /* OnDeviceReceiptParser.swift in Sources */,
+				AA000000000000000000BB80 /* ReceiptReconciler.swift in Sources */,
+				AA000000000000000000BB81 /* SplitQRSheet.swift in Sources */,
+				AA000000000000000000BB82 /* SplitPassAroundView.swift in Sources */,
+				AA000000000000000000BB83 /* SplitResultView.swift in Sources */,
 				AA000000000000000000BB7A /* ScanningOverlay.swift in Sources */,
 				AA000000000000000000BB7B /* ExpenseSplitSection.swift in Sources */,
 			);
@@ -690,7 +718,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Settlr/Settlr.entitlements;
 					CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = 49T6266TLB;
 				ENABLE_PREVIEWS = YES;
@@ -705,7 +733,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.4;
+				MARKETING_VERSION = 1.4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = cash.settlr.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -721,7 +749,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Settlr/Settlr.entitlements;
 					CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = 49T6266TLB;
 				ENABLE_PREVIEWS = YES;
@@ -736,7 +764,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.4;
+				MARKETING_VERSION = 1.4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = cash.settlr.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

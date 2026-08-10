@@ -58,6 +58,12 @@ struct BillSplit: Codable, Identifiable {
     let feeCents: Int
     let totalCents: Int
     let status: String
+    /// "me" — you fronted the whole bill and the table owes you.
+    /// "each_own" — everyone paid their own share, so nobody owes anybody.
+    /// Optional so a split created before the field existed still decodes.
+    let payer: String?
+    /// "by_item" (people claim what they ordered) | "even" (divided by heads).
+    let splitMode: String?
     let expenseId: String?
     let createdAt: String
     let items: [BillSplitItem]
@@ -67,6 +73,9 @@ struct BillSplit: Codable, Identifiable {
     let outstandingCents: Int
 
     var isOpen: Bool { status == "open" }
+    /// Nobody owes the organizer: everyone settled with the restaurant directly.
+    var isEachOwn: Bool { payer == "each_own" }
+    var isEvenSplit: Bool { splitMode == "even" }
     var isSettled: Bool { status == "settled" }
     var organizer: BillSplitParticipant? { participants.first(where: \.isOrganizer) }
     var guests: [BillSplitParticipant] { participants.filter { !$0.isOrganizer } }
@@ -131,13 +140,16 @@ struct BillSplitResponse: Decodable { let split: BillSplit }
 
 // MARK: - Request bodies
 
-struct BillSplitItemBody: Encodable {
+/// `Codable`, not just `Encodable`: a split composed with no signal is written
+/// to disk in exactly this shape and replayed later, so it has to survive the
+/// round trip.
+struct BillSplitItemBody: Codable {
     let name: String
     let quantity: Int
     let unitPriceCents: Int
 }
 
-struct CreateBillSplitBody: Encodable {
+struct CreateBillSplitBody: Codable {
     let merchant: String
     let occurredAt: String
     let items: [BillSplitItemBody]
@@ -147,11 +159,29 @@ struct CreateBillSplitBody: Encodable {
     let totalCents: Int
     let paymentChannel: String
     let creditCardId: String?
+    /// Makes this create safe to retry. Minted once when the split is composed
+    /// and reused on every attempt, so a request whose response was lost — to a
+    /// dropped connection, to the app being killed — replays into the same
+    /// split instead of a second one. Sent even when the phone is online: that
+    /// is precisely when a response can go missing without anyone noticing.
+    var idempotencyKey: String? = nil
+    /// "me" (default) | "each_own". Omitted by callers that don't care.
+    var payer: String? = nil
+    /// "by_item" (default) | "even".
+    var splitMode: String? = nil
+    /// Headcount, organizer included. Required by the server for an even split.
+    var participantCount: Int? = nil
+    /// Optional names for the other people on an even split, in order, you
+    /// excluded. Blank entries become "Person 2", "Person 3"… on the server.
+    var participantNames: [String]? = nil
 }
 
 struct BillSplitClaimBody: Encodable {
     let itemId: String
     let claimed: Bool
+    /// Whose claim this is. Omitted means the organizer's own row, which is what
+    /// the detail screen wants; the pass-the-phone flow names each person in turn.
+    var participantId: String? = nil
 }
 
 struct BillSplitStatusBody: Encodable { let status: String }
@@ -194,6 +224,10 @@ struct PublicSplit: Codable {
     let feeCents: Int
     let totalCents: Int
     let status: String
+    /// "me" | "each_own", and "by_item" | "even". Optional so a split served by
+    /// an older deployment still decodes.
+    let payer: String?
+    let splitMode: String?
     let organizerName: String?
     let items: [BillSplitItem]
     let participants: [PublicSplitParticipant]
@@ -201,6 +235,9 @@ struct PublicSplit: Codable {
     let viewerParticipantId: String?
 
     var isOpen: Bool { status == "open" }
+    var isEachOwn: Bool { payer == "each_own" }
+    /// Divided by headcount, so there is nothing for a guest to pick.
+    var isEvenSplit: Bool { splitMode == "even" }
 }
 
 struct PublicSplitResponse: Decodable { let split: PublicSplit }

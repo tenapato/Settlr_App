@@ -103,11 +103,26 @@ private extension OnDeviceReceiptParser {
         return reply.content.asScannedReceipt()
     }
 
+    /// Never put a concrete price in these instructions.
+    ///
+    /// An earlier version illustrated the quantity rule with `2 JAMESON 290.00`
+    /// and "the price of one unit is 145.00". Scans came back with every line
+    /// priced at exactly 145.00: the example was the most available number in
+    /// context and a small model reached for it instead of reading the column.
+    /// Columns are shown as `<amount>` here, and `ReceiptPrices` copies every
+    /// number the user actually sees off the receipt anyway.
     static var instructions: String {
         """
         You read receipts from restaurants and shops, often in Spanish or English.
 
-        Pull out only the things that were ordered.
+        The text is laid out one printed row per line, with the receipt's columns
+        separated by runs of spaces, like `<qty>   <name>   <amount>`. The amount
+        on a row belongs to the name on that same row — never to the row above or
+        below it.
+
+        Pull out only the things that were ordered, and pull out every one of
+        them. Never merge two rows into one, and never drop a repeat: the same
+        dish printed on two rows is two items.
 
         Never turn these into items:
         - subtotal, IVA, tax, propina, tip, service charge, total, cash, change,
@@ -117,11 +132,18 @@ private extension OnDeviceReceiptParser {
           the same line as one of them
         - the footer: "gracias por su visita", website, ticket or invoice numbers
 
-        A line like `2  JAMESON  290.00` prints the total for both units, so the
-        price of one unit is 145.00. Only treat a price as per-unit when the
-        receipt marks it that way, e.g. `@ 145.00`.
+        Copy each row's amount character for character, exactly as it is printed.
+        Never round it, never convert it, never work it out, and never divide it
+        by the quantity — a row that prints one amount for several units keeps
+        that amount.
 
-        Amounts are written exactly as printed on the receipt, like 129.50.
+        Two rows that happen to cost the same still cost the same. Do not make
+        prices differ to look plausible, and never reuse one row's amount on a
+        different row.
+
+        Report tax, tip and total exactly as they are printed. Do not decide
+        whether the tax is charged on top or already inside the prices, and do
+        not adjust any of them to make the arithmetic come out even.
         """
     }
 }
@@ -129,8 +151,10 @@ private extension OnDeviceReceiptParser {
 /// Prices cross as printed decimal strings rather than cents.
 ///
 /// Asking a model to multiply by 100 invites an order-of-magnitude slip on
-/// somebody's dinner; `centsFromText` already does that conversion exactly, and
-/// is the same function the manual entry fields use.
+/// somebody's dinner; `ReceiptPrices.centsFromPrinted` does that conversion
+/// exactly, on a string that can be compared straight back to the receipt.
+///
+/// Descriptions here carry no example amounts on purpose — see `instructions`.
 @available(iOS 26, *)
 @Generable
 private struct ReceiptDraft {
@@ -140,10 +164,10 @@ private struct ReceiptDraft {
     @Guide(description: "Every item that was ordered, in the order printed.")
     var items: [ReceiptDraftItem]
 
-    @Guide(description: "Tax as printed, e.g. 229.60. Use 0 when the receipt shows none.")
+    @Guide(description: "Tax as printed on the receipt. Use 0 when it shows none.")
     var tax: String
 
-    @Guide(description: "Tip or gratuity as printed. Use 0 when the receipt shows none.")
+    @Guide(description: "Tip or gratuity as printed on the receipt. Use 0 when it shows none.")
     var tip: String
 
     @Guide(description: "The grand total as printed. Use 0 when you cannot find one.")
@@ -156,11 +180,11 @@ private struct ReceiptDraftItem {
     @Guide(description: "The item name exactly as printed, without the price.")
     var name: String
 
-    @Guide(description: "How many were ordered. Use 1 when the receipt doesn't say.")
+    @Guide(description: "The count printed on that row. Use 1 when the row prints none.")
     var quantity: Int
 
-    @Guide(description: "Price of ONE unit as printed, e.g. 145.00. When a line prints the total for several units, divide it by the quantity.")
-    var unitPrice: String
+    @Guide(description: "The money printed on that row, copied exactly as printed. Do not divide it by the quantity.")
+    var amount: String
 }
 
 @available(iOS 26, *)
@@ -170,20 +194,25 @@ private extension ReceiptDraft {
         var unreadable = 0
 
         let parsed: [ScannedReceiptItem] = items.compactMap { item in
-            let cents = centsFromText(item.unitPrice)
+            // The row's money is its line total; `ReceiptPrices.rebuilt` turns
+            // that back into the quantity/unit-price pair a split stores.
+            let lineTotalCents = ReceiptPrices.centsFromPrinted(item.amount) ?? 0
             let name = item.name.trimmingCharacters(in: .whitespacesAndNewlines)
             // A zero or negative price is an OCR artifact or a discount line we
             // don't model — same rule the server parser applies.
-            guard cents > 0, !name.isEmpty else {
+            guard lineTotalCents > 0, !name.isEmpty else {
                 unreadable += 1
                 return nil
             }
             // Not counted as unreadable: read fine, just isn't an ordered item.
             guard !ReceiptLineFilter.isNonItem(name, merchant: trimmedMerchant) else { return nil }
-            return ScannedReceiptItem(
-                name: String(name.prefix(120)),
-                quantity: max(1, min(item.quantity, 99)),
-                unitPriceCents: cents
+            return ReceiptPrices.rebuilt(
+                ScannedReceiptItem(
+                    name: String(name.prefix(120)),
+                    quantity: max(1, min(item.quantity, 99)),
+                    unitPriceCents: lineTotalCents
+                ),
+                lineTotalCents: lineTotalCents
             )
         }
         let skipped = unreadable
@@ -191,9 +220,9 @@ private extension ReceiptDraft {
         return ScannedReceipt(
             merchant: trimmedMerchant.isEmpty ? nil : String(trimmedMerchant.prefix(120)),
             items: parsed,
-            taxCents: max(0, centsFromText(tax)),
-            tipCents: max(0, centsFromText(tip)),
-            totalCents: max(0, centsFromText(total)),
+            taxCents: max(0, ReceiptPrices.centsFromPrinted(tax) ?? 0),
+            tipCents: max(0, ReceiptPrices.centsFromPrinted(tip) ?? 0),
+            totalCents: max(0, ReceiptPrices.centsFromPrinted(total) ?? 0),
             warnings: skipped > 0 ? ["\(skipped) unreadable line(s) were skipped."] : []
         )
     }

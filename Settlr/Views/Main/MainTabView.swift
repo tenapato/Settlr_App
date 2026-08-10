@@ -36,10 +36,18 @@ struct MainTabView: View {
                 .padding(.bottom, 16)
         }
         .background(Color(hex: "#0e0f11"))
+        // A tab can disappear under the user: an admin turns a feature off and
+        // the next `/api/me` drops it. Landing on Home beats rendering a tab
+        // whose content no longer exists.
+        .onAppear(perform: reconcileSelectedTab)
+        .onChange(of: availableTabs) { _, _ in reconcileSelectedTab() }
         // Splitting starts at the camera, not at a form.
         .fullScreenCover(isPresented: $showSplitScan) {
-            SplitScanFlow(workspaceId: appState.activeWorkspace?.id ?? "") { created in
-                createdSplitId = created.id
+            SplitScanFlow(workspaceId: appState.activeWorkspace?.id ?? "") { outcome in
+                // Only a split that reached the server has an id worth opening.
+                // A queued one lands in the list's "Waiting to upload" section,
+                // and deep-linking a local id would spin forever.
+                if case .created(let split) = outcome { createdSplitId = split.id }
                 showSplitList = true
             }
         }
@@ -76,6 +84,17 @@ struct MainTabView: View {
         withAnimation(open ? fabSpring : fabCloseSpring) {
             fabOpen = open
         }
+    }
+
+    // MARK: - Feature availability
+
+    private var availableTabs: [Tab] { Tab.available(for: appState.currentUser) }
+
+    private func reconcileSelectedTab() {
+        guard !availableTabs.contains(selectedTab) else { return }
+        selectedTab = .home
+        // An open palette may have been showing actions that just went away.
+        if fabOpen { setFabOpen(false) }
     }
 
     // MARK: - Action items
@@ -141,9 +160,16 @@ struct MainTabView: View {
         var actions: [QuickAction] = []
         // Bill splitting lives only here — it is a one-off action, not a place
         // you navigate to, so it stays out of the tab bar.
-        if appState.currentUser?.hasFeature("bill_splits") ?? false {
+        if appState.currentUser?.has(.billSplits) ?? false {
+            // The pending count rides on the label because the split list lives
+            // behind a sheet — without it, a split waiting to upload is
+            // invisible until the user happens to go looking for it.
+            let waiting = appState.currentUser.map { PendingSplitQueue.shared.pendingCount(userId: $0.id) } ?? 0
             actions.append(
-                QuickAction(label: "Split a Bill", shortLabel: "Split", icon: "doc.viewfinder", color: Color(hex: "#c8ff5a")) {
+                QuickAction(
+                    label: waiting > 0 ? "Split a Bill (\(waiting) waiting)" : "Split a Bill",
+                    shortLabel: "Split", icon: "doc.viewfinder", color: Color(hex: "#c8ff5a")
+                ) {
                     setFabOpen(false)
                     Task {
                         try? await Task.sleep(nanoseconds: 320_000_000)
@@ -156,36 +182,46 @@ struct MainTabView: View {
         return actions
     }
 
+    /// One entry per Activity segment, so a segment the admin turned off can't
+    /// leave behind a palette action that jumps to a tab which no longer shows it.
     private var ledgerActions: [QuickAction] {
-        [
-            QuickAction(label: "Add Expense", shortLabel: "Expense", icon: "arrow.up", color: Color(hex: "#ff6b6b")) {
-                setFabOpen(false)
-                selectedTab = .activity
-                activitySegment = .expenses
-                Task {
-                    try? await Task.sleep(nanoseconds: 320_000_000)
-                    showExpenseForm = true
+        var actions: [QuickAction] = []
+        let user = appState.currentUser
+
+        if ActivitySegment.expenses.isAvailable(for: user) {
+            actions.append(
+                QuickAction(label: "Add Expense", shortLabel: "Expense", icon: "arrow.up", color: Color(hex: "#ff6b6b")) {
+                    openLedgerForm(.expenses) { showExpenseForm = true }
                 }
-            },
-            QuickAction(label: "Add Income", shortLabel: "Income", icon: "arrow.down", color: Color(hex: "#5ddf8a")) {
-                setFabOpen(false)
-                selectedTab = .activity
-                activitySegment = .income
-                Task {
-                    try? await Task.sleep(nanoseconds: 320_000_000)
-                    showIncomeForm = true
+            )
+        }
+        if ActivitySegment.income.isAvailable(for: user) {
+            actions.append(
+                QuickAction(label: "Add Income", shortLabel: "Income", icon: "arrow.down", color: Color(hex: "#5ddf8a")) {
+                    openLedgerForm(.income) { showIncomeForm = true }
                 }
-            },
-            QuickAction(label: "Add Savings", shortLabel: "Savings", icon: "banknote", color: Color(hex: "#22c55e")) {
-                setFabOpen(false)
-                selectedTab = .activity
-                activitySegment = .savings
-                Task {
-                    try? await Task.sleep(nanoseconds: 320_000_000)
-                    showSavingsForm = true
+            )
+        }
+        if ActivitySegment.savings.isAvailable(for: user) {
+            actions.append(
+                QuickAction(label: "Add Savings", shortLabel: "Savings", icon: "banknote", color: Color(hex: "#22c55e")) {
+                    openLedgerForm(.savings) { showSavingsForm = true }
                 }
-            },
-        ]
+            )
+        }
+        return actions
+    }
+
+    /// Closes the palette, switches to the right segment, then presents the form
+    /// once the close animation has cleared the screen.
+    private func openLedgerForm(_ segment: ActivitySegment, present: @escaping () -> Void) {
+        setFabOpen(false)
+        selectedTab = .activity
+        activitySegment = segment
+        Task {
+            try? await Task.sleep(nanoseconds: 320_000_000)
+            present()
+        }
     }
 
     // MARK: - Bottom bar
@@ -202,17 +238,18 @@ struct MainTabView: View {
     @available(iOS 26, *)
     private var glassBottomBar: some View {
         HStack(spacing: 12) {
-            FloatingTabBar(selected: $selectedTab)
+            FloatingTabBar(selected: $selectedTab, tabs: availableTabs)
                 .frame(maxWidth: .infinity)
                 .glassEffect(.regular.interactive(), in: Capsule())
 
-            fabButton
+            // Nothing left to create — the palette would open onto an empty card.
+            if !quickActions.isEmpty { fabButton }
         }
     }
 
     private var legacyBottomBar: some View {
         HStack(spacing: 12) {
-            FloatingTabBar(selected: $selectedTab)
+            FloatingTabBar(selected: $selectedTab, tabs: availableTabs)
                 .frame(maxWidth: .infinity)
                 .background(
                     Capsule()
@@ -220,7 +257,7 @@ struct MainTabView: View {
                         .shadow(color: .black.opacity(0.4), radius: 20, y: 8)
                 )
 
-            fabButton
+            if !quickActions.isEmpty { fabButton }
         }
     }
 
@@ -240,6 +277,9 @@ struct MainTabView: View {
         switch selectedTab {
         case .home:
             DashboardView(workspaceId: wsId, onOpenCategories: {
+                // The insights ticker still makes sense without the Categories
+                // screen behind it, so it stays — only the jump goes away.
+                guard CardsCategoriesSegment.categories.isAvailable(for: appState.currentUser) else { return }
                 cardsSegment = .categories
                 selectedTab = .cards
             })

@@ -8,8 +8,8 @@ import Vision
 /// server for structuring, so receipt images stay off our infrastructure and we
 /// don't need a vision model.
 enum ReceiptOCR {
-    /// Recognises a receipt top-to-bottom, left-to-right so item names stay next
-    /// to their prices in the text the parser sees.
+    /// Recognises a receipt as rows, so each item's name stays on the same line as
+    /// its price in the text the parser sees.
     static func recognizeText(in image: UIImage) throws -> String {
         guard let cgImage = image.cgImage else { throw ReceiptScanError.noTextFound }
         let straightened = deskewedDocument(in: cgImage) ?? cgImage
@@ -21,20 +21,66 @@ enum ReceiptOCR {
 
         try VNImageRequestHandler(cgImage: straightened, options: [:]).perform([request])
 
-        let lines: [(y: CGFloat, x: CGFloat, text: String)] = (request.results ?? []).compactMap {
+        let fragments: [Fragment] = (request.results ?? []).compactMap {
             guard let candidate = $0.topCandidates(1).first else { return nil }
-            return (y: $0.boundingBox.midY, x: $0.boundingBox.minX, text: candidate.string)
+            return Fragment(box: $0.boundingBox, text: candidate.string)
         }
-        let text = lines
-            // Vision's origin is bottom-left, so descending Y is top-down.
-            .sorted { $0.y == $1.y ? $0.x < $1.x : $0.y > $1.y }
-            .map(\.text)
+
+        let text = groupIntoRows(fragments)
+            .map { row in
+                row.sorted { $0.box.minX < $1.box.minX }
+                    .map(\.text)
+                    .joined(separator: "   ")
+            }
             .joined(separator: "\n")
 
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw ReceiptScanError.noTextFound
         }
         return text
+    }
+
+    private struct Fragment {
+        let box: CGRect
+        let text: String
+    }
+
+    /// Puts text fragments that sit on the same printed line back together.
+    ///
+    /// Vision reports each column as its own observation, so an item's name and
+    /// its price arrive separately. Emitting one fragment per line loses the
+    /// pairing: the columns have slightly different baselines, so a price can
+    /// sort ahead of its own name and land against the item above it — which is
+    /// how a 300-peso ramen ends up printed against a soft drink. Worse, the
+    /// mistake isn't stable, so two photos of one receipt disagree.
+    ///
+    /// Rows are cut by vertical overlap rather than by distance between
+    /// midpoints, so a large bold total still groups with its small-text label.
+    /// Rotation is `deskewedDocument`'s job; this assumes lines are level.
+    private static func groupIntoRows(_ fragments: [Fragment]) -> [[Fragment]] {
+        // Vision's origin is bottom-left, so descending Y walks the receipt down.
+        let ordered = fragments.sorted { $0.box.midY > $1.box.midY }
+
+        var rows: [[Fragment]] = []
+        for fragment in ordered {
+            // Compared against the row's first fragment, never the last one
+            // added: chaining off the last would let a row creep down the
+            // receipt one tolerance at a time and swallow the line below.
+            if let anchor = rows.last?.first, sharesRow(anchor.box, fragment.box) {
+                rows[rows.count - 1].append(fragment)
+            } else {
+                rows.append([fragment])
+            }
+        }
+        return rows
+    }
+
+    /// Two fragments are on one printed line when their vertical extents overlap
+    /// by more than a third of the shorter one. Adjacent lines clear each other
+    /// comfortably at that threshold, even on a tightly printed receipt.
+    private static func sharesRow(_ a: CGRect, _ b: CGRect) -> Bool {
+        let overlap = min(a.maxY, b.maxY) - max(a.minY, b.minY)
+        return overlap > 0.35 * min(a.height, b.height)
     }
 
     /// Crops to the receipt and corrects perspective, which is most of what a

@@ -71,12 +71,12 @@ struct PublicSplitClaimView: View {
                 SplitGuestStore.clear(for: shareToken)
             }
             loadError = nil
-        } catch let error as APIError {
-            if case .server(let message) = error, message.contains("Not found") {
-                loadError = "This split link isn't valid any more."
-            } else {
-                loadError = error.localizedDescription
-            }
+        } catch let error as APIServerError {
+            // A revoked or mistyped link 404s; anything else is worth showing as
+            // the server worded it.
+            loadError = error.status == 404 || error.message.contains("Not found")
+                ? "This split link isn't valid any more."
+                : error.localizedDescription
         } catch {
             loadError = error.localizedDescription
         }
@@ -162,7 +162,15 @@ struct PublicSplitClaimView: View {
                     )
                 }
 
-                if participantId == nil { joinCard(split) }
+                // Joining an even split would add a head and silently re-divide
+                // everyone's share — including the shares of people who already
+                // walked away with a number in mind. The organizer set the
+                // headcount; the link only reports what it came to.
+                if split.isEvenSplit {
+                    evenShareCard(split)
+                } else if participantId == nil {
+                    joinCard(split)
+                }
 
                 itemsSection(split)
 
@@ -178,6 +186,43 @@ struct PublicSplitClaimView: View {
             .padding(.bottom, 24)
         }
         .refreshable { await load() }
+    }
+
+    /// The whole answer for a guest on an even split: what one person pays.
+    private func evenShareCard(_ split: PublicSplit) -> some View {
+        let heads = max(1, split.participants.count)
+        return VStack(spacing: 8) {
+            Text("Split evenly between \(heads)")
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.muted)
+            Text(formatSplitMoney(split.totalCents / heads, currency: split.currency))
+                .font(.system(size: 40, weight: .bold, design: .monospaced))
+                .foregroundStyle(Theme.accent)
+            Text("each")
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.faint)
+            if split.isEachOwn {
+                Text("Everyone pays the restaurant directly.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.faint)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 2)
+            } else if let organizer = split.organizerName {
+                Text("Pay \(organizer) back for your share.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.faint)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 2)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 22)
+        .background(Theme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Theme.accent.opacity(0.35), lineWidth: 1)
+        )
     }
 
     private func joinCard(_ split: PublicSplit) -> some View {
@@ -227,7 +272,13 @@ struct PublicSplitClaimView: View {
 
     private func itemsSection(_ split: PublicSplit) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionEyebrow(participantId == nil ? "What was ordered" : "Select your items")
+            // An even split is decided by the headcount, so there is nothing here
+            // for a guest to pick — the lines are just the receipt.
+            SectionEyebrow(
+                split.isEvenSplit || participantId == nil
+                    ? "What was ordered"
+                    : "Select your items"
+            )
 
             VStack(spacing: 0) {
                 ForEach(split.items) { item in
@@ -249,10 +300,13 @@ struct PublicSplitClaimView: View {
     private func itemRow(split: PublicSplit, item: BillSplitItem) -> some View {
         let claimers = split.participants.filter { $0.claimedItemIds.contains(item.id) }
         let mine = myClaims.contains(item.id)
-        let interactive = participantId != nil && split.isOpen
-        return Button { toggle(item) } label: {
+        let claimable = !split.isEvenSplit
+        let interactive = participantId != nil && split.isOpen && claimable
+        return Button { if claimable { toggle(item) } } label: {
             HStack(spacing: 12) {
-                if pendingItemIds.contains(item.id) {
+                if !claimable {
+                    EmptyView()
+                } else if pendingItemIds.contains(item.id) {
                     ProgressView().tint(Theme.muted).frame(width: 19)
                 } else {
                     Image(systemName: mine ? "checkmark.square.fill" : "square")
@@ -265,7 +319,9 @@ struct PublicSplitClaimView: View {
                         .font(.system(size: 15))
                         .foregroundStyle(Theme.ink)
                         .lineLimit(1)
-                    if claimers.isEmpty {
+                    if !claimable {
+                        EmptyView()
+                    } else if claimers.isEmpty {
                         Text("Unclaimed").font(.system(size: 11)).foregroundStyle(Theme.faint)
                     } else {
                         Text(

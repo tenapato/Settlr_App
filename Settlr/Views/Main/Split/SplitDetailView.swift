@@ -14,6 +14,9 @@ struct SplitDetailView: View {
 
     @State private var confirmDelete = false
     @State private var copiedLink = false
+    @State private var showQR = false
+    @State private var showPassAround = false
+    @State private var showResult = false
     @State private var isRefreshing = false
     @State private var refreshSpin = 0.0
     @Environment(\.scenePhase) private var scenePhase
@@ -36,6 +39,24 @@ struct SplitDetailView: View {
         }
         .navigationTitle(split?.merchant ?? "Split")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showQR) {
+            if let split, let link = split.shareLink {
+                SplitQRSheet(link: link, merchant: split.merchant)
+            }
+        }
+        .sheet(isPresented: $showPassAround) {
+            if let split {
+                SplitPassAroundView(workspaceId: workspaceId, split: split, vm: vm)
+            }
+        }
+        .sheet(isPresented: $showResult) {
+            if let split {
+                NavigationStack {
+                    SplitResultView(split: split, onFinish: { showResult = false })
+                }
+                .preferredColorScheme(.dark)
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button { refresh() } label: {
@@ -141,6 +162,10 @@ struct SplitDetailView: View {
                     shareCard(split)
                     itemsSection(split)
                     peopleSection(split)
+                } else if split.isEachOwn {
+                    // Nothing to collect: everyone settled with the restaurant.
+                    eachOwnSummary(split)
+                    closedItemsSection(split)
                 } else {
                     collectProgress(split)
                     collectionSection(split)
@@ -219,11 +244,81 @@ struct SplitDetailView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Copy link")
+
+                    Button {
+                        showQR = true
+                    } label: {
+                        Image(systemName: "qrcode")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
+                            .frame(width: 46, height: 44)
+                            .background(Theme.surface)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .strokeBorder(Theme.line, lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Show QR code")
                 }
             }
-            Text("Anyone with the link picks their own items — no account, no install needed. It opens in the app if they have it.")
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.faint)
+
+            // The link only works for people who have a phone out and data. This
+            // is the fallback that always works at a table — but only where there
+            // is something to tap. An even split is decided by the headcount, so
+            // walking the phone around asking "what did you have" changes nothing.
+            if !split.items.isEmpty, !split.isEvenSplit {
+                Button {
+                    showPassAround = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "iphone.gen3.radiowaves.left.and.right")
+                            .font(.system(size: 15, weight: .semibold))
+                        Text("Pass the phone around").font(.system(size: 15, weight: .semibold))
+                    }
+                    .foregroundStyle(Theme.ink)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Theme.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(Theme.line, lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+
+            if split.isEvenSplit {
+                Button {
+                    showResult = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "list.number")
+                            .font(.system(size: 15, weight: .semibold))
+                        Text("Show who pays what").font(.system(size: 15, weight: .semibold))
+                    }
+                    .foregroundStyle(Theme.ink)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Theme.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(Theme.line, lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+
+            Text(
+                split.isEvenSplit
+                    ? "The bill is divided equally — anyone with the link sees their share. No account, no install needed."
+                    : "Anyone with the link picks their own items — no account, no install needed. It opens in the app if they have it."
+            )
+            .font(.system(size: 12))
+            .foregroundStyle(Theme.faint)
         }
     }
 
@@ -241,6 +336,46 @@ struct SplitDetailView: View {
             try? await Task.sleep(nanoseconds: 1_800_000_000)
             withAnimation(.easeOut(duration: 0.2)) { copiedLink = false }
         }
+    }
+
+    /// The finished view of an `each_own` split: what each person's share came
+    /// to, and which one of those is yours. No progress bar, no "to go" — there
+    /// is no debt here, and showing one would invent an obligation nobody has.
+    private func eachOwnSummary(_ split: BillSplit) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionEyebrow("Everyone paid their own")
+            ForEach(split.participants) { person in
+                HStack {
+                    Text(person.name)
+                        .font(.system(size: 15, weight: person.isOrganizer ? .semibold : .regular))
+                        .foregroundStyle(Theme.ink)
+                    if person.isOrganizer {
+                        Text("you")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Theme.bg)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Theme.accent)
+                            .clipShape(Capsule())
+                    }
+                    Spacer()
+                    Text(formatSplitMoney(person.owedCents, currency: split.currency))
+                        .font(.system(size: 15, design: .monospaced))
+                        .foregroundStyle(person.isOrganizer ? Theme.accent : Theme.muted)
+                }
+            }
+            Text("Only your own share was recorded as an expense.")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.faint)
+                .padding(.top, 2)
+        }
+        .padding(14)
+        .background(Theme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Theme.line, lineWidth: 1)
+        )
     }
 
     // MARK: - Collecting (locked / settled)
@@ -442,9 +577,12 @@ struct SplitDetailView: View {
         let mine = Set(split.organizer?.claimedItemIds ?? [])
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
-                SectionEyebrow(split.isOpen ? "Your items" : "Items")
+                // Nothing is claimed on an even split — the lines are just the
+                // receipt, kept for the record. Calling them "your items" would
+                // promise a choice that doesn't change anybody's share.
+                SectionEyebrow(split.isEvenSplit ? "What was ordered" : (split.isOpen ? "Your items" : "Items"))
                 Spacer()
-                if split.unclaimedItemsCents > 0 {
+                if !split.isEvenSplit, split.unclaimedItemsCents > 0 {
                     Text("\(formatSplitMoney(split.unclaimedItemsCents, currency: split.currency)) unclaimed")
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.warning)
@@ -481,8 +619,9 @@ struct SplitDetailView: View {
         organizerId: String?
     ) -> some View {
         let claimers = split.participants.filter { $0.claimedItemIds.contains(item.id) }
+        let claimable = !split.isEvenSplit
         return Button {
-            guard split.isOpen else { return }
+            guard split.isOpen, claimable else { return }
             Task {
                 await vm.toggleClaim(
                     workspaceId: workspaceId,
@@ -493,16 +632,20 @@ struct SplitDetailView: View {
             }
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: mine ? "checkmark.square.fill" : "square")
-                    .font(.system(size: 19))
-                    .foregroundStyle(mine ? Theme.accent : Theme.faint)
+                if claimable {
+                    Image(systemName: mine ? "checkmark.square.fill" : "square")
+                        .font(.system(size: 19))
+                        .foregroundStyle(mine ? Theme.accent : Theme.faint)
+                }
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.quantity > 1 ? "\(item.quantity)× \(item.name)" : item.name)
                         .font(.system(size: 15))
                         .foregroundStyle(Theme.ink)
                         .lineLimit(1)
-                    if claimers.isEmpty {
+                    if !claimable {
+                        EmptyView()
+                    } else if claimers.isEmpty {
                         Text("Unclaimed").font(.system(size: 11)).foregroundStyle(Theme.faint)
                     } else {
                         Text(
@@ -526,7 +669,7 @@ struct SplitDetailView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(!split.isOpen)
+        .disabled(!split.isOpen || !claimable)
     }
 
     // MARK: - People
@@ -559,6 +702,23 @@ struct SplitDetailView: View {
         }
     }
 
+    /// An item count under someone's name only means something when items were
+    /// claimed. On an even split it would always read "0 items" next to a real
+    /// amount, which looks like a bug rather than a rule.
+    private func personSubtitle(split: BillSplit, person: BillSplitParticipant) -> String {
+        if split.isEvenSplit {
+            return "Equal share"
+        }
+        if person.isOrganizer, !split.isEachOwn {
+            return "Paid the bill"
+        }
+        if person.isOrganizer {
+            return "Paid their own share"
+        }
+        let count = person.claimedItemIds.count
+        return "\(count) item\(count == 1 ? "" : "s")"
+    }
+
     private func personRow(split: BillSplit, person: BillSplitParticipant) -> some View {
         HStack(spacing: 12) {
             ZStack {
@@ -573,13 +733,9 @@ struct SplitDetailView: View {
                     .font(.system(size: 15))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1)
-                Text(
-                    person.isOrganizer
-                        ? "Paid the bill"
-                        : "\(person.claimedItemIds.count) item\(person.claimedItemIds.count == 1 ? "" : "s")"
-                )
-                .font(.system(size: 11))
-                .foregroundStyle(Theme.faint)
+                Text(personSubtitle(split: split, person: person))
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.faint)
             }
 
             Spacer(minLength: 4)
@@ -645,7 +801,7 @@ struct SplitDetailView: View {
                     )
                 }
             } label: {
-                Text(split.isOpen ? "Close claiming & collect" : "Reopen for claiming")
+                Text(lockButtonTitle(split))
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(split.isOpen ? Theme.bg : Theme.ink)
                     .frame(maxWidth: .infinity)
@@ -655,14 +811,30 @@ struct SplitDetailView: View {
             }
             .disabled(vm.isSaving)
 
-            Text(
-                split.isOpen
-                    ? "Freezes everyone's share so you can start marking people as paid."
-                    : "Un-settle everyone first if you need to change the items."
-            )
-            .font(.system(size: 12))
-            .foregroundStyle(Theme.faint)
-            .multilineTextAlignment(.center)
+            Text(lockButtonCaption(split))
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.faint)
+                .multilineTextAlignment(.center)
         }
+    }
+
+    /// On an `each_own` split there is nothing to collect — finishing is what
+    /// puts the organizer's own share in their ledger, so the button says that.
+    private func lockButtonTitle(_ split: BillSplit) -> String {
+        if split.isEachOwn {
+            return split.isOpen ? "Finish split" : "Reopen for claiming"
+        }
+        return split.isOpen ? "Close claiming & collect" : "Reopen for claiming"
+    }
+
+    private func lockButtonCaption(_ split: BillSplit) -> String {
+        if split.isEachOwn {
+            return split.isOpen
+                ? "Freezes everyone's share and records your own share as an expense. Nobody owes you anything on this split."
+                : "Reopening removes the expense recorded for your share until you finish again."
+        }
+        return split.isOpen
+            ? "Freezes everyone's share so you can start marking people as paid."
+            : "Un-settle everyone first if you need to change the items."
     }
 }

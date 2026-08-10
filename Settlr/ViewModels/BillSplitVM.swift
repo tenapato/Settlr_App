@@ -71,13 +71,24 @@ final class BillSplitVM {
         }
     }
 
+    /// `participantId` nil claims for the organizer — the server's default.
     @MainActor
-    func toggleClaim(workspaceId: String, splitId: String, itemId: String, claimed: Bool) async {
+    func toggleClaim(
+        workspaceId: String,
+        splitId: String,
+        itemId: String,
+        claimed: Bool,
+        participantId: String? = nil
+    ) async {
         _ = await mutate {
             try await api.fetch(
                 Endpoints.billSplitClaims(workspaceId, splitId),
                 method: "POST",
-                body: BillSplitClaimBody(itemId: itemId, claimed: claimed)
+                body: BillSplitClaimBody(
+                    itemId: itemId,
+                    claimed: claimed,
+                    participantId: participantId
+                )
             )
         }
     }
@@ -120,25 +131,12 @@ final class BillSplitVM {
 
     // MARK: - Create / delete
 
-    @MainActor
-    func create(workspaceId: String, body: CreateBillSplitBody) async -> BillSplit? {
-        isSaving = true
-        errorMessage = nil
-        defer { isSaving = false }
-        do {
-            let resp: BillSplitResponse = try await api.fetch(
-                Endpoints.billSplits(workspaceId),
-                method: "POST",
-                body: body
-            )
-            detail = resp.split
-            await load(workspaceId: workspaceId)
-            return resp.split
-        } catch {
-            errorMessage = error.localizedDescription
-            return nil
-        }
-    }
+    /// Creation does not live here.
+    ///
+    /// A split is composed at a table, where the connection is worst, so it is
+    /// written to disk first and uploaded by `PendingSplitQueue` — which owns
+    /// the retry, the idempotency key and the "not yet" state that a view model
+    /// tied to one screen's lifetime cannot.
 
     @MainActor
     func delete(workspaceId: String, splitId: String) async -> Bool {
@@ -166,23 +164,28 @@ final class BillSplitVM {
     /// the server whenever Apple Intelligence isn't available on this device —
     /// and also if it fails, because a working scan matters more than where it
     /// ran. Throws only when both routes fail.
+    ///
+    /// Both routes go through `ReceiptReconciler` against the same OCR text, so
+    /// whichever model read the receipt, every price comes off the receipt
+    /// itself and the draft the organizer sees adds up the same way.
     @MainActor
     func scanReceipt(workspaceId: String, text: String) async throws -> ScannedReceipt {
         do {
             if let onDevice = try await OnDeviceReceiptParser.parse(ocrText: text),
                !onDevice.items.isEmpty {
                 lastScanWasOnDevice = true
-                return onDevice
+                return ReceiptReconciler.reconcile(onDevice, ocrText: text)
             }
         } catch {
             // Fall through to the server rather than failing the scan outright.
         }
 
         lastScanWasOnDevice = false
-        return try await api.fetch(
+        let fromServer: ScannedReceipt = try await api.fetch(
             Endpoints.billSplitScanReceipt(workspaceId),
             method: "POST",
             body: ScanReceiptBody(text: text)
         )
+        return ReceiptReconciler.reconcile(fromServer, ocrText: text)
     }
 }

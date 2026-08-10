@@ -25,11 +25,15 @@ enum Tab: CaseIterable {
 // Pill content — the selected tab expands to show its label; background applied by MainTabView
 struct FloatingTabBar: View {
     @Binding var selected: Tab
+    /// Only the tabs this user's features leave reachable — an admin can switch
+    /// off cards or payments, and a bar item that leads nowhere is worse than
+    /// a shorter bar.
+    var tabs: [Tab] = Tab.allCases
     @Namespace private var indicatorNS
 
     var body: some View {
         HStack(spacing: 2) {
-            ForEach(Tab.allCases, id: \.self) { tab in
+            ForEach(tabs, id: \.self) { tab in
                 item(for: tab)
             }
         }

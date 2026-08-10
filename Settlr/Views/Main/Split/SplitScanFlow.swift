@@ -8,8 +8,9 @@ import SwiftUI
 /// scan is the default path rather than one option on a form.
 struct SplitScanFlow: View {
     let workspaceId: String
-    /// Called after a split is created so the caller can open its detail screen.
-    let onCreated: (BillSplit) -> Void
+    /// Called once the split is safely somewhere — on the server, or on the
+    /// phone waiting to upload. Only the first case has a detail screen to open.
+    let onSaved: (SplitSaveOutcome) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var vm = BillSplitVM()
@@ -19,6 +20,9 @@ struct SplitScanFlow: View {
     @State private var busyMessage: String?
     @State private var busyImage: UIImage?
     @State private var errorMessage: String?
+    /// Carried into the create sheet when the scan couldn't run — the user needs
+    /// to know why the form is empty.
+    @State private var notice: String?
 
     var body: some View {
         ReceiptCaptureView(
@@ -33,10 +37,10 @@ struct SplitScanFlow: View {
             errorMessage: errorMessage
         )
         .sheet(isPresented: $showCreate) {
-            SplitCreateSheet(workspaceId: workspaceId, vm: vm, prefill: prefill) { created in
+            SplitCreateSheet(workspaceId: workspaceId, vm: vm, prefill: prefill, notice: notice) { outcome in
                 showCreate = false
                 dismiss()
-                onCreated(created)
+                onSaved(outcome)
             }
         }
         .sheet(isPresented: $showList) {
@@ -63,6 +67,13 @@ struct SplitScanFlow: View {
                 busyMessage = "Finding the items…"
                 let parsed = try await vm.scanReceipt(workspaceId: workspaceId, text: text)
                 prefill = parsed
+                showCreate = true
+            } catch let error where APIError.isOffline(error) {
+                // Vision read the receipt fine; only the fallback parser needed
+                // the network. Another photo would fail identically, so move on
+                // to the form rather than parking the user on the camera.
+                notice = "No signal, so the items couldn't be read automatically — type them in."
+                prefill = nil
                 showCreate = true
             } catch {
                 // Stay on the camera so the obvious next move is another shot.

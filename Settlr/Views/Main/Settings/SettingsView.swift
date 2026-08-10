@@ -186,7 +186,17 @@ struct SettingsView: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("You'll need to sign in again to access your workspaces.")
+                // Queued splits are kept, not deleted — they're stamped with the
+                // user id, so they stay invisible to anyone else who signs in on
+                // this phone and upload themselves when their owner returns.
+                let waiting = appState.currentUser.map {
+                    PendingSplitQueue.shared.pendingCount(userId: $0.id)
+                } ?? 0
+                Text(
+                    waiting > 0
+                        ? "\(waiting) split\(waiting == 1 ? "" : "s") haven't uploaded yet. They'll still be here when you sign back in."
+                        : "You'll need to sign in again to access your workspaces."
+                )
             }
             .confirmationDialog("Delete Account", isPresented: $showDeleteAccountConfirm, titleVisibility: .visible) {
                 Button("Delete My Account", role: .destructive) {

@@ -2,9 +2,15 @@ import SwiftUI
 
 /// Shown on an expense that mirrors a bill split.
 ///
-/// The expense is the whole bill, so on its own it overstates what the meal cost
-/// you — the paybacks land separately as income. Expanding this says who is
-/// covering which part of it, and how much has actually come back.
+/// What the expense means depends on who paid, and the two answers are not
+/// variations on a phrase — they are different amounts of money:
+///
+/// - `me` — you fronted the whole bill, so the expense is the whole bill and on
+///   its own it overstates what the meal cost you. The paybacks land separately
+///   as income, and the number worth showing is what's left after them.
+/// - `each_own` — everyone settled with the restaurant directly, so the expense
+///   is only ever your share. Nobody owes you anything, and showing a "paid you
+///   back" progress line here would invent a debt that does not exist.
 struct ExpenseSplitSection: View {
     let workspaceId: String
     let splitId: String
@@ -87,8 +93,14 @@ struct ExpenseSplitSection: View {
     }
 
     private var subtitle: String {
-        guard let split else { return "Tap to see who owes what" }
+        guard let split else { return "Tap to see how this was split" }
         let guests = split.guests
+        if split.isEachOwn {
+            // No debt to report on, so the useful fact is the size of the table.
+            return guests.isEmpty
+                ? "Everyone paid their own share"
+                : "Split \(split.participants.count) ways · everyone paid their own"
+        }
         let settled = guests.filter(\.isSettled).count
         if guests.isEmpty { return "Nobody has joined yet" }
         if settled == guests.count { return "Everyone settled up" }
@@ -132,16 +144,17 @@ struct ExpenseSplitSection: View {
         }
     }
 
+    @ViewBuilder
     private func netRow(_ split: BillSplit) -> some View {
+        if split.isEachOwn { eachOwnRows(split) } else { paidItAllRows(split) }
+    }
+
+    /// You fronted the bill: the expense is the whole thing, and the number that
+    /// matters is what it comes to once the paybacks are in.
+    private func paidItAllRows(_ split: BillSplit) -> some View {
         let recovered = split.guests.filter(\.isSettled).reduce(0) { $0 + $1.owedCents }
         return VStack(spacing: 8) {
-            HStack {
-                Text("Bill total").font(.system(size: 13)).foregroundStyle(Theme.muted)
-                Spacer()
-                Text(formatSplitMoney(split.totalCents, currency: split.currency))
-                    .font(.system(size: 13, design: .monospaced))
-                    .foregroundStyle(Theme.ink)
-            }
+            amountRow("Bill total", split.totalCents, currency: split.currency)
             HStack {
                 Text("Paid back to you").font(.system(size: 13)).foregroundStyle(Theme.muted)
                 Spacer()
@@ -149,44 +162,90 @@ struct ExpenseSplitSection: View {
                     .font(.system(size: 13, design: .monospaced))
                     .foregroundStyle(Theme.income)
             }
-            HStack {
-                Text("Your net cost").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.ink)
-                Spacer()
-                Text(formatSplitMoney(split.totalCents - recovered, currency: split.currency))
-                    .font(.system(size: 15, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Theme.accent)
-            }
+            emphasisRow("Your net cost", split.totalCents - recovered, currency: split.currency)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
     }
 
+    /// Everyone paid the restaurant directly: only your share was ever your
+    /// money, and that is the amount this expense records. The bill total is
+    /// here as context for it, never as something you are owed back.
+    private func eachOwnRows(_ split: BillSplit) -> some View {
+        let yours = split.organizer?.owedCents ?? 0
+        return VStack(spacing: 8) {
+            amountRow("Bill total", split.totalCents, currency: split.currency)
+            amountRow("Paid by everyone else", max(0, split.totalCents - yours), currency: split.currency)
+            emphasisRow("Your share", yours, currency: split.currency)
+            Text("Only your share was recorded as an expense.")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.faint)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 2)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+    }
+
+    private func amountRow(_ label: String, _ cents: Int, currency: String) -> some View {
+        HStack {
+            Text(label).font(.system(size: 13)).foregroundStyle(Theme.muted)
+            Spacer()
+            Text(formatSplitMoney(cents, currency: currency))
+                .font(.system(size: 13, design: .monospaced))
+                .foregroundStyle(Theme.ink)
+        }
+    }
+
+    private func emphasisRow(_ label: String, _ cents: Int, currency: String) -> some View {
+        HStack {
+            Text(label).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.ink)
+            Spacer()
+            Text(formatSplitMoney(cents, currency: currency))
+                .font(.system(size: 15, weight: .semibold, design: .monospaced))
+                .foregroundStyle(Theme.accent)
+        }
+    }
+
     private func participantRow(split: BillSplit, person: BillSplitParticipant) -> some View {
-        HStack(spacing: 10) {
+        // On an `each_own` split nobody is behind on anything, so no row is
+        // marked as owing and none of them is dimmed as "already handled".
+        let isDebt = !split.isEachOwn && !person.isOrganizer && !person.isSettled
+        let isDone = split.isEachOwn || person.isSettled
+
+        return HStack(spacing: 10) {
             ZStack {
                 Circle()
-                    .fill(person.isSettled ? Theme.income.opacity(0.16) : Theme.surface2)
+                    .fill(isDone ? Theme.income.opacity(0.16) : Theme.surface2)
                     .frame(width: 26, height: 26)
                 Text(splitInitials(person.name))
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(person.isSettled ? Theme.income : Theme.muted)
+                    .foregroundStyle(isDone ? Theme.income : Theme.muted)
             }
             VStack(alignment: .leading, spacing: 1) {
                 Text(person.name)
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1)
-                Text(person.isOrganizer ? "Paid the bill" : (person.isSettled ? "Settled" : "Owes you"))
+                Text(status(split: split, person: person))
                     .font(.system(size: 11))
-                    .foregroundStyle(person.isSettled || person.isOrganizer ? Theme.faint : Theme.warning)
+                    .foregroundStyle(isDebt ? Theme.warning : Theme.faint)
             }
             Spacer(minLength: 4)
             Text(formatSplitMoney(person.owedCents, currency: split.currency))
                 .font(.system(size: 14, design: .monospaced))
-                .foregroundStyle(person.isSettled ? Theme.faint : Theme.ink)
+                .foregroundStyle(person.isOrganizer || !isDone ? Theme.ink : Theme.faint)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 11)
+    }
+
+    private func status(split: BillSplit, person: BillSplitParticipant) -> String {
+        if split.isEachOwn {
+            return person.isOrganizer ? "Your share" : "Paid their own"
+        }
+        if person.isOrganizer { return "Paid the bill" }
+        return person.isSettled ? "Settled" : "Owes you"
     }
 
     private func load() async {
