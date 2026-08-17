@@ -126,4 +126,36 @@ final class PassAroundStateTests: XCTestCase {
         XCTAssertEqual(body.participantCount, 3)
         XCTAssertEqual(body.participantNames, ["Ana", "Person 3"])
     }
+
+    func testPublicUnitControlUsesViewerQuantityAndRemainingCapacity() throws {
+        // This catches the native public link falling back to a boolean claim
+        // even though the server returned two units for the current viewer.
+        let participant = try JSONDecoder().decode(
+            PublicSplitParticipant.self,
+            from: Data(#"{"id":"guest","name":"Ana","isOrganizer":false,"claimedItemIds":["tacos"],"claimQuantities":{"tacos":2},"owedCents":2000,"settled":false}"#.utf8)
+        )
+        let control = SplitClaimControlState(
+            allocationMode: "units",
+            totalQuantity: 4,
+            claimedQuantity: 3,
+            participantQuantity: participant.claimQuantities["tacos"] ?? 0
+        )
+
+        XCTAssertEqual(control.mine, 2)
+        XCTAssertEqual(control.available, 1)
+        XCTAssertEqual(control.total, 4)
+        XCTAssertEqual(control.decrementedQuantity, 1)
+        XCTAssertEqual(control.incrementedQuantity, 3)
+    }
+
+    func testLegacyPublicParticipantDefaultsMissingClaimQuantities() throws {
+        // This catches the additive quantity field making a response from an
+        // older server undecodable during rollout.
+        let participant = try JSONDecoder().decode(
+            PublicSplitParticipant.self,
+            from: Data(#"{"id":"guest","name":"Ana","isOrganizer":false,"claimedItemIds":["plate"],"owedCents":1000,"settled":false}"#.utf8)
+        )
+
+        XCTAssertEqual(participant.claimQuantities, [:])
+    }
 }

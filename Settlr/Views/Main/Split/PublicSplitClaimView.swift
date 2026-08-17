@@ -25,7 +25,6 @@ struct PublicSplitClaimView: View {
         guard let participantId else { return nil }
         return split?.participants.first { $0.id == participantId }
     }
-    private var myClaims: Set<String> { Set(me?.claimedItemIds ?? []) }
 
     var body: some View {
         NavigationStack {
@@ -111,9 +110,8 @@ struct PublicSplitClaimView: View {
         }
     }
 
-    private func toggle(_ item: BillSplitItem) {
+    private func setClaim(_ item: BillSplitItem, quantity: Int) {
         guard let secret, split?.isOpen == true, !pendingItemIds.contains(item.id) else { return }
-        let claimed = !myClaims.contains(item.id)
         pendingItemIds.insert(item.id)
         actionError = nil
         Task {
@@ -122,10 +120,18 @@ struct PublicSplitClaimView: View {
                 let resp: PublicSplitResponse = try await APIClient.shared.fetch(
                     Endpoints.publicSplitClaims(shareToken),
                     method: "POST",
-                    body: BillSplitClaimBody(itemId: item.id, quantity: claimed ? 1 : 0),
+                    body: BillSplitClaimBody(itemId: item.id, quantity: max(0, quantity)),
                     headers: ["X-Split-Secret": secret]
                 )
                 split = resp.split
+            } catch let error as APIServerError where error.status == 409 {
+                actionError = error.code == "claim_capacity_changed"
+                    ? "Someone else just claimed the remaining quantity. This item has been refreshed."
+                    : error.localizedDescription
+                // APIClient keeps all non-2xx bodies behind APIServerError, so
+                // fetch the fresh public DTO that the conflict represents. The
+                // claim secret resolves the same viewer and their quantity.
+                await load()
             } catch {
                 actionError = error.localizedDescription
                 await load()
@@ -299,19 +305,20 @@ struct PublicSplitClaimView: View {
 
     private func itemRow(split: PublicSplit, item: BillSplitItem) -> some View {
         let claimers = split.participants.filter { $0.claimedItemIds.contains(item.id) }
-        let mine = myClaims.contains(item.id)
+        let mineQuantity = me?.claimQuantities[item.id]
+            ?? (me?.claimedItemIds.contains(item.id) == true ? 1 : 0)
+        let control = SplitClaimControlState(
+            allocationMode: item.allocationMode,
+            totalQuantity: item.quantity,
+            claimedQuantity: item.claimedQuantity,
+            participantQuantity: mineQuantity
+        )
         let claimable = !split.isEvenSplit
         let interactive = participantId != nil && split.isOpen && claimable
-        return Button { if claimable { toggle(item) } } label: {
+        return VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 12) {
-                if !claimable {
-                    EmptyView()
-                } else if pendingItemIds.contains(item.id) {
+                if pendingItemIds.contains(item.id) {
                     ProgressView().tint(Theme.muted).frame(width: 19)
-                } else {
-                    Image(systemName: mine ? "checkmark.square.fill" : "square")
-                        .font(.system(size: 19))
-                        .foregroundStyle(mine ? Theme.accent : Theme.faint)
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -323,11 +330,18 @@ struct PublicSplitClaimView: View {
                         EmptyView()
                     } else if claimers.isEmpty {
                         Text("Unclaimed").font(.system(size: 11)).foregroundStyle(Theme.faint)
+                    } else if control.isShared {
+                        Text("Sharing: " + claimers.map(\.name).joined(separator: ", "))
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.muted)
+                        .lineLimit(1)
                     } else {
-                        Text(
-                            (claimers.count > 1 ? "Split \(claimers.count) ways · " : "")
-                                + claimers.map(\.name).joined(separator: ", ")
-                        )
+                        let holders = claimers.map { participant in
+                            let quantity = participant.claimQuantities[item.id]
+                                ?? (participant.claimedItemIds.contains(item.id) ? 1 : 0)
+                            return quantity > 1 ? "\(participant.name) \(quantity)×" : participant.name
+                        }
+                        Text("\(item.claimedQuantity) of \(item.quantity) claimed · " + holders.joined(separator: ", "))
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.muted)
                         .lineLimit(1)
@@ -340,12 +354,71 @@ struct PublicSplitClaimView: View {
                     .font(.system(size: 14, design: .monospaced))
                     .foregroundStyle(Theme.ink)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 11)
-            .contentShape(Rectangle())
+
+            if interactive {
+                if control.isShared {
+                    Button(control.sharedActionTitle) {
+                        setClaim(item, quantity: control.sharedDesiredQuantity)
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(control.mine > 0 ? Theme.muted : Theme.bg)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(control.mine > 0 ? Theme.surface2 : Theme.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .disabled(pendingItemIds.contains(item.id))
+                } else {
+                    HStack(spacing: 10) {
+                        publicQuantityButton(
+                            "minus",
+                            enabled: control.canDecrement && !pendingItemIds.contains(item.id)
+                        ) {
+                            setClaim(item, quantity: control.decrementedQuantity)
+                        }
+                        Spacer()
+                        publicQuantityLabel("Mine", control.mine)
+                        publicQuantityLabel("Available", control.available)
+                        publicQuantityLabel("Total", control.total)
+                        Spacer()
+                        publicQuantityButton(
+                            "plus",
+                            enabled: control.canIncrement && !pendingItemIds.contains(item.id)
+                        ) {
+                            setClaim(item, quantity: control.incrementedQuantity)
+                        }
+                    }
+                }
+            }
         }
-        .buttonStyle(.plain)
-        .disabled(!interactive)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+    }
+
+    private func publicQuantityButton(
+        _ systemName: String,
+        enabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 13, weight: .bold))
+                .frame(width: 30, height: 30)
+                .background(Theme.surface2)
+                .clipShape(Circle())
+        }
+        .foregroundStyle(enabled ? Theme.accent : Theme.faint)
+        .disabled(!enabled)
+    }
+
+    private func publicQuantityLabel(_ label: String, _ value: Int) -> some View {
+        VStack(spacing: 1) {
+            Text("\(value)")
+                .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                .foregroundStyle(Theme.ink)
+            Text(label)
+                .font(.system(size: 9))
+                .foregroundStyle(Theme.faint)
+        }
     }
 
     private func shareFooter(split: PublicSplit, me: PublicSplitParticipant) -> some View {

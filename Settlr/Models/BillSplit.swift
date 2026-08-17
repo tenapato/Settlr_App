@@ -583,8 +583,24 @@ struct PublicSplitParticipant: Codable, Identifiable {
     let name: String
     let isOrganizer: Bool
     let claimedItemIds: [String]
+    let claimQuantities: [String: Int]
     let owedCents: Int
     let settled: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, isOrganizer, claimedItemIds, claimQuantities, owedCents, settled
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(String.self, forKey: .id)
+        name = try values.decode(String.self, forKey: .name)
+        isOrganizer = try values.decode(Bool.self, forKey: .isOrganizer)
+        claimedItemIds = try values.decodeIfPresent([String].self, forKey: .claimedItemIds) ?? []
+        claimQuantities = try values.decodeIfPresent([String: Int].self, forKey: .claimQuantities) ?? [:]
+        owedCents = try values.decode(Int.self, forKey: .owedCents)
+        settled = try values.decode(Bool.self, forKey: .settled)
+    }
 }
 
 struct PublicSplit: Codable {
