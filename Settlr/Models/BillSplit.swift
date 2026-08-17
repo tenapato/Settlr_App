@@ -84,6 +84,130 @@ struct BillSplitParticipant: Codable, Identifiable {
     var isSettled: Bool { settledAt != nil }
 }
 
+/// Pure navigation state for the pass-the-phone flow.
+///
+/// Participant identity, not array position, is the source of truth. Server
+/// refreshes can insert, remove, or reorder people while the phone is moving
+/// around the table; keeping the id here prevents that refresh from silently
+/// switching the person whose claims are being edited.
+struct PassAroundState: Equatable {
+    private(set) var orderedParticipantIDs: [String]
+    private(set) var currentParticipantID: String?
+    private(set) var hasStarted = false
+    private var soloWasConfirmed = false
+
+    init(participantIDs: [String]) {
+        orderedParticipantIDs = Self.unique(participantIDs)
+        currentParticipantID = nil
+    }
+
+    var canStart: Bool {
+        orderedParticipantIDs.count >= 2
+            || (orderedParticipantIDs.count == 1 && soloWasConfirmed)
+    }
+
+    /// One-based position for display; zero before the claim flow starts.
+    var position: Int {
+        guard let currentParticipantID,
+              let index = orderedParticipantIDs.firstIndex(of: currentParticipantID) else { return 0 }
+        return index + 1
+    }
+
+    var isLast: Bool { position > 0 && position == orderedParticipantIDs.count }
+
+    mutating func continueWithJustMe() {
+        guard orderedParticipantIDs.count == 1 else { return }
+        soloWasConfirmed = true
+    }
+
+    @discardableResult
+    mutating func start() -> Bool {
+        guard canStart, let first = orderedParticipantIDs.first else { return false }
+        hasStarted = true
+        if let currentParticipantID, orderedParticipantIDs.contains(currentParticipantID) {
+            // Resume the same person when returning from table setup.
+        } else {
+            currentParticipantID = first
+        }
+        return true
+    }
+
+    mutating func selectNext() {
+        guard let currentParticipantID,
+              let index = orderedParticipantIDs.firstIndex(of: currentParticipantID),
+              index + 1 < orderedParticipantIDs.count else { return }
+        self.currentParticipantID = orderedParticipantIDs[index + 1]
+    }
+
+    mutating func selectPrevious() {
+        guard let currentParticipantID,
+              let index = orderedParticipantIDs.firstIndex(of: currentParticipantID),
+              index > 0 else { return }
+        self.currentParticipantID = orderedParticipantIDs[index - 1]
+    }
+
+    mutating func moveParticipant(id: String, by offset: Int) {
+        guard let oldIndex = orderedParticipantIDs.firstIndex(of: id) else { return }
+        let newIndex = min(max(0, oldIndex + offset), orderedParticipantIDs.count - 1)
+        guard oldIndex != newIndex else { return }
+        orderedParticipantIDs.remove(at: oldIndex)
+        orderedParticipantIDs.insert(id, at: newIndex)
+    }
+
+    mutating func adoptParticipantIDs(_ participantIDs: [String]) {
+        let incoming = Self.unique(participantIDs)
+        let incomingSet = Set(incoming)
+        let oldPosition = max(0, position - 1)
+        var nextOrder = orderedParticipantIDs.filter(incomingSet.contains)
+        nextOrder.append(contentsOf: incoming.filter { !nextOrder.contains($0) })
+        orderedParticipantIDs = nextOrder
+
+        if let currentParticipantID, incomingSet.contains(currentParticipantID) {
+            return
+        }
+        currentParticipantID = nextOrder.isEmpty
+            ? nil
+            : nextOrder[min(oldPosition, nextOrder.count - 1)]
+    }
+
+    private static func unique(_ ids: [String]) -> [String] {
+        var seen = Set<String>()
+        return ids.filter { seen.insert($0).inserted }
+    }
+}
+
+/// Derived bounds and copy for one participant's item claim controls.
+struct SplitClaimControlState: Equatable {
+    let isShared: Bool
+    let mine: Int
+    let available: Int
+    let total: Int
+
+    init(
+        allocationMode: String,
+        totalQuantity: Int,
+        claimedQuantity: Int,
+        participantQuantity: Int
+    ) {
+        isShared = allocationMode == "shared"
+        total = max(1, totalQuantity)
+        if isShared {
+            mine = participantQuantity > 0 ? 1 : 0
+            available = 0
+        } else {
+            mine = min(max(0, participantQuantity), total)
+            available = max(0, total - max(0, claimedQuantity))
+        }
+    }
+
+    var canDecrement: Bool { !isShared && mine > 0 }
+    var canIncrement: Bool { !isShared && available > 0 }
+    var decrementedQuantity: Int { canDecrement ? mine - 1 : mine }
+    var incrementedQuantity: Int { canIncrement ? mine + 1 : mine }
+    var sharedActionTitle: String { mine > 0 ? "Remove share" : "Share item" }
+    var sharedDesiredQuantity: Int { mine > 0 ? 0 : 1 }
+}
+
 struct BillSplit: Codable, Identifiable {
     let id: String
     let shareToken: String
@@ -301,11 +425,15 @@ struct EditBillSplitBody: Encodable {
 
 struct BillSplitClaimBody: Encodable {
     let itemId: String
-    let claimed: Bool
+    /// Desired quantity after this mutation. Zero removes the claim. Shared
+    /// items use zero or one; unit items may use any value within capacity.
+    let quantity: Int
     /// Whose claim this is. Omitted means the organizer's own row, which is what
     /// the detail screen wants; the pass-the-phone flow names each person in turn.
     var participantId: String? = nil
 }
+
+struct BillSplitParticipantNameBody: Encodable { let name: String }
 
 struct BillSplitStatusBody: Encodable { let status: String }
 

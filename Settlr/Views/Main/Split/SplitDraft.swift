@@ -216,7 +216,10 @@ struct SplitDraft {
             payer: payer,
             splitMode: splitMode,
             participantCount: participants.count,
-            participantNames: guests.map(\.name),
+            participantNames: guests.enumerated().map { index, participant in
+                let name = participant.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                return name.isEmpty ? "Person \(index + 2)" : name
+            },
             mismatchAcknowledged: mismatchAcknowledged ? true : nil
         )
     }

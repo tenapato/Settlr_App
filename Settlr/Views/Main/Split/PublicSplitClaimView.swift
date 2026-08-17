@@ -122,7 +122,7 @@ struct PublicSplitClaimView: View {
                 let resp: PublicSplitResponse = try await APIClient.shared.fetch(
                     Endpoints.publicSplitClaims(shareToken),
                     method: "POST",
-                    body: BillSplitClaimBody(itemId: item.id, claimed: claimed),
+                    body: BillSplitClaimBody(itemId: item.id, quantity: claimed ? 1 : 0),
                     headers: ["X-Split-Secret": secret]
                 )
                 split = resp.split

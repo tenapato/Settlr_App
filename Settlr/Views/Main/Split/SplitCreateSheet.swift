@@ -386,7 +386,7 @@ struct SplitCreateSheet: View {
         if headcount > 1 {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text("Who else")
+                    Text("Who's at the table?")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Theme.muted)
                     Text("optional")

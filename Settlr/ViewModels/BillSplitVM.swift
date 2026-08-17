@@ -7,6 +7,12 @@ import Observation
 /// disagree about who owes what.
 @Observable
 final class BillSplitVM {
+    enum ClaimMutationResult: Equatable {
+        case saved
+        case capacityChanged
+        case failed
+    }
+
     var splits: [BillSplitSummary] = []
     var detail: BillSplit?
     var isLoading = false
@@ -71,25 +77,46 @@ final class BillSplitVM {
         }
     }
 
-    /// `participantId` nil claims for the organizer — the server's default.
+    /// Sends desired state, not a boolean toggle. `participantId` nil writes the
+    /// organizer's row, which is the server default.
     @MainActor
-    func toggleClaim(
+    func setClaimQuantity(
         workspaceId: String,
         splitId: String,
         itemId: String,
-        claimed: Bool,
+        quantity: Int,
         participantId: String? = nil
-    ) async {
-        _ = await mutate {
-            try await api.fetch(
+    ) async -> ClaimMutationResult {
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+        do {
+            let response: BillSplitResponse = try await api.fetch(
                 Endpoints.billSplitClaims(workspaceId, splitId),
                 method: "POST",
                 body: BillSplitClaimBody(
                     itemId: itemId,
-                    claimed: claimed,
+                    quantity: max(0, quantity),
                     participantId: participantId
                 )
             )
+            detail = response.split
+            return .saved
+        } catch let error as APIServerError where error.status == 409 {
+            // A 409 response carries a fresh DTO, but APIClient deliberately
+            // exposes server errors uniformly. Fetch it again so every caller
+            // adopts current capacity before showing the conflict.
+            let response: BillSplitResponse? = try? await api.fetch(
+                Endpoints.billSplit(workspaceId, splitId)
+            )
+            if let response { detail = response.split }
+            errorMessage = error.code == "claim_capacity_changed"
+                ? "Someone else just claimed the remaining quantity. The item has been refreshed."
+                : error.localizedDescription
+            return error.code == "claim_capacity_changed" ? .capacityChanged : .failed
+        } catch {
+            errorMessage = error.localizedDescription
+            return .failed
         }
     }
 
@@ -120,13 +147,73 @@ final class BillSplitVM {
     }
 
     @MainActor
-    func removeParticipant(workspaceId: String, splitId: String, participantId: String) async {
-        _ = await mutate {
-            try await api.fetch(
-                Endpoints.billSplitParticipant(workspaceId, splitId, participantId),
-                method: "DELETE"
+    private func mutateParticipant(
+        workspaceId: String,
+        splitId: String,
+        endpoint: String,
+        method: String,
+        body: (any Encodable)? = nil
+    ) async -> Bool {
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+        do {
+            let response: BillSplitResponse = try await api.fetch(
+                endpoint,
+                method: method,
+                body: body
             )
+            detail = response.split
+            return true
+        } catch let error as APIServerError where error.status == 409 {
+            let response: BillSplitResponse? = try? await api.fetch(
+                Endpoints.billSplit(workspaceId, splitId)
+            )
+            if let response { detail = response.split }
+            errorMessage = "The table changed on another screen. It has been refreshed; try again."
+            return false
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
         }
+    }
+
+    @MainActor
+    func addParticipant(workspaceId: String, splitId: String, name: String) async -> Bool {
+        await mutateParticipant(
+            workspaceId: workspaceId,
+            splitId: splitId,
+            endpoint: Endpoints.billSplitParticipants(workspaceId, splitId),
+            method: "POST",
+            body: BillSplitParticipantNameBody(name: name)
+        )
+    }
+
+    @MainActor
+    func renameParticipant(
+        workspaceId: String,
+        splitId: String,
+        participantId: String,
+        name: String
+    ) async -> Bool {
+        await mutateParticipant(
+            workspaceId: workspaceId,
+            splitId: splitId,
+            endpoint: Endpoints.billSplitParticipant(workspaceId, splitId, participantId),
+            method: "PATCH",
+            body: BillSplitParticipantNameBody(name: name)
+        )
+    }
+
+    @MainActor
+    @discardableResult
+    func removeParticipant(workspaceId: String, splitId: String, participantId: String) async -> Bool {
+        await mutateParticipant(
+            workspaceId: workspaceId,
+            splitId: splitId,
+            endpoint: Endpoints.billSplitParticipant(workspaceId, splitId, participantId),
+            method: "DELETE"
+        )
     }
 
     // MARK: - Create / delete

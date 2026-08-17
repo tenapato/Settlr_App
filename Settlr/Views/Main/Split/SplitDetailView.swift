@@ -634,14 +634,12 @@ struct SplitDetailView: View {
     }
 
     private func itemsCard(_ split: BillSplit) -> some View {
-        let organizerId = split.organizer?.id
-        let mine = Set(split.organizer?.claimedItemIds ?? [])
         return VStack(spacing: 0) {
             ForEach(split.items) { item in
                 if item.id != split.items.first?.id {
                     Rectangle().fill(Theme.line).frame(height: 1)
                 }
-                itemRow(split: split, item: item, mine: mine.contains(item.id), organizerId: organizerId)
+                itemRow(split: split, item: item)
             }
         }
         .background(Theme.surface)
@@ -654,30 +652,21 @@ struct SplitDetailView: View {
 
     private func itemRow(
         split: BillSplit,
-        item: BillSplitItem,
-        mine: Bool,
-        organizerId: String?
+        item: BillSplitItem
     ) -> some View {
+        let organizer = split.organizer
+        let mineQuantity = organizer?.claimQuantities[item.id]
+            ?? (organizer?.claimedItemIds.contains(item.id) == true ? 1 : 0)
+        let control = SplitClaimControlState(
+            allocationMode: item.allocationMode,
+            totalQuantity: item.quantity,
+            claimedQuantity: item.claimedQuantity,
+            participantQuantity: mineQuantity
+        )
         let claimers = split.participants.filter { $0.claimedItemIds.contains(item.id) }
         let claimable = !split.isEvenSplit
-        return Button {
-            guard split.isOpen, claimable else { return }
-            Task {
-                await vm.toggleClaim(
-                    workspaceId: workspaceId,
-                    splitId: splitId,
-                    itemId: item.id,
-                    claimed: !mine
-                )
-            }
-        } label: {
+        return VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 12) {
-                if claimable {
-                    Image(systemName: mine ? "checkmark.square.fill" : "square")
-                        .font(.system(size: 19))
-                        .foregroundStyle(mine ? Theme.accent : Theme.faint)
-                }
-
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.quantity > 1 ? "\(item.quantity)× \(item.name)" : item.name)
                         .font(.system(size: 15))
@@ -687,11 +676,18 @@ struct SplitDetailView: View {
                         EmptyView()
                     } else if claimers.isEmpty {
                         Text("Unclaimed").font(.system(size: 11)).foregroundStyle(Theme.faint)
+                    } else if control.isShared {
+                        Text("Sharing: " + claimers.map(\.name).joined(separator: ", "))
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.muted)
+                        .lineLimit(1)
                     } else {
-                        Text(
-                            (claimers.count > 1 ? "Split \(claimers.count) ways · " : "")
-                                + claimers.map(\.name).joined(separator: ", ")
-                        )
+                        let holders = claimers.map { participant in
+                            let quantity = participant.claimQuantities[item.id]
+                                ?? (participant.claimedItemIds.contains(item.id) ? 1 : 0)
+                            return quantity > 1 ? "\(participant.name) \(quantity)×" : participant.name
+                        }
+                        Text("\(item.claimedQuantity) of \(item.quantity) claimed · " + holders.joined(separator: ", "))
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.muted)
                         .lineLimit(1)
@@ -704,12 +700,76 @@ struct SplitDetailView: View {
                     .font(.system(size: 14, design: .monospaced))
                     .foregroundStyle(Theme.ink)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 11)
-            .contentShape(Rectangle())
+
+            if split.isOpen, claimable {
+                if control.isShared {
+                    Button(control.sharedActionTitle) {
+                        setOrganizerClaim(item: item, quantity: control.sharedDesiredQuantity)
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(control.mine > 0 ? Theme.muted : Theme.bg)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(control.mine > 0 ? Theme.surface2 : Theme.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .disabled(vm.isSaving)
+                } else {
+                    HStack(spacing: 10) {
+                        organizerQuantityButton("minus", enabled: control.canDecrement) {
+                            setOrganizerClaim(item: item, quantity: control.decrementedQuantity)
+                        }
+                        Spacer()
+                        detailQuantityLabel("Mine", control.mine)
+                        detailQuantityLabel("Available", control.available)
+                        detailQuantityLabel("Total", control.total)
+                        Spacer()
+                        organizerQuantityButton("plus", enabled: control.canIncrement) {
+                            setOrganizerClaim(item: item, quantity: control.incrementedQuantity)
+                        }
+                    }
+                }
+            }
         }
-        .buttonStyle(.plain)
-        .disabled(!split.isOpen || !claimable)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+    }
+
+    private func setOrganizerClaim(item: BillSplitItem, quantity: Int) {
+        Task {
+            _ = await vm.setClaimQuantity(
+                workspaceId: workspaceId,
+                splitId: splitId,
+                itemId: item.id,
+                quantity: quantity
+            )
+        }
+    }
+
+    private func organizerQuantityButton(
+        _ systemName: String,
+        enabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 13, weight: .bold))
+                .frame(width: 30, height: 30)
+                .background(Theme.surface2)
+                .clipShape(Circle())
+        }
+        .foregroundStyle(enabled ? Theme.accent : Theme.faint)
+        .disabled(!enabled || vm.isSaving)
+    }
+
+    private func detailQuantityLabel(_ label: String, _ value: Int) -> some View {
+        VStack(spacing: 1) {
+            Text("\(value)")
+                .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                .foregroundStyle(Theme.ink)
+            Text(label)
+                .font(.system(size: 9))
+                .foregroundStyle(Theme.faint)
+        }
     }
 
     // MARK: - People
