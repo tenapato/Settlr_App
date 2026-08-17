@@ -9,8 +9,8 @@ import SwiftUI
 ///   its own it overstates what the meal cost you. The paybacks land separately
 ///   as income, and the number worth showing is what's left after them.
 /// - `each_own` — everyone settled with the restaurant directly, so the expense
-///   is only ever your share. Nobody owes you anything, and showing a "paid you
-///   back" progress line here would invent a debt that does not exist.
+///   is only ever your share. No reimbursement exists, and showing repayment
+///   progress here would invent a debt that does not exist.
 struct ExpenseSplitSection: View {
     let workspaceId: String
     let splitId: String
@@ -95,16 +95,12 @@ struct ExpenseSplitSection: View {
     private var subtitle: String {
         guard let split else { return "Tap to see how this was split" }
         let guests = split.guests
-        if split.isEachOwn {
-            // No debt to report on, so the useful fact is the size of the table.
-            return guests.isEmpty
-                ? "Everyone paid their own share"
-                : "Split \(split.participants.count) ways · everyone paid their own"
-        }
         let settled = guests.filter(\.isSettled).count
-        if guests.isEmpty { return "Nobody has joined yet" }
-        if settled == guests.count { return "Everyone settled up" }
-        return "\(settled) of \(guests.count) paid you back"
+        return split.accountingPresentation.expenseSubtitle(
+            participantCount: split.participants.count,
+            guestCount: guests.count,
+            settledGuestCount: settled
+        )
     }
 
     @ViewBuilder
@@ -112,16 +108,20 @@ struct ExpenseSplitSection: View {
         VStack(spacing: 0) {
             Divider().overlay(Theme.line).padding(.leading, 16)
 
-            // The number the ledger can't show on its own: bill minus paybacks.
-            netRow(split)
+            if split.accountingPresentation.summaryMode == .reviewRequired {
+                unavailablePayerRow(split)
+            } else {
+                // The number the ledger can't show on its own: bill minus paybacks.
+                netRow(split)
 
-            Divider().overlay(Theme.line).padding(.leading, 16)
+                Divider().overlay(Theme.line).padding(.leading, 16)
 
-            ForEach(split.participants) { person in
-                if person.id != split.participants.first?.id {
-                    Divider().overlay(Theme.line).padding(.leading, 16)
+                ForEach(split.participants) { person in
+                    if person.id != split.participants.first?.id {
+                        Divider().overlay(Theme.line).padding(.leading, 16)
+                    }
+                    participantRow(split: split, person: person)
                 }
-                participantRow(split: split, person: person)
             }
 
             Divider().overlay(Theme.line).padding(.leading, 16)
@@ -146,7 +146,32 @@ struct ExpenseSplitSection: View {
 
     @ViewBuilder
     private func netRow(_ split: BillSplit) -> some View {
-        if split.isEachOwn { eachOwnRows(split) } else { paidItAllRows(split) }
+        switch split.accountingPresentation.summaryMode {
+        case .individualShares:
+            eachOwnRows(split)
+        case .organizerReimbursement:
+            paidItAllRows(split)
+        case .reviewRequired:
+            unavailablePayerRow(split)
+        }
+    }
+
+    private func unavailablePayerRow(_ split: BillSplit) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(Theme.warning)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(split.accountingPresentation.reviewMessage ?? "Split needs review")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+                Text("Choose who paid before this card shows expenses or reimbursements.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.muted)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
     }
 
     /// You fronted the bill: the expense is the whole thing, and the number that
@@ -175,7 +200,7 @@ struct ExpenseSplitSection: View {
         let yours = split.organizer?.owedCents ?? 0
         return VStack(spacing: 8) {
             amountRow("Bill total", split.totalCents, currency: split.currency)
-            amountRow("Paid by everyone else", max(0, split.totalCents - yours), currency: split.currency)
+            amountRow("Everyone else's shares", max(0, split.totalCents - yours), currency: split.currency)
             emphasisRow("Your share", yours, currency: split.currency)
             Text("Only your share was recorded as an expense.")
                 .font(.system(size: 11))
@@ -210,8 +235,9 @@ struct ExpenseSplitSection: View {
     private func participantRow(split: BillSplit, person: BillSplitParticipant) -> some View {
         // On an `each_own` split nobody is behind on anything, so no row is
         // marked as owing and none of them is dimmed as "already handled".
-        let isDebt = !split.isEachOwn && !person.isOrganizer && !person.isSettled
-        let isDone = split.isEachOwn || person.isSettled
+        let presentation = split.accountingPresentation
+        let isDebt = presentation.allowsSettlementActions && !person.isOrganizer && !person.isSettled
+        let isDone = presentation.summaryMode == .individualShares || person.isSettled
 
         return HStack(spacing: 10) {
             ZStack {
@@ -241,11 +267,10 @@ struct ExpenseSplitSection: View {
     }
 
     private func status(split: BillSplit, person: BillSplitParticipant) -> String {
-        if split.isEachOwn {
-            return person.isOrganizer ? "Your share" : "Paid their own"
-        }
-        if person.isOrganizer { return "Paid the bill" }
-        return person.isSettled ? "Settled" : "Owes you"
+        split.accountingPresentation.participantStatus(
+            isOrganizer: person.isOrganizer,
+            isSettled: person.isSettled
+        )
     }
 
     private func load() async {

@@ -198,7 +198,10 @@ struct SplitDetailView: View {
                         .foregroundStyle(Theme.expense)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                if split.isOpen {
+                if split.accountingPresentation.summaryMode == .reviewRequired {
+                    unavailablePayerCard(split)
+                    closedItemsSection(split)
+                } else if split.isOpen {
                     shareCard(split)
                     itemsSection(split)
                     peopleSection(split)
@@ -211,7 +214,9 @@ struct SplitDetailView: View {
                     collectionSection(split)
                     closedItemsSection(split)
                 }
-                lockButton(split)
+                if split.accountingPresentation.summaryMode != .reviewRequired {
+                    lockButton(split)
+                }
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
@@ -232,13 +237,16 @@ struct SplitDetailView: View {
                 .foregroundStyle(Theme.muted)
             if !split.isOpen {
                 let outstanding = split.outstandingCents
-                Text(
-                    outstanding > 0
-                        ? "\(formatSplitMoney(outstanding, currency: split.currency)) still owed to you"
-                        : "Everyone has settled up"
-                )
+                Text(split.accountingPresentation.lockedHeaderStatus(
+                    outstandingCents: outstanding,
+                    currency: split.currency
+                ))
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(outstanding > 0 ? Theme.warning : Theme.income)
+                .foregroundStyle(
+                    split.accountingPresentation.summaryMode == .reviewRequired
+                        ? Theme.warning
+                        : (outstanding > 0 && !split.isEachOwn ? Theme.warning : Theme.income)
+                )
                 .padding(.top, 2)
             }
         }
@@ -774,9 +782,49 @@ struct SplitDetailView: View {
 
     // MARK: - People
 
+    private func unavailablePayerCard(_ split: BillSplit) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(Theme.warning)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(split.accountingPresentation.reviewMessage ?? "Split needs review")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                    Text("Choose whether one person paid or everyone paid their own before showing balances or recording settlements.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.muted)
+                }
+            }
+
+            Button("Review split mode") {
+                if split.isOpen {
+                    showEditor = true
+                } else if split.participants.contains(where: \.isSettled) {
+                    showSettledEditExplanation = true
+                } else {
+                    reopenAndEdit()
+                }
+            }
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(Theme.bg)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 11)
+            .background(Theme.accent)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .padding(14)
+        .background(Theme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Theme.warning.opacity(0.4), lineWidth: 1)
+        )
+    }
+
     private func peopleSection(_ split: BillSplit) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionEyebrow("Who owes what")
+            SectionEyebrow(split.accountingPresentation.peopleSectionTitle)
 
             VStack(spacing: 0) {
                 ForEach(split.participants) { person in
@@ -793,8 +841,9 @@ struct SplitDetailView: View {
                     .strokeBorder(Theme.line, lineWidth: 1)
             )
 
-            if split.isOpen && split.guests.isEmpty {
-                Text("Nobody has joined yet. Send the link and their picks show up here.")
+            if split.guests.isEmpty,
+               let emptyMessage = split.accountingPresentation.emptyPeopleMessage(isOpen: split.isOpen) {
+                Text(emptyMessage)
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.faint)
                     .padding(.horizontal, 4)
@@ -806,17 +855,11 @@ struct SplitDetailView: View {
     /// claimed. On an even split it would always read "0 items" next to a real
     /// amount, which looks like a bug rather than a rule.
     private func personSubtitle(split: BillSplit, person: BillSplitParticipant) -> String {
-        if split.isEvenSplit {
-            return "Equal share"
-        }
-        if person.isOrganizer, !split.isEachOwn {
-            return "Paid the bill"
-        }
-        if person.isOrganizer {
-            return "Paid their own share"
-        }
-        let count = person.claimedItemIds.count
-        return "\(count) item\(count == 1 ? "" : "s")"
+        split.accountingPresentation.participantSubtitle(
+            isOrganizer: person.isOrganizer,
+            isEvenSplit: split.isEvenSplit,
+            claimedItemCount: person.claimedItemIds.count
+        )
     }
 
     private func personRow(split: BillSplit, person: BillSplitParticipant) -> some View {
@@ -867,7 +910,7 @@ struct SplitDetailView: View {
             Image(systemName: "lock.open")
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.faint)
-        } else {
+        } else if split.accountingPresentation.allowsSettlementActions {
             Button {
                 Task {
                     await vm.setSettled(
@@ -884,6 +927,11 @@ struct SplitDetailView: View {
             }
             .buttonStyle(.plain)
             .disabled(vm.isSaving)
+        } else {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 20))
+                .foregroundStyle(Theme.income)
+                .accessibilityLabel("Paid their own share")
         }
     }
 
@@ -921,20 +969,10 @@ struct SplitDetailView: View {
     /// On an `each_own` split there is nothing to collect — finishing is what
     /// puts the organizer's own share in their ledger, so the button says that.
     private func lockButtonTitle(_ split: BillSplit) -> String {
-        if split.isEachOwn {
-            return split.isOpen ? "Finish split" : "Reopen for claiming"
-        }
-        return split.isOpen ? "Close claiming & collect" : "Reopen for claiming"
+        split.accountingPresentation.lockButtonTitle(isOpen: split.isOpen)
     }
 
     private func lockButtonCaption(_ split: BillSplit) -> String {
-        if split.isEachOwn {
-            return split.isOpen
-                ? "Freezes everyone's share and records your own share as an expense. Nobody owes you anything on this split."
-                : "Reopening removes the expense recorded for your share until you finish again."
-        }
-        return split.isOpen
-            ? "Freezes everyone's share so you can start marking people as paid."
-            : "Un-settle everyone first if you need to change the items."
+        split.accountingPresentation.lockButtonCaption(isOpen: split.isOpen)
     }
 }

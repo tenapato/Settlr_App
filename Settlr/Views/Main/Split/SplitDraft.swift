@@ -128,7 +128,9 @@ struct SplitDraft {
         merchant = split.merchant
         occurredAt = Self.day(from: split.occurredAt) ?? Date()
         currency = split.currency
-        payer = split.payer ?? "me"
+        // A missing legacy payer must remain visibly unresolved. Defaulting to
+        // `me` here would turn opening the editor into an accounting decision.
+        payer = split.payerMode == .unavailable ? "" : split.payer
         splitMode = split.splitMode ?? "by_item"
         participants = split.participants.map {
             Participant(id: $0.id, name: $0.name, isOrganizer: $0.isOrganizer)

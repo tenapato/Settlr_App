@@ -141,11 +141,7 @@ struct SplitResultView: View {
 
     private var footer: some View {
         VStack(spacing: 10) {
-            Text(
-                split.isEachOwn
-                    ? "Everyone pays the restaurant directly. Nobody owes you anything."
-                    : "You paid the bill, so these are the amounts owed back to you."
-            )
+            Text(footerExplanation)
             .font(.system(size: 12))
             .foregroundStyle(Theme.faint)
             .multilineTextAlignment(.center)
@@ -162,5 +158,16 @@ struct SplitResultView: View {
         }
         .padding(16)
         .background(Theme.bg)
+    }
+
+    private var footerExplanation: String {
+        switch split.payerMode {
+        case .eachOwn:
+            return "Everyone pays the restaurant directly. No reimbursements are recorded."
+        case .organizerPaid:
+            return "You paid the bill, so these are the amounts owed back to you."
+        case .unavailable:
+            return "Split mode unavailable — open to review"
+        }
     }
 }

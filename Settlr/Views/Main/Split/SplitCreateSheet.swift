@@ -83,6 +83,7 @@ struct SplitCreateSheet: View {
         return !draft.merchant.trimmingCharacters(in: .whitespaces).isEmpty
             && itemsOk
             && effectiveTotalCents > 0
+            && BillSplitPayerMode(persistedValue: draft.payer) != .unavailable
             && (draft.paymentChannel != "credit_card" || draft.creditCardId != nil)
             && !reconciliation.requiresDecision
             && (!isEditing || network.isOnline)
@@ -462,14 +463,18 @@ struct SplitCreateSheet: View {
     /// Says what this combination will do to the ledger, in the same words the
     /// ledger will end up using. Getting this wrong is somebody's money.
     private var splitModeExplanation: String {
-        if draft.payer == "each_own" {
+        switch BillSplitPayerMode(persistedValue: draft.payer) {
+        case .eachOwn:
             return isEvenSplit
-                ? "Everyone pays the restaurant directly. Only your own share is recorded as your expense, and nobody owes you anything."
+                ? "Everyone pays the restaurant directly. Only your own share is recorded as your expense, with no reimbursements."
                 : "Everyone pays the restaurant directly. Tap the items you had; only your own share is recorded as your expense."
+        case .unavailable:
+            return "Choose who paid before saving. This decides whether the split records reimbursements or individual shares."
+        case .organizerPaid:
+            return isEvenSplit
+                ? "The full bill is recorded as one expense. Each person you mark as paid back is recorded as income."
+                : "The full bill is recorded as one expense. People claim what they ordered, and each one you mark as paid back is recorded as income."
         }
-        return isEvenSplit
-            ? "The full bill is recorded as one expense. Each person you mark as paid back is recorded as income."
-            : "The full bill is recorded as one expense. People claim what they ordered, and each one you mark as paid back is recorded as income."
     }
 
     // MARK: - Items
@@ -728,7 +733,7 @@ struct SplitCreateSheet: View {
     /// table, which is the one moment they have least patience for it.
     private var tipShortcuts: some View {
         HStack(spacing: 8) {
-            ForEach([10, 15, 20], id: \.self) { percent in
+            ForEach(TipPreset.values, id: \.self) { percent in
                 tipChip(percent)
             }
             Spacer(minLength: 0)
@@ -772,13 +777,11 @@ struct SplitCreateSheet: View {
 
     /// The percentage currently in the tip field, if it is one of the presets.
     private var activeTipPercent: Int? {
-        let tip = draft.tipCents
-        guard tip > 0, tipBaseCents > 0 else { return nil }
-        return [10, 15, 20].first { tipCents(percent: $0) == tip }
+        TipPreset.activePercent(base: tipBaseCents, tipCents: draft.tipCents)
     }
 
     private func tipCents(percent: Int) -> Int {
-        TipMath.cents(base: tipBaseCents, percent: percent)
+        TipPreset.cents(base: tipBaseCents, percent: percent)
     }
 
     /// Sets the tip, and moves the total with it.
@@ -792,8 +795,8 @@ struct SplitCreateSheet: View {
     private func applyTip(percent: Int?) {
         let newTip = percent.map { tipCents(percent: $0) } ?? 0
         if totalEdited {
-            draft.selectedTotalCents = TipMath.retotal(
-                total: draft.selectedTotalCents,
+            draft.selectedTotalCents = TipPreset.retotal(
+                selectedTotal: draft.selectedTotalCents,
                 replacing: draft.tipCents,
                 with: newTip
             )
@@ -969,29 +972,6 @@ struct SplitCreateSheet: View {
         }
     }
 
-}
-
-// MARK: - Tip arithmetic
-
-/// The two sums behind the tip shortcuts, kept out of the view so they can be
-/// exercised on their own. Both produce money somebody is asked to pay back.
-enum TipMath {
-    /// Rounded to the nearest cent, so 15% of an odd subtotal doesn't leave a
-    /// fraction that the share math would then have to redistribute.
-    static func cents(base: Int, percent: Int) -> Int {
-        guard base > 0, percent > 0 else { return 0 }
-        return Int((Double(base) * Double(percent) / 100).rounded())
-    }
-
-    /// Swaps one tip out of a total and another in.
-    ///
-    /// Needed because a scanned receipt pins the total by hand, after which it
-    /// stops tracking the lines: adding a tip without moving the total would
-    /// leave it swallowed, and the table would under-pay by exactly the tip.
-    /// Removing the old tip first is what stops 10% → 15% from compounding.
-    static func retotal(total: Int, replacing oldTip: Int, with newTip: Int) -> Int {
-        max(0, total - oldTip) + newTip
-    }
 }
 
 // MARK: - Money text helpers

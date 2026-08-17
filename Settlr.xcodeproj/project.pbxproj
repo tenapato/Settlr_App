@@ -11,6 +11,8 @@
 		AB0000000000000000000002 /* ParserPreferenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000004 /* ParserPreferenceTests.swift */; };
 		AB0000000000000000000011 /* SplitDraftTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000010 /* SplitDraftTests.swift */; };
 		AB0000000000000000000013 /* PassAroundStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000012 /* PassAroundStateTests.swift */; };
+		AB0000000000000000000015 /* EachOwnPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000014 /* EachOwnPresentationTests.swift */; };
+		AB0000000000000000000017 /* TipPresetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000016 /* TipPresetTests.swift */; };
 		AA000000000000000000BB01 /* SettlrApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR01 /* SettlrApp.swift */; };
 		AA000000000000000000BB02 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR02 /* ContentView.swift */; };
 		AA000000000000000000BB03 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR03 /* APIClient.swift */; };
@@ -115,6 +117,8 @@
 		AB0000000000000000000004 /* ParserPreferenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParserPreferenceTests.swift; sourceTree = "<group>"; };
 		AB0000000000000000000010 /* SplitDraftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitDraftTests.swift; sourceTree = "<group>"; };
 		AB0000000000000000000012 /* PassAroundStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassAroundStateTests.swift; sourceTree = "<group>"; };
+		AB0000000000000000000014 /* EachOwnPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EachOwnPresentationTests.swift; sourceTree = "<group>"; };
+		AB0000000000000000000016 /* TipPresetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TipPresetTests.swift; sourceTree = "<group>"; };
 		AB0000000000000000000005 /* SettlrTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SettlrTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA000000000000000000FR01 /* SettlrApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettlrApp.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR02 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -473,6 +477,8 @@
 				AB0000000000000000000004 /* ParserPreferenceTests.swift */,
 				AB0000000000000000000010 /* SplitDraftTests.swift */,
 				AB0000000000000000000012 /* PassAroundStateTests.swift */,
+				AB0000000000000000000014 /* EachOwnPresentationTests.swift */,
+				AB0000000000000000000016 /* TipPresetTests.swift */,
 			);
 			path = SettlrTests;
 			sourceTree = "<group>";
@@ -580,6 +586,8 @@
 				AB0000000000000000000002 /* ParserPreferenceTests.swift in Sources */,
 				AB0000000000000000000011 /* SplitDraftTests.swift in Sources */,
 				AB0000000000000000000013 /* PassAroundStateTests.swift in Sources */,
+				AB0000000000000000000015 /* EachOwnPresentationTests.swift in Sources */,
+				AB0000000000000000000017 /* TipPresetTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

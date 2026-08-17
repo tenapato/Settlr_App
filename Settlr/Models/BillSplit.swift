@@ -208,6 +208,185 @@ struct SplitClaimControlState: Equatable {
     var sharedDesiredQuantity: Int { mine > 0 ? 0 : 1 }
 }
 
+/// The accounting meaning used by the UI after decoding a server response.
+///
+/// The wire value remains optional so cached responses from an older server can
+/// still decode. Rendering never branches on that optional value directly:
+/// missing and unknown values become `.unavailable`, which cannot be mistaken
+/// for the organizer having paid the whole bill.
+enum BillSplitPayerMode: Equatable {
+    case organizerPaid
+    case eachOwn
+    case unavailable
+
+    init(persistedValue: String?) {
+        switch persistedValue {
+        case "me": self = .organizerPaid
+        case "each_own": self = .eachOwn
+        default: self = .unavailable
+        }
+    }
+}
+
+/// Copy and capabilities shared by split detail and the linked expense card.
+/// Keeping these decisions pure prevents one screen from inventing a debt that
+/// the other screen correctly knows does not exist.
+struct SplitAccountingPresentation: Equatable {
+    enum SummaryMode: Equatable {
+        case organizerReimbursement
+        case individualShares
+        case reviewRequired
+    }
+
+    let payerMode: BillSplitPayerMode
+
+    var summaryMode: SummaryMode {
+        switch payerMode {
+        case .organizerPaid: .organizerReimbursement
+        case .eachOwn: .individualShares
+        case .unavailable: .reviewRequired
+        }
+    }
+
+    var reviewMessage: String? {
+        payerMode == .unavailable ? "Split mode unavailable — open to review" : nil
+    }
+
+    var allowsSettlementActions: Bool { payerMode == .organizerPaid }
+
+    var peopleSectionTitle: String {
+        switch payerMode {
+        case .organizerPaid: "Who owes what"
+        case .eachOwn: "Individual shares"
+        case .unavailable: "Split needs review"
+        }
+    }
+
+    func expenseSubtitle(
+        participantCount: Int,
+        guestCount: Int,
+        settledGuestCount: Int
+    ) -> String {
+        switch payerMode {
+        case .eachOwn:
+            return guestCount == 0
+                ? "Your individual share"
+                : "Split \(participantCount) ways · everyone paid their own"
+        case .organizerPaid:
+            if guestCount == 0 { return "Nobody has joined yet" }
+            if settledGuestCount == guestCount { return "Everyone settled up" }
+            return "\(settledGuestCount) of \(guestCount) paid you back"
+        case .unavailable:
+            return reviewMessage ?? "Split needs review"
+        }
+    }
+
+    func participantStatus(isOrganizer: Bool, isSettled: Bool) -> String {
+        switch payerMode {
+        case .eachOwn:
+            return isOrganizer ? "Your share" : "Paid their own"
+        case .organizerPaid:
+            if isOrganizer { return "Paid the bill" }
+            return isSettled ? "Settled" : "Owes you"
+        case .unavailable:
+            return "Share needs review"
+        }
+    }
+
+    func participantSubtitle(
+        isOrganizer: Bool,
+        isEvenSplit: Bool,
+        claimedItemCount: Int
+    ) -> String {
+        switch payerMode {
+        case .unavailable:
+            return "Share needs review"
+        case .eachOwn:
+            if isOrganizer { return "Your share" }
+            if isEvenSplit { return "Individual share" }
+            return "\(claimedItemCount) item\(claimedItemCount == 1 ? "" : "s")"
+        case .organizerPaid:
+            if isEvenSplit { return "Equal share" }
+            if isOrganizer { return "Paid the bill" }
+            return "\(claimedItemCount) item\(claimedItemCount == 1 ? "" : "s")"
+        }
+    }
+
+    func emptyPeopleMessage(isOpen: Bool) -> String? {
+        guard isOpen else { return nil }
+        switch payerMode {
+        case .organizerPaid:
+            return "Nobody has joined yet. Send the link and their picks show up here."
+        case .eachOwn:
+            return "Add everyone at the table to show their individual shares."
+        case .unavailable:
+            return reviewMessage
+        }
+    }
+
+    func lockedHeaderStatus(outstandingCents: Int, currency: String = "MXN") -> String {
+        switch payerMode {
+        case .eachOwn:
+            return "Everyone paid their own share"
+        case .organizerPaid:
+            return outstandingCents > 0
+                ? "\(formatSplitMoney(outstandingCents, currency: currency)) still owed to you"
+                : "Everyone has settled up"
+        case .unavailable:
+            return reviewMessage ?? "Split needs review"
+        }
+    }
+
+    func lockButtonTitle(isOpen: Bool) -> String {
+        switch payerMode {
+        case .eachOwn:
+            return isOpen ? "Finish split" : "Reopen for claiming"
+        case .organizerPaid:
+            return isOpen ? "Close claiming & collect" : "Reopen for claiming"
+        case .unavailable:
+            return "Review split mode"
+        }
+    }
+
+    func lockButtonCaption(isOpen: Bool) -> String {
+        switch payerMode {
+        case .eachOwn:
+            return isOpen
+                ? "Freezes everyone's share and records your own share as an expense. No reimbursements are recorded."
+                : "Reopening removes the expense recorded for your share until you finish again."
+        case .organizerPaid:
+            return isOpen
+                ? "Freezes everyone's share so you can start marking people as paid."
+                : "Un-settle everyone first if you need to change the items."
+        case .unavailable:
+            return "Choose who paid before changing this split's accounting."
+        }
+    }
+}
+
+/// Shared tip choices and money arithmetic for both rendering and selection.
+enum TipPreset {
+    static let values = [10, 12, 15, 20]
+
+    static func cents(base: Int, percent: Int) -> Int {
+        guard base > 0, percent > 0 else { return 0 }
+        return Int((Double(base) * Double(percent) / 100).rounded())
+    }
+
+    static func activePercent(base: Int, tipCents: Int) -> Int? {
+        guard base > 0, tipCents > 0 else { return nil }
+        return values.first { cents(base: base, percent: $0) == tipCents }
+    }
+
+    static func retotal(
+        selectedTotal: Int,
+        replacing oldTip: Int,
+        with newTip: Int
+    ) -> Int {
+        max(0, selectedTotal - oldTip) + newTip
+    }
+}
+
 struct BillSplit: Codable, Identifiable {
     let id: String
     let shareToken: String
@@ -229,8 +408,9 @@ struct BillSplit: Codable, Identifiable {
     let mismatchAcknowledged: Bool
     /// "me" — you fronted the whole bill and the table owes you.
     /// "each_own" — everyone paid their own share, so nobody owes anybody.
-    /// Optional so a split created before the field existed still decodes.
-    let payer: String?
+    /// Missing legacy wire values decode to `unavailable`; presentation must
+    /// resolve that explicit domain state before showing accounting language.
+    let payer: String
     /// "by_item" (people claim what they ordered) | "even" (divided by heads).
     let splitMode: String?
     let paymentChannel: String
@@ -268,7 +448,7 @@ struct BillSplit: Codable, Identifiable {
         status = try values.decode(String.self, forKey: .status)
         version = try values.decodeIfPresent(Int.self, forKey: .version) ?? 0
         mismatchAcknowledged = try values.decodeIfPresent(Bool.self, forKey: .mismatchAcknowledged) ?? false
-        payer = try values.decodeIfPresent(String.self, forKey: .payer)
+        payer = try values.decodeIfPresent(String.self, forKey: .payer) ?? "unavailable"
         splitMode = try values.decodeIfPresent(String.self, forKey: .splitMode)
         paymentChannel = try values.decodeIfPresent(String.self, forKey: .paymentChannel) ?? "cash"
         creditCardId = try values.decodeIfPresent(String.self, forKey: .creditCardId)
@@ -283,8 +463,12 @@ struct BillSplit: Codable, Identifiable {
     }
 
     var isOpen: Bool { status == "open" }
+    var payerMode: BillSplitPayerMode { BillSplitPayerMode(persistedValue: payer) }
+    var accountingPresentation: SplitAccountingPresentation {
+        SplitAccountingPresentation(payerMode: payerMode)
+    }
     /// Nobody owes the organizer: everyone settled with the restaurant directly.
-    var isEachOwn: Bool { payer == "each_own" }
+    var isEachOwn: Bool { payerMode == .eachOwn }
     var isEvenSplit: Bool { splitMode == "even" }
     var isSettled: Bool { status == "settled" }
     var organizer: BillSplitParticipant? { participants.first(where: \.isOrganizer) }
@@ -376,8 +560,9 @@ struct CreateBillSplitBody: Codable {
     /// split instead of a second one. Sent even when the phone is online: that
     /// is precisely when a response can go missing without anyone noticing.
     var idempotencyKey: String? = nil
-    /// "me" (default) | "each_own". Omitted by callers that don't care.
-    var payer: String? = nil
+    /// "me" | "each_own". New requests always carry an explicit payer.
+    /// Legacy durable queue entries that predate this field decode as `me`.
+    var payer: String = "me"
     /// "by_item" (default) | "even".
     var splitMode: String? = nil
     /// Headcount, organizer included. Required by the server for an even split.
@@ -387,6 +572,65 @@ struct CreateBillSplitBody: Codable {
     var participantNames: [String]? = nil
     /// Audit-only acknowledgement; never changes the user's selected total.
     var mismatchAcknowledged: Bool? = nil
+
+    private enum CodingKeys: String, CodingKey {
+        case merchant, occurredAt, items, taxCents, tipCents, feeCents, totalCents
+        case paymentChannel, creditCardId, idempotencyKey, payer, splitMode
+        case participantCount, participantNames, mismatchAcknowledged
+    }
+
+    init(
+        merchant: String,
+        occurredAt: String,
+        items: [BillSplitItemBody],
+        taxCents: Int,
+        tipCents: Int,
+        feeCents: Int,
+        totalCents: Int,
+        paymentChannel: String,
+        creditCardId: String?,
+        idempotencyKey: String? = nil,
+        payer: String = "me",
+        splitMode: String? = nil,
+        participantCount: Int? = nil,
+        participantNames: [String]? = nil,
+        mismatchAcknowledged: Bool? = nil
+    ) {
+        self.merchant = merchant
+        self.occurredAt = occurredAt
+        self.items = items
+        self.taxCents = taxCents
+        self.tipCents = tipCents
+        self.feeCents = feeCents
+        self.totalCents = totalCents
+        self.paymentChannel = paymentChannel
+        self.creditCardId = creditCardId
+        self.idempotencyKey = idempotencyKey
+        self.payer = payer
+        self.splitMode = splitMode
+        self.participantCount = participantCount
+        self.participantNames = participantNames
+        self.mismatchAcknowledged = mismatchAcknowledged
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        merchant = try values.decode(String.self, forKey: .merchant)
+        occurredAt = try values.decode(String.self, forKey: .occurredAt)
+        items = try values.decode([BillSplitItemBody].self, forKey: .items)
+        taxCents = try values.decode(Int.self, forKey: .taxCents)
+        tipCents = try values.decode(Int.self, forKey: .tipCents)
+        feeCents = try values.decode(Int.self, forKey: .feeCents)
+        totalCents = try values.decode(Int.self, forKey: .totalCents)
+        paymentChannel = try values.decode(String.self, forKey: .paymentChannel)
+        creditCardId = try values.decodeIfPresent(String.self, forKey: .creditCardId)
+        idempotencyKey = try values.decodeIfPresent(String.self, forKey: .idempotencyKey)
+        payer = try values.decodeIfPresent(String.self, forKey: .payer) ?? "me"
+        splitMode = try values.decodeIfPresent(String.self, forKey: .splitMode)
+        participantCount = try values.decodeIfPresent(Int.self, forKey: .participantCount)
+        participantNames = try values.decodeIfPresent([String].self, forKey: .participantNames)
+        mismatchAcknowledged = try values.decodeIfPresent(Bool.self, forKey: .mismatchAcknowledged)
+    }
 }
 
 struct EditBillSplitItemBody: Encodable {
@@ -624,7 +868,8 @@ struct PublicSplit: Codable {
     let viewerParticipantId: String?
 
     var isOpen: Bool { status == "open" }
-    var isEachOwn: Bool { payer == "each_own" }
+    var payerMode: BillSplitPayerMode { BillSplitPayerMode(persistedValue: payer) }
+    var isEachOwn: Bool { payerMode == .eachOwn }
     /// Divided by headcount, so there is nothing for a guest to pick.
     var isEvenSplit: Bool { splitMode == "even" }
 }

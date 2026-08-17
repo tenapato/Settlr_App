@@ -145,8 +145,8 @@ struct PublicSplitClaimView: View {
         ScrollView {
             VStack(spacing: 18) {
                 VStack(spacing: 5) {
-                    if let organizer = split.organizerName {
-                        Text("\(organizer) paid")
+                    if let payerHeadline = payerHeadline(split) {
+                        Text(payerHeadline)
                             .font(.system(size: 12))
                             .foregroundStyle(Theme.faint)
                     }
@@ -207,16 +207,23 @@ struct PublicSplitClaimView: View {
             Text("each")
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.faint)
-            if split.isEachOwn {
+            if split.payerMode == .eachOwn {
                 Text("Everyone pays the restaurant directly.")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.faint)
                     .multilineTextAlignment(.center)
                     .padding(.top, 2)
-            } else if let organizer = split.organizerName {
+            } else if split.payerMode == .organizerPaid,
+                      let organizer = split.organizerName {
                 Text("Pay \(organizer) back for your share.")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.faint)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 2)
+            } else if split.payerMode == .unavailable {
+                Text("Split mode unavailable — open to review")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.warning)
                     .multilineTextAlignment(.center)
                     .padding(.top, 2)
             }
@@ -229,6 +236,17 @@ struct PublicSplitClaimView: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Theme.accent.opacity(0.35), lineWidth: 1)
         )
+    }
+
+    private func payerHeadline(_ split: PublicSplit) -> String? {
+        switch split.payerMode {
+        case .eachOwn:
+            return "Everyone paid their own"
+        case .organizerPaid:
+            return split.organizerName.map { "\($0) paid" }
+        case .unavailable:
+            return "Split mode unavailable — open to review"
+        }
     }
 
     private func joinCard(_ split: PublicSplit) -> some View {

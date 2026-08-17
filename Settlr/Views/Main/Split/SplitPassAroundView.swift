@@ -349,7 +349,7 @@ struct SplitPassAroundView: View {
     private func footer(_ person: BillSplitParticipant) -> some View {
         VStack(spacing: 10) {
             HStack {
-                Text(current.isEachOwn ? "\(person.name)'s share" : "\(person.name) owes")
+                Text(passAmountLabel(split: current, person: person))
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.muted)
                 Spacer()
@@ -385,6 +385,17 @@ struct SplitPassAroundView: View {
         }
         .padding(16)
         .background(Theme.bg)
+    }
+
+    private func passAmountLabel(split: BillSplit, person: BillSplitParticipant) -> String {
+        switch split.payerMode {
+        case .eachOwn:
+            return "\(person.name)'s share"
+        case .organizerPaid:
+            return "\(person.name) owes"
+        case .unavailable:
+            return "Share needs review"
+        }
     }
 
     // MARK: - Actions and derived state
