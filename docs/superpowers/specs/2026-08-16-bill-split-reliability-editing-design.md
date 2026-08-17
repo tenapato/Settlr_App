@@ -7,14 +7,14 @@ Make scanned bill splits trustworthy and fully correctable from the iOS app. The
 The implementation spans the three existing repositories:
 
 - `App/`: capture, parser preference, draft creation/editing, pass-the-phone, and split/expense presentation.
-- `Server/`: Cloudflare Workers AI parsing, participant and claim APIs, persisted allocation state, draft editing, and accounting invariants.
+- `Server/`: hosted AI parsing, participant and claim APIs, persisted allocation state, draft editing, and accounting invariants.
 - `Panel/`: quantity-aware public claiming so the web link obeys the same rules as iOS.
 
 ## Success Criteria
 
 1. `1 XX AMB 23 105.00` can never become `23x XX AMB`; quantity comes from the leading receipt column, not a model guess or a number inside the item name.
 2. A parser cannot silently shift one row's price onto another row. Unverified rows remain visibly flagged for review.
-3. Settings offers `Automatic`, `On device`, and `Cloudflare` receipt parsing. `Automatic` remains the default.
+3. Settings offers `Automatic`, `On device`, and `On server` receipt parsing. `Automatic` remains the default.
 4. The review form clearly reconciles item lines with the printed total and requires an explicit decision for a material mismatch.
 5. A participant can claim a chosen number of units from a quantity line without claiming the remaining units.
 6. Unit claims cannot exceed the item's quantity, including under concurrent requests.
@@ -30,9 +30,9 @@ The implementation spans the three existing repositories:
 
 Add a stored iOS preference with three values:
 
-- `automatic`: try the on-device Foundation Model when available; use the Cloudflare Worker when unavailable, invalid, or unable to return any usable item rows.
-- `onDevice`: use only the on-device Foundation Model. If unavailable or invalid, explain why and offer to switch to Automatic or Cloudflare; do not silently upload OCR text.
-- `cloudflare`: send the locally recognized OCR text directly to the existing Worker receipt endpoint. The receipt image remains on the phone.
+- `automatic`: try the on-device Foundation Model when available; parse on the server when the device model is unavailable, invalid, or unable to return any usable item rows.
+- `onDevice`: use only the on-device Foundation Model. If unavailable or invalid, explain why and offer to switch to Automatic or On server; do not silently upload OCR text.
+- `server`: send the locally recognized OCR text directly to the existing server receipt endpoint. The receipt image remains on the phone.
 
 The setting belongs in the existing Receipts section. The scan result banner names the parser used and links back to Settings when review is needed.
 
@@ -50,7 +50,7 @@ The language model identifies semantic item rows; it does not own quantity or mo
 
 Extract the shared concepts into small, separately tested helpers on each platform rather than leaving quantity inference embedded in view or model code.
 
-### Cloudflare parser
+### Server parser
 
 Keep the existing Workers AI binding and text-only privacy boundary. The Worker path uses the more capable hosted model to classify rows, then applies the same deterministic money and quantity reconstruction used on device. Fix the legacy server fallback so decimal strings such as `145.00` cannot be interpreted as 145 cents when a row is unmatched.
 
@@ -67,7 +67,7 @@ type ScannedReceiptItem = {
 };
 
 type ScannedReceipt = {
-  parser: "on_device" | "cloudflare";
+  parser: "on_device" | "server";
   merchant: string | null;
   items: ScannedReceiptItem[];
   taxCents: number;
@@ -192,7 +192,7 @@ Change the shared preset list to `[10, 12, 15, 20]`. Both chip rendering and act
 ## Error Handling
 
 - Parser failures name the attempted parser and preserve captured OCR text for a retry during the current editor session.
-- Cloudflare quota failures explain that manual entry and on-device parsing remain available.
+- Server parsing quota failures explain that manual entry and on-device parsing remain available.
 - Participant and claim conflicts refresh the split and preserve the current pass-phone position by participant ID, not array index.
 - Draft edit conflicts never auto-merge money fields. Refresh and show which server version superseded the draft.
 - Offline creation retains the existing durable queue. Editing and participant mutations require a connection in the first version; the UI says so before accepting changes.
@@ -208,7 +208,7 @@ Required cases:
 - leading quantity extraction preserves `XX AMB 23` as the name and quantity one;
 - repeated names consume distinct rows and retain their own prices;
 - short names remain unverified instead of fuzzy-matching another row;
-- Automatic, On-device, and Cloudflare routing obey preference and fallback rules;
+- Automatic, On-device, and On-server routing obey preference and fallback rules;
 - parser metadata and missing legacy metadata decode correctly;
 - total reconciliation distinguishes rounding, shortfall, and overshoot;
 - create and queued bodies preserve `payer = each_own` and by-item participants;
@@ -258,4 +258,4 @@ Release order:
 3. iOS parser preference, participants, edit flow, quantity claims, accounting presentation, and tip chip.
 4. Remove the legacy boolean claim body only after supported clients have moved to desired quantities.
 
-No receipt image is uploaded as part of this design; only OCR text reaches Cloudflare when the user selects or falls back to Cloudflare parsing.
+No receipt image is uploaded as part of this design; only OCR text reaches the app server when the user selects or falls back to server parsing.
