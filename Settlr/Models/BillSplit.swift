@@ -24,9 +24,30 @@ struct BillSplitItem: Codable, Identifiable {
     let id: String
     let name: String
     let quantity: Int
+    let allocationMode: String
+    let claimedQuantity: Int
+    let availableQuantity: Int?
     let unitPriceCents: Int
     let lineTotalCents: Int
     let sortOrder: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, quantity, allocationMode, claimedQuantity, availableQuantity
+        case unitPriceCents, lineTotalCents, sortOrder
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(String.self, forKey: .id)
+        name = try values.decode(String.self, forKey: .name)
+        quantity = try values.decode(Int.self, forKey: .quantity)
+        allocationMode = try values.decodeIfPresent(String.self, forKey: .allocationMode) ?? "shared"
+        claimedQuantity = try values.decodeIfPresent(Int.self, forKey: .claimedQuantity) ?? 0
+        availableQuantity = try values.decodeIfPresent(Int.self, forKey: .availableQuantity)
+        unitPriceCents = try values.decode(Int.self, forKey: .unitPriceCents)
+        lineTotalCents = try values.decode(Int.self, forKey: .lineTotalCents)
+        sortOrder = try values.decode(Int.self, forKey: .sortOrder)
+    }
 }
 
 struct BillSplitParticipant: Codable, Identifiable {
@@ -34,11 +55,31 @@ struct BillSplitParticipant: Codable, Identifiable {
     let name: String
     let isOrganizer: Bool
     let claimedItemIds: [String]
+    let claimQuantities: [String: Int]
     let owedCents: Int
     let shareCents: Int?
     let settledAt: String?
     let incomeId: String?
     let joinedAt: String
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, isOrganizer, claimedItemIds, claimQuantities, owedCents
+        case shareCents, settledAt, incomeId, joinedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(String.self, forKey: .id)
+        name = try values.decode(String.self, forKey: .name)
+        isOrganizer = try values.decode(Bool.self, forKey: .isOrganizer)
+        claimedItemIds = try values.decodeIfPresent([String].self, forKey: .claimedItemIds) ?? []
+        claimQuantities = try values.decodeIfPresent([String: Int].self, forKey: .claimQuantities) ?? [:]
+        owedCents = try values.decode(Int.self, forKey: .owedCents)
+        shareCents = try values.decodeIfPresent(Int.self, forKey: .shareCents)
+        settledAt = try values.decodeIfPresent(String.self, forKey: .settledAt)
+        incomeId = try values.decodeIfPresent(String.self, forKey: .incomeId)
+        joinedAt = try values.decode(String.self, forKey: .joinedAt)
+    }
 
     var isSettled: Bool { settledAt != nil }
 }
@@ -58,12 +99,19 @@ struct BillSplit: Codable, Identifiable {
     let feeCents: Int
     let totalCents: Int
     let status: String
+    /// Optimistic concurrency token for complete draft edits.
+    let version: Int
+    /// Audit-only confirmation that a material line/total mismatch was kept.
+    let mismatchAcknowledged: Bool
     /// "me" — you fronted the whole bill and the table owes you.
     /// "each_own" — everyone paid their own share, so nobody owes anybody.
     /// Optional so a split created before the field existed still decodes.
     let payer: String?
     /// "by_item" (people claim what they ordered) | "even" (divided by heads).
     let splitMode: String?
+    let paymentChannel: String
+    let creditCardId: String?
+    let categoryId: String?
     let expenseId: String?
     let createdAt: String
     let items: [BillSplitItem]
@@ -71,6 +119,44 @@ struct BillSplit: Codable, Identifiable {
     let unclaimedItemsCents: Int
     let unallocatedExtrasCents: Int
     let outstandingCents: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case id, shareToken, shareUrl, merchant, currency, occurredAt, subtotalCents
+        case taxCents, tipCents, feeCents, totalCents, status, version
+        case mismatchAcknowledged, payer, splitMode, paymentChannel, creditCardId
+        case categoryId, expenseId, createdAt, items, participants, unclaimedItemsCents
+        case unallocatedExtrasCents, outstandingCents
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(String.self, forKey: .id)
+        shareToken = try values.decode(String.self, forKey: .shareToken)
+        shareUrl = try values.decodeIfPresent(String.self, forKey: .shareUrl)
+        merchant = try values.decode(String.self, forKey: .merchant)
+        currency = try values.decode(String.self, forKey: .currency)
+        occurredAt = try values.decode(String.self, forKey: .occurredAt)
+        subtotalCents = try values.decode(Int.self, forKey: .subtotalCents)
+        taxCents = try values.decode(Int.self, forKey: .taxCents)
+        tipCents = try values.decode(Int.self, forKey: .tipCents)
+        feeCents = try values.decode(Int.self, forKey: .feeCents)
+        totalCents = try values.decode(Int.self, forKey: .totalCents)
+        status = try values.decode(String.self, forKey: .status)
+        version = try values.decodeIfPresent(Int.self, forKey: .version) ?? 0
+        mismatchAcknowledged = try values.decodeIfPresent(Bool.self, forKey: .mismatchAcknowledged) ?? false
+        payer = try values.decodeIfPresent(String.self, forKey: .payer)
+        splitMode = try values.decodeIfPresent(String.self, forKey: .splitMode)
+        paymentChannel = try values.decodeIfPresent(String.self, forKey: .paymentChannel) ?? "cash"
+        creditCardId = try values.decodeIfPresent(String.self, forKey: .creditCardId)
+        categoryId = try values.decodeIfPresent(String.self, forKey: .categoryId)
+        expenseId = try values.decodeIfPresent(String.self, forKey: .expenseId)
+        createdAt = try values.decode(String.self, forKey: .createdAt)
+        items = try values.decode([BillSplitItem].self, forKey: .items)
+        participants = try values.decode([BillSplitParticipant].self, forKey: .participants)
+        unclaimedItemsCents = try values.decode(Int.self, forKey: .unclaimedItemsCents)
+        unallocatedExtrasCents = try values.decode(Int.self, forKey: .unallocatedExtrasCents)
+        outstandingCents = try values.decode(Int.self, forKey: .outstandingCents)
+    }
 
     var isOpen: Bool { status == "open" }
     /// Nobody owes the organizer: everyone settled with the restaurant directly.
@@ -147,6 +233,7 @@ struct BillSplitItemBody: Codable {
     let name: String
     let quantity: Int
     let unitPriceCents: Int
+    var allocationMode: String? = nil
 }
 
 struct CreateBillSplitBody: Codable {
@@ -174,6 +261,42 @@ struct CreateBillSplitBody: Codable {
     /// Optional names for the other people on an even split, in order, you
     /// excluded. Blank entries become "Person 2", "Person 3"… on the server.
     var participantNames: [String]? = nil
+    /// Audit-only acknowledgement; never changes the user's selected total.
+    var mismatchAcknowledged: Bool? = nil
+}
+
+struct EditBillSplitItemBody: Encodable {
+    let id: String?
+    let name: String
+    let quantity: Int
+    let unitPriceCents: Int
+    let allocationMode: String
+    var clearClaims: Bool? = nil
+}
+
+struct EditBillSplitParticipantBody: Encodable {
+    let id: String?
+    let name: String
+    let isOrganizer: Bool
+}
+
+struct EditBillSplitBody: Encodable {
+    let version: Int
+    let merchant: String
+    let occurredAt: String
+    let currency: String
+    let payer: String
+    let splitMode: String
+    let paymentChannel: String
+    let creditCardId: String?
+    let categoryId: String?
+    let taxCents: Int
+    let tipCents: Int
+    let feeCents: Int
+    let totalCents: Int
+    let items: [EditBillSplitItemBody]
+    let participants: [EditBillSplitParticipantBody]
+    let mismatchAcknowledged: Bool
 }
 
 struct BillSplitClaimBody: Encodable {

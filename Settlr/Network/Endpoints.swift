@@ -45,6 +45,7 @@ enum Endpoints {
     // Bill splits — organizer side
     static func billSplits(_ wsId: String) -> String { "/api/workspaces/\(wsId)/bill-splits" }
     static func billSplit(_ wsId: String, _ id: String) -> String { "/api/workspaces/\(wsId)/bill-splits/\(id)" }
+    static func billSplitDraft(_ wsId: String, _ id: String) -> String { "/api/workspaces/\(wsId)/bill-splits/\(id)/draft" }
     static func billSplitItems(_ wsId: String, _ id: String) -> String { "/api/workspaces/\(wsId)/bill-splits/\(id)/items" }
     static func billSplitClaims(_ wsId: String, _ id: String) -> String { "/api/workspaces/\(wsId)/bill-splits/\(id)/claims" }
     static func billSplitParticipant(_ wsId: String, _ id: String, _ participantId: String) -> String {

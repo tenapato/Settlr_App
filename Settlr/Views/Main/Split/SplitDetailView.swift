@@ -17,6 +17,8 @@ struct SplitDetailView: View {
     @State private var showQR = false
     @State private var showPassAround = false
     @State private var showResult = false
+    @State private var showEditor = false
+    @State private var showSettledEditExplanation = false
     @State private var isRefreshing = false
     @State private var refreshSpin = 0.0
     @Environment(\.scenePhase) private var scenePhase
@@ -57,6 +59,21 @@ struct SplitDetailView: View {
                 .preferredColorScheme(.dark)
             }
         }
+        .sheet(isPresented: $showEditor) {
+            if let split {
+                SplitCreateSheet(
+                    workspaceId: workspaceId,
+                    vm: vm,
+                    editingSplit: split,
+                    onSaved: { _ in showEditor = false }
+                )
+            }
+        }
+        .alert("Undo settlements before editing", isPresented: $showSettledEditExplanation) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("At least one person is already marked paid. Undo those settlements, then reopen the split to edit its money and items.")
+        }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button { refresh() } label: {
@@ -70,6 +87,21 @@ struct SplitDetailView: View {
             }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
+                    if let split {
+                        if split.isOpen {
+                            Button { showEditor = true } label: {
+                                Label("Edit split", systemImage: "pencil")
+                            }
+                        } else if split.participants.contains(where: \.isSettled) {
+                            Button { showSettledEditExplanation = true } label: {
+                                Label("Editing unavailable", systemImage: "lock")
+                            }
+                        } else {
+                            Button { reopenAndEdit() } label: {
+                                Label("Reopen and edit", systemImage: "lock.open")
+                            }
+                        }
+                    }
                     if let link = split?.shareLink {
                         ShareLink(item: link.absoluteString) {
                             Label("Share link", systemImage: "square.and.arrow.up")
@@ -145,6 +177,14 @@ struct SplitDetailView: View {
             await vm.loadDetail(workspaceId: workspaceId, splitId: splitId, silent: true)
             try? await Task.sleep(nanoseconds: 300_000_000)
             isRefreshing = false
+        }
+    }
+
+    private func reopenAndEdit() {
+        Task {
+            if await vm.setStatus(workspaceId: workspaceId, splitId: splitId, status: "open") {
+                showEditor = true
+            }
         }
     }
 

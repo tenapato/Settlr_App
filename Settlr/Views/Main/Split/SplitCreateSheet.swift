@@ -12,6 +12,8 @@ struct SplitCreateSheet: View {
     /// Seeded by the caller when the scan couldn't run at all, so an empty form
     /// arrives with an explanation rather than as a mystery.
     var notice: String?
+    /// Non-nil uses this same form as the complete, versioned split editor.
+    var editingSplit: BillSplit? = nil
     let onSaved: (SplitSaveOutcome) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -19,27 +21,10 @@ struct SplitCreateSheet: View {
     private let queue = PendingSplitQueue.shared
     private let network = NetworkMonitor.shared
 
-    @State private var merchant = ""
-    @State private var occurredAt = Date()
-    @State private var items: [DraftItem] = [DraftItem()]
-    @State private var taxText = ""
-    @State private var tipText = ""
-    @State private var totalText = ""
+    @State private var draft = SplitDraft()
     /// Set once the user edits the total by hand; until then it tracks the items.
     @State private var totalEdited = false
-    @State private var paymentChannel = "cash"
-    /// "me" — you fronted the bill and the table owes you back.
-    /// "each_own" — everyone paid their own share, so nothing is owed.
-    @State private var payer = "me"
-    /// "by_item" — people claim what they ordered. "even" — divide by heads.
-    @State private var splitMode = "by_item"
-    @State private var headcount = 2
-    /// Names for the other people on an even split, you excluded, indexed from
-    /// person 2. Kept sparse on purpose: naming anybody is optional, and lowering
-    /// the headcount then raising it again shouldn't lose what was typed.
-    @State private var guestNames: [String] = []
     @State private var creditCards: [CreditCard] = []
-    @State private var selectedCreditCardId: String?
     @State private var showScanner = false
     @State private var isScanning = false
     @State private var hasScanned = false
@@ -47,6 +32,12 @@ struct SplitCreateSheet: View {
     @State private var scanNeedsReview = false
     @State private var showReceiptSettings = false
     @State private var errorMessage: String?
+    @State private var showKeepMismatchConfirmation = false
+    @State private var hasInitialized = false
+    /// Captured when the editor opens. The detail view keeps refreshing behind
+    /// this sheet, but a newer DTO must not silently lend its version to an
+    /// older draft and bypass the server's stale-edit protection.
+    @State private var openedEditVersion: Int?
     /// Local rather than `vm.isSaving`: saving now means writing to disk and
     /// then trying the network, which the view model doesn't run.
     @State private var isSubmitting = false
@@ -62,41 +53,39 @@ struct SplitCreateSheet: View {
         case guestName(Int)
         case tax
         case tip
+        case fee
         case total
     }
 
-    struct DraftItem: Identifiable {
-        let id = UUID()
-        var name = ""
-        var quantity = 1
-        var priceText = ""
-
-        var unitPriceCents: Int { centsFromText(priceText) }
-        var lineTotalCents: Int { unitPriceCents * max(0, quantity) }
-        var isBlank: Bool {
-            name.trimmingCharacters(in: .whitespaces).isEmpty && priceText.isEmpty
-        }
-    }
-
-    private var filledItems: [DraftItem] { items.filter { !$0.isBlank } }
-    private var subtotalCents: Int { filledItems.reduce(0) { $0 + $1.lineTotalCents } }
-    private var derivedTotalCents: Int {
-        subtotalCents + centsFromText(taxText) + centsFromText(tipText)
-    }
+    private var filledItems: [SplitDraft.Item] { draft.filledItems }
+    private var subtotalCents: Int { draft.itemSubtotalCents }
+    private var derivedTotalCents: Int { draft.calculatedTotalCents }
     private var effectiveTotalCents: Int {
-        totalEdited ? centsFromText(totalText) : derivedTotalCents
+        totalEdited ? draft.selectedTotalCents : derivedTotalCents
     }
-    private var isEvenSplit: Bool { splitMode == "even" }
+    private var isEvenSplit: Bool { draft.splitMode == "even" }
+    private var isEditing: Bool { editingSplit != nil }
+    private var headcount: Int { draft.participants.count }
+
+    private var submissionDraft: SplitDraft {
+        var result = draft
+        if !totalEdited { result.selectedTotalCents = result.calculatedTotalCents }
+        return result
+    }
+
+    private var reconciliation: SplitDraft.Reconciliation { submissionDraft.reconciliation }
 
     private var canSave: Bool {
         // An even split needs a total and a headcount, nothing else — itemising
         // is the work it exists to skip. Every other mode needs priced lines,
         // because there is nothing to claim without them.
         let itemsOk = isEvenSplit || (!filledItems.isEmpty && filledItems.allSatisfy { $0.unitPriceCents > 0 })
-        return !merchant.trimmingCharacters(in: .whitespaces).isEmpty
+        return !draft.merchant.trimmingCharacters(in: .whitespaces).isEmpty
             && itemsOk
             && effectiveTotalCents > 0
-            && (paymentChannel != "credit_card" || selectedCreditCardId != nil)
+            && (draft.paymentChannel != "credit_card" || draft.creditCardId != nil)
+            && !reconciliation.requiresDecision
+            && (!isEditing || network.isOnline)
     }
 
     /// What one person pays on an even split, shown live so the table can settle
@@ -118,7 +107,7 @@ struct SplitCreateSheet: View {
                             FormTextRow(
                                 label: "Where",
                                 placeholder: "Restaurant or store",
-                                text: $merchant,
+                                text: $draft.merchant,
                                 focus: $merchantFocused
                             )
                             FormRowDivider()
@@ -128,6 +117,14 @@ struct SplitCreateSheet: View {
                         if !isEvenSplit { itemsSection }
                         extrasSection
                         paymentSection
+
+                        if isEditing && !network.isOnline {
+                            Text("Editing needs an internet connection. Your existing split has not changed.")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Theme.warning)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 4)
+                        }
 
                         if let errorMessage {
                             Text(errorMessage)
@@ -143,7 +140,7 @@ struct SplitCreateSheet: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
             }
-            .navigationTitle("Split a Bill")
+            .navigationTitle(isEditing ? "Edit Bill Split" : "Split a Bill")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -153,7 +150,7 @@ struct SplitCreateSheet: View {
                     // Says what will actually happen. Offline the split is saved
                     // to the phone and uploads itself later, and promising
                     // "Create" would be a promise this can't keep at a table.
-                    Button(network.isOnline ? "Create" : "Save for later") { save() }
+                    Button(saveButtonTitle) { save() }
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(canSave ? Theme.accent : Theme.faint)
                         .disabled(!canSave || isSubmitting)
@@ -178,10 +175,21 @@ struct SplitCreateSheet: View {
             .sheet(isPresented: $showReceiptSettings) {
                 SettingsView()
             }
+            .alert("Keep the receipt total?", isPresented: $showKeepMismatchConfirmation) {
+                Button("Cancel", role: .cancel) {}
+                Button("Keep receipt total") { draft.confirmKeepReceiptTotal() }
+            } message: {
+                Text("The item lines and total differ materially. Keep this total only after checking the receipt for missing or duplicated rows.")
+            }
         }
         .preferredColorScheme(.dark)
         .task { await loadCards() }
-        .onAppear { applyPrefillOnce() }
+        .onAppear { applyInitialDraftOnce() }
+    }
+
+    private var saveButtonTitle: String {
+        if isEditing { return "Save" }
+        return network.isOnline ? "Create" : "Save for later"
     }
 
     // MARK: - Scan
@@ -247,28 +255,50 @@ struct SplitCreateSheet: View {
 
     /// Fills the form from a scan that already happened in the capture flow.
     /// Guarded because `onAppear` fires again when the camera cover dismisses.
-    private func applyPrefillOnce() {
+    private func applyInitialDraftOnce() {
+        guard !hasInitialized else { return }
+        hasInitialized = true
         if scanNotice == nil, let notice { scanNotice = notice }
-        guard let prefill, !hasScanned else { return }
-        applyScan(prefill)
+        if let editingSplit {
+            draft = SplitDraft(split: editingSplit)
+            openedEditVersion = editingSplit.version
+            totalEdited = true
+            hasScanned = true
+        } else if let prefill {
+            applyScan(prefill)
+        } else if draft.participants.count == 1 {
+            // Preserve the existing two-person starting point without baking a
+            // UI preference into the reusable draft model.
+            draft.participants.append(.init(id: nil, name: "", isOrganizer: false))
+        }
     }
 
     private func applyScan(_ parsed: ScannedReceipt) {
         hasScanned = true
-        if merchant.trimmingCharacters(in: .whitespaces).isEmpty, let scanned = parsed.merchant {
-            merchant = scanned
+        if draft.merchant.trimmingCharacters(in: .whitespaces).isEmpty, let scanned = parsed.merchant {
+            draft.merchant = scanned
         }
-        items = parsed.items.map {
-            DraftItem(name: $0.name, quantity: max(1, $0.quantity), priceText: textFromCents($0.unitPriceCents))
+        draft.items = parsed.items.map {
+            SplitDraft.Item(
+                name: $0.name,
+                quantity: max(1, $0.quantity),
+                unitPriceCents: $0.unitPriceCents,
+                verification: $0.verification
+            )
         }
-        items.append(DraftItem())
-        if parsed.taxCents > 0 { taxText = textFromCents(parsed.taxCents) }
-        if parsed.tipCents > 0 { tipText = textFromCents(parsed.tipCents) }
+        draft.items.append(SplitDraft.Item())
+        draft.taxCents = parsed.taxCents
+        draft.tipCents = parsed.tipCents
+        draft.scanWarnings = parsed.warnings
+        draft.mismatchAcknowledged = false
         // A printed total the lines don't reconstruct is normal (service charge,
         // rounding). Keep it: the server shares the difference across the table.
         if parsed.totalCents > 0 {
-            totalText = textFromCents(parsed.totalCents)
+            draft.selectedTotalCents = parsed.totalCents
             totalEdited = true
+        } else {
+            draft.selectedTotalCents = draft.calculatedTotalCents
+            totalEdited = false
         }
 
         let unverifiedCount = parsed.items.filter { $0.verification == .unverified }.count
@@ -291,37 +321,37 @@ struct SplitCreateSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             SectionEyebrow("Splitting this bill")
             SegmentedToggle(
-                selection: $payer,
+                selection: $draft.payer,
                 options: [
                     ToggleOption(value: "me", label: "I paid it all", icon: "person.fill"),
                     ToggleOption(value: "each_own", label: "Each paid their own", icon: "person.2.fill"),
                 ]
             )
             SegmentedToggle(
-                selection: $splitMode,
+                selection: $draft.splitMode,
                 options: [
                     ToggleOption(value: "by_item", label: "By item", icon: "list.bullet"),
                     ToggleOption(value: "even", label: "Even", icon: "equal"),
                 ]
             )
 
-            if isEvenSplit {
-                FormCard {
-                    HStack {
-                        Text("How many people")
-                            .font(.system(size: 15))
-                            .foregroundStyle(Theme.ink)
-                        Spacer()
-                        Text("\(headcount)")
-                            .font(.system(size: 17, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(Theme.accent)
-                            .frame(minWidth: 32, alignment: .trailing)
-                        Stepper("", value: $headcount, in: 1...50)
-                            .labelsHidden()
-                            .fixedSize()
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
+            FormCard {
+                HStack {
+                    Text("How many people")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Theme.ink)
+                    Spacer()
+                    Text("\(headcount)")
+                        .font(.system(size: 17, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Theme.accent)
+                        .frame(minWidth: 32, alignment: .trailing)
+                    Stepper("", value: headcountBinding, in: 1...50)
+                        .labelsHidden()
+                        .fixedSize()
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                if isEvenSplit {
                     FormRowDivider()
                     HStack {
                         Text("Each pays")
@@ -335,9 +365,8 @@ struct SplitCreateSheet: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 12)
                 }
-
-                guestNamesCard
             }
+            guestNamesCard
 
             Text(splitModeExplanation)
                 .font(.system(size: 12))
@@ -402,12 +431,30 @@ struct SplitCreateSheet: View {
     /// so lowering the headcount and raising it again keeps the earlier names.
     private func guestNameBinding(_ index: Int) -> Binding<String> {
         Binding(
-            get: { index < guestNames.count ? guestNames[index] : "" },
+            get: {
+                let guests = draft.participants.indices.filter { !draft.participants[$0].isOrganizer }
+                guard index < guests.count else { return "" }
+                return draft.participants[guests[index]].name
+            },
             set: { newValue in
-                if guestNames.count <= index {
-                    guestNames.append(contentsOf: Array(repeating: "", count: index - guestNames.count + 1))
+                let guests = draft.participants.indices.filter { !draft.participants[$0].isOrganizer }
+                guard index < guests.count else { return }
+                draft.participants[guests[index]].name = newValue
+            }
+        )
+    }
+
+    private var headcountBinding: Binding<Int> {
+        Binding(
+            get: { headcount },
+            set: { newCount in
+                while draft.participants.count < newCount {
+                    draft.participants.append(.init(id: nil, name: "", isOrganizer: false))
                 }
-                guestNames[index] = newValue
+                while draft.participants.count > newCount,
+                      let lastGuest = draft.participants.lastIndex(where: { !$0.isOrganizer }) {
+                    draft.participants.remove(at: lastGuest)
+                }
             }
         )
     }
@@ -415,7 +462,7 @@ struct SplitCreateSheet: View {
     /// Says what this combination will do to the ledger, in the same words the
     /// ledger will end up using. Getting this wrong is somebody's money.
     private var splitModeExplanation: String {
-        if payer == "each_own" {
+        if draft.payer == "each_own" {
             return isEvenSplit
                 ? "Everyone pays the restaurant directly. Only your own share is recorded as your expense, and nobody owes you anything."
                 : "Everyone pays the restaurant directly. Tap the items you had; only your own share is recorded as your expense."
@@ -438,14 +485,14 @@ struct SplitCreateSheet: View {
             }
 
             FormCard {
-                ForEach($items) { $item in
-                    if item.id != items.first?.id { FormRowDivider() }
+                ForEach($draft.items) { $item in
+                    if item.id != draft.items.first?.id { FormRowDivider() }
                     itemRow($item)
                 }
             }
 
             Button {
-                items.append(DraftItem())
+                draft.items.append(SplitDraft.Item())
             } label: {
                 Label("Add item", systemImage: "plus")
                     .font(.system(size: 14, weight: .medium))
@@ -455,46 +502,100 @@ struct SplitCreateSheet: View {
         }
     }
 
-    private func itemRow(_ item: Binding<DraftItem>) -> some View {
-        HStack(spacing: 10) {
-            TextField("", text: item.name, prompt: Text("Item").foregroundStyle(Theme.faint))
-                .font(.system(size: 15))
-                .foregroundStyle(Theme.ink)
-                .focused($focusedField, equals: .itemName(item.wrappedValue.id))
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            Menu {
-                ForEach(1...20, id: \.self) { n in
-                    Button("\(n)×") { item.wrappedValue.quantity = n }
-                }
-            } label: {
-                Text("\(item.wrappedValue.quantity)×")
-                    .font(.system(size: 13, design: .monospaced))
-                    .foregroundStyle(item.wrappedValue.quantity > 1 ? Theme.accent : Theme.faint)
-                    .frame(width: 34)
-            }
-
-            TextField("", text: item.priceText, prompt: Text("0.00").foregroundStyle(Theme.faint))
-                .font(.system(size: 15, design: .monospaced))
-                .foregroundStyle(Theme.ink)
-                .keyboardType(.decimalPad)
-                .focused($focusedField, equals: .itemPrice(item.wrappedValue.id))
-                .multilineTextAlignment(.trailing)
-                .frame(width: 88)
-
-            Button {
-                withAnimation(.easeOut(duration: 0.15)) {
-                    items.removeAll { $0.id == item.wrappedValue.id }
-                    if items.isEmpty { items = [DraftItem()] }
-                }
-            } label: {
-                Image(systemName: "minus.circle")
+    private func itemRow(_ item: Binding<SplitDraft.Item>) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                TextField("", text: item.name, prompt: Text("Item").foregroundStyle(Theme.faint))
                     .font(.system(size: 15))
-                    .foregroundStyle(Theme.faint)
+                    .foregroundStyle(Theme.ink)
+                    .focused($focusedField, equals: .itemName(item.wrappedValue.id))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Menu {
+                    ForEach(1...20, id: \.self) { n in
+                        Button("\(n)×") {
+                            guard n != item.wrappedValue.quantity else { return }
+                            item.wrappedValue.quantity = n
+                            item.wrappedValue.clearClaims = item.wrappedValue.serverID != nil
+                            draft.mismatchAcknowledged = false
+                        }
+                    }
+                } label: {
+                    Text("\(item.wrappedValue.quantity)×")
+                        .font(.system(size: 13, design: .monospaced))
+                        .foregroundStyle(item.wrappedValue.quantity > 1 ? Theme.accent : Theme.faint)
+                        .frame(width: 34)
+                }
+
+                TextField(
+                    "",
+                    text: itemPriceBinding(item.wrappedValue.id),
+                    prompt: Text("0.00").foregroundStyle(Theme.faint)
+                )
+                    .font(.system(size: 15, design: .monospaced))
+                    .foregroundStyle(Theme.ink)
+                    .keyboardType(.decimalPad)
+                    .focused($focusedField, equals: .itemPrice(item.wrappedValue.id))
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 88)
+
+                Button {
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        draft.items.removeAll { $0.id == item.wrappedValue.id }
+                        if draft.items.isEmpty { draft.items = [SplitDraft.Item()] }
+                        draft.mismatchAcknowledged = false
+                    }
+                } label: {
+                    Image(systemName: "minus.circle")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Theme.faint)
+                }
+            }
+            Menu {
+                Button("Claim individual units") {
+                    guard item.wrappedValue.allocationMode != "units" else { return }
+                    item.wrappedValue.allocationMode = "units"
+                    item.wrappedValue.clearClaims = item.wrappedValue.serverID != nil
+                }
+                Button("Share the whole item") {
+                    guard item.wrappedValue.allocationMode != "shared" else { return }
+                    item.wrappedValue.allocationMode = "shared"
+                    item.wrappedValue.clearClaims = item.wrappedValue.serverID != nil
+                }
+            } label: {
+                Label(
+                    item.wrappedValue.allocationMode == "units" ? "Individual units" : "Shared item",
+                    systemImage: item.wrappedValue.allocationMode == "units" ? "square.stack.3d.up" : "person.2"
+                )
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.muted)
+            }
+            if item.wrappedValue.verification == .unverified {
+                Label("Unverified receipt row — check its name, quantity, and price", systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.warning)
             }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
+    }
+
+    private func itemPriceBinding(_ id: UUID) -> Binding<String> {
+        Binding(
+            get: {
+                guard let item = draft.items.first(where: { $0.id == id }) else { return "" }
+                return item.unitPriceCents > 0 ? textFromCents(item.unitPriceCents) : ""
+            },
+            set: { value in
+                guard let index = draft.items.firstIndex(where: { $0.id == id }) else { return }
+                let newValue = centsFromText(value)
+                if draft.items[index].unitPriceCents != newValue {
+                    draft.items[index].unitPriceCents = newValue
+                    draft.items[index].clearClaims = draft.items[index].serverID != nil
+                    draft.mismatchAcknowledged = false
+                }
+            }
+        )
     }
 
     // MARK: - Extras + total
@@ -503,12 +604,14 @@ struct SplitCreateSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             SectionEyebrow("Tax, tip & total")
             FormCard {
-                moneyRow(label: "Tax", text: $taxText, field: .tax)
+                moneyRow(label: "Tax", text: moneyBinding(\.taxCents), field: .tax)
                 FormRowDivider()
-                moneyRow(label: "Tip", text: $tipText, field: .tip)
+                moneyRow(label: "Tip", text: moneyBinding(\.tipCents), field: .tip)
                 if tipBaseCents > 0 {
                     tipShortcuts
                 }
+                FormRowDivider()
+                moneyRow(label: "Fee", text: moneyBinding(\.feeCents), field: .fee)
                 FormRowDivider()
                 HStack {
                     Text("Total")
@@ -518,8 +621,16 @@ struct SplitCreateSheet: View {
                     TextField(
                         "",
                         text: Binding(
-                            get: { totalEdited ? totalText : textFromCents(derivedTotalCents) },
-                            set: { totalText = $0; totalEdited = true }
+                            get: {
+                                totalEdited
+                                    ? textFromCents(draft.selectedTotalCents)
+                                    : textFromCents(derivedTotalCents)
+                            },
+                            set: {
+                                draft.selectedTotalCents = centsFromText($0)
+                                draft.mismatchAcknowledged = false
+                                totalEdited = true
+                            }
                         ),
                         prompt: Text("0.00").foregroundStyle(Theme.faint)
                     )
@@ -540,7 +651,72 @@ struct SplitCreateSheet: View {
                     .foregroundStyle(Theme.muted)
                     .padding(.horizontal, 4)
             }
+            reconciliationReview
         }
+    }
+
+    @ViewBuilder
+    private var reconciliationReview: some View {
+        if reconciliation.isMaterial {
+            VStack(alignment: .leading, spacing: 10) {
+                SectionEyebrow("Check the receipt")
+                FormCard {
+                    reconciliationRow("Item subtotal", reconciliation.itemSubtotalCents)
+                    FormRowDivider()
+                    reconciliationRow("Calculated total", reconciliation.calculatedTotalCents)
+                    FormRowDivider()
+                    reconciliationRow("Receipt total", reconciliation.selectedTotalCents)
+                    FormRowDivider()
+                    reconciliationRow("Difference", reconciliation.differenceCents, signed: true)
+                }
+
+                if !draft.unverifiedItems.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Unverified rows")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.warning)
+                        ForEach(draft.unverifiedItems) { item in
+                            Text("• \(item.name)")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Theme.muted)
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                }
+
+                HStack(spacing: 10) {
+                    Button("Keep receipt total") { showKeepMismatchConfirmation = true }
+                        .buttonStyle(.bordered)
+                        .tint(draft.mismatchAcknowledged ? Theme.income : Theme.warning)
+                    Button("Use calculated total") {
+                        draft.useCalculatedTotal()
+                        totalEdited = true
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.accent)
+                }
+                .font(.system(size: 13, weight: .semibold))
+
+                if draft.mismatchAcknowledged {
+                    Text("Receipt total confirmed.")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Theme.income)
+                }
+            }
+        }
+    }
+
+    private func reconciliationRow(_ label: String, _ cents: Int, signed: Bool = false) -> some View {
+        HStack {
+            Text(label).foregroundStyle(Theme.muted)
+            Spacer()
+            Text(signed && cents > 0 ? "+\(formatSplitMoney(cents))" : formatSplitMoney(cents))
+                .font(.system(size: 13, design: .monospaced))
+                .foregroundStyle(signed ? Theme.warning : Theme.ink)
+        }
+        .font(.system(size: 13))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
 
     // MARK: - Tip shortcuts
@@ -590,13 +766,13 @@ struct SplitCreateSheet: View {
     /// including it gives the post-tax base instead. Falls back to the typed
     /// total for an even split, where there are no lines to add up.
     private var tipBaseCents: Int {
-        if subtotalCents > 0 { return subtotalCents + centsFromText(taxText) }
-        return max(0, effectiveTotalCents - centsFromText(tipText))
+        if subtotalCents > 0 { return subtotalCents + draft.taxCents }
+        return max(0, effectiveTotalCents - draft.tipCents)
     }
 
     /// The percentage currently in the tip field, if it is one of the presets.
     private var activeTipPercent: Int? {
-        let tip = centsFromText(tipText)
+        let tip = draft.tipCents
         guard tip > 0, tipBaseCents > 0 else { return nil }
         return [10, 15, 20].first { tipCents(percent: $0) == tip }
     }
@@ -616,15 +792,14 @@ struct SplitCreateSheet: View {
     private func applyTip(percent: Int?) {
         let newTip = percent.map { tipCents(percent: $0) } ?? 0
         if totalEdited {
-            totalText = textFromCents(
-                TipMath.retotal(
-                    total: centsFromText(totalText),
-                    replacing: centsFromText(tipText),
-                    with: newTip
-                )
+            draft.selectedTotalCents = TipMath.retotal(
+                total: draft.selectedTotalCents,
+                replacing: draft.tipCents,
+                with: newTip
             )
         }
-        tipText = newTip > 0 ? textFromCents(newTip) : ""
+        draft.tipCents = newTip
+        draft.mismatchAcknowledged = false
     }
 
     /// The lines and the total disagreeing is worth saying plainly, and the two
@@ -656,26 +831,39 @@ struct SplitCreateSheet: View {
         .padding(.vertical, 11)
     }
 
+    private func moneyBinding(_ keyPath: WritableKeyPath<SplitDraft, Int>) -> Binding<String> {
+        Binding(
+            get: {
+                let cents = draft[keyPath: keyPath]
+                return cents > 0 ? textFromCents(cents) : ""
+            },
+            set: {
+                draft[keyPath: keyPath] = centsFromText($0)
+                draft.mismatchAcknowledged = false
+            }
+        )
+    }
+
     // MARK: - Payment
 
     private var paymentSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionEyebrow("You paid with")
             SegmentedToggle(
-                selection: $paymentChannel,
+                selection: $draft.paymentChannel,
                 options: [
                     ToggleOption(value: "cash", label: "Cash / debit", icon: "banknote"),
                     ToggleOption(value: "credit_card", label: "Credit card", icon: "creditcard"),
                 ]
             )
-            if paymentChannel == "credit_card" {
+            if draft.paymentChannel == "credit_card" {
                 FormCard {
                     FormMenuRow(
                         label: "Card",
-                        value: creditCards.first { $0.id == selectedCreditCardId }?.label ?? "Select"
+                        value: creditCards.first { $0.id == draft.creditCardId }?.label ?? "Select"
                     ) {
                         ForEach(creditCards) { card in
-                            Button(card.label) { selectedCreditCardId = card.id }
+                            Button(card.label) { draft.creditCardId = card.id }
                         }
                     }
                 }
@@ -689,7 +877,7 @@ struct SplitCreateSheet: View {
                 .font(.system(size: 15))
                 .foregroundStyle(Theme.ink)
             Spacer()
-            DatePicker("", selection: $occurredAt, displayedComponents: .date)
+            DatePicker("", selection: $draft.occurredAt, displayedComponents: .date)
                 .labelsHidden()
                 .colorScheme(.dark)
         }
@@ -721,39 +909,47 @@ struct SplitCreateSheet: View {
     }
 
     private func save() {
+        let bodyDraft = submissionDraft
+        if bodyDraft.reconciliation.requiresDecision {
+            errorMessage = "Choose whether to keep the receipt total or use the calculated total."
+            return
+        }
+
+        if let editingSplit {
+            guard network.isOnline else {
+                errorMessage = "Editing needs an internet connection."
+                return
+            }
+            guard let openedEditVersion else {
+                errorMessage = "Reload this split before editing."
+                return
+            }
+            errorMessage = nil
+            isSubmitting = true
+            Task {
+                defer { isSubmitting = false }
+                let saved = await vm.updateDraft(
+                    workspaceId: workspaceId,
+                    splitId: editingSplit.id,
+                    body: bodyDraft.makeEditBody(version: openedEditVersion)
+                )
+                if saved, let updated = vm.detail {
+                    onSaved(.created(updated))
+                    dismiss()
+                } else {
+                    errorMessage = vm.errorMessage
+                }
+            }
+            return
+        }
+
         guard let userId = appState.currentUser?.id else {
             errorMessage = "Sign in again to save this split."
             return
         }
         errorMessage = nil
         isSubmitting = true
-        let body = CreateBillSplitBody(
-            merchant: merchant.trimmingCharacters(in: .whitespaces),
-            occurredAt: isoDay(occurredAt),
-            // An even split keeps whatever was scanned — the lines are still worth
-            // having on the record — but the shares come from the headcount.
-            items: filledItems.map {
-                BillSplitItemBody(
-                    name: $0.name.trimmingCharacters(in: .whitespaces),
-                    quantity: max(1, $0.quantity),
-                    unitPriceCents: $0.unitPriceCents
-                )
-            },
-            taxCents: centsFromText(taxText),
-            tipCents: centsFromText(tipText),
-            feeCents: 0,
-            totalCents: effectiveTotalCents,
-            paymentChannel: paymentChannel,
-            creditCardId: paymentChannel == "credit_card" ? selectedCreditCardId : nil,
-            payer: payer,
-            splitMode: splitMode,
-            participantCount: isEvenSplit ? headcount : nil,
-            // Padded to the headcount so a name typed for person 4 doesn't slide
-            // onto person 3 when person 2 was left blank.
-            participantNames: isEvenSplit && headcount > 1
-                ? (0..<(headcount - 1)).map { $0 < guestNames.count ? guestNames[$0] : "" }
-                : nil
-        )
+        let body = bodyDraft.makeCreateBody()
         Task {
             defer { isSubmitting = false }
             // Written to disk before a single byte goes out, so a split can't be
@@ -773,19 +969,6 @@ struct SplitCreateSheet: View {
         }
     }
 
-    /// Pinned to a fixed locale and calendar.
-    ///
-    /// A bare `DateFormatter` follows the device: on a Buddhist-calendar phone
-    /// `yyyy-MM-dd` renders 2026 as 2568, and the server would reject it or file
-    /// the dinner five centuries out. It mattered less when the value was sent
-    /// immediately; now it can sit in the queue for hours first.
-    private func isoDay(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.calendar = Calendar(identifier: .gregorian)
-        f.dateFormat = "yyyy-MM-dd"
-        return f.string(from: date)
-    }
 }
 
 // MARK: - Tip arithmetic

@@ -138,6 +138,23 @@ final class BillSplitVM {
     /// the retry, the idempotency key and the "not yet" state that a view model
     /// tied to one screen's lifetime cannot.
 
+    /// Complete replacement edit. The returned DTO is adopted before this
+    /// returns so the detail screen never briefly renders stale money or claims.
+    @MainActor
+    func updateDraft(
+        workspaceId: String,
+        splitId: String,
+        body: EditBillSplitBody
+    ) async -> Bool {
+        await mutate {
+            try await api.fetch(
+                Endpoints.billSplitDraft(workspaceId, splitId),
+                method: "PUT",
+                body: body
+            )
+        }
+    }
+
     @MainActor
     func delete(workspaceId: String, splitId: String) async -> Bool {
         errorMessage = nil

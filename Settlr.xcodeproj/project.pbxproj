@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		AB0000000000000000000001 /* ReceiptEvidenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000003 /* ReceiptEvidenceTests.swift */; };
 		AB0000000000000000000002 /* ParserPreferenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000004 /* ParserPreferenceTests.swift */; };
+		AB0000000000000000000011 /* SplitDraftTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000010 /* SplitDraftTests.swift */; };
 		AA000000000000000000BB01 /* SettlrApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR01 /* SettlrApp.swift */; };
 		AA000000000000000000BB02 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR02 /* ContentView.swift */; };
 		AA000000000000000000BB03 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR03 /* APIClient.swift */; };
@@ -93,6 +94,7 @@
 		AA000000000000000000BB81 /* SplitQRSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR81 /* SplitQRSheet.swift */; };
 		AA000000000000000000BB82 /* SplitPassAroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR82 /* SplitPassAroundView.swift */; };
 		AA000000000000000000BB83 /* SplitResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR83 /* SplitResultView.swift */; };
+		AA000000000000000000BB87 /* SplitDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR87 /* SplitDraft.swift */; };
 		AA000000000000000000BB7A /* ScanningOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR7A /* ScanningOverlay.swift */; };
 		AA000000000000000000BB7B /* ExpenseSplitSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR7B /* ExpenseSplitSection.swift */; };
 /* End PBXBuildFile section */
@@ -110,6 +112,7 @@
 /* Begin PBXFileReference section */
 		AB0000000000000000000003 /* ReceiptEvidenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptEvidenceTests.swift; sourceTree = "<group>"; };
 		AB0000000000000000000004 /* ParserPreferenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParserPreferenceTests.swift; sourceTree = "<group>"; };
+		AB0000000000000000000010 /* SplitDraftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitDraftTests.swift; sourceTree = "<group>"; };
 		AB0000000000000000000005 /* SettlrTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SettlrTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA000000000000000000FR01 /* SettlrApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettlrApp.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR02 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -118,6 +121,7 @@
 		AA000000000000000000FR05 /* TokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenStore.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR06 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR85 /* FeatureAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureAccess.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR87 /* SplitDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitDraft.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR07 /* Workspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Workspace.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR08 /* Expense.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Expense.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR09 /* Income.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Income.swift; sourceTree = "<group>"; };
@@ -396,6 +400,7 @@
 			isa = PBXGroup;
 			children = (
 				AA000000000000000000FR72 /* ReceiptScanner.swift */,
+				AA000000000000000000FR87 /* SplitDraft.swift */,
 				AA000000000000000000FR73 /* SplitCreateSheet.swift */,
 				AA000000000000000000FR74 /* SplitListView.swift */,
 				AA000000000000000000FR75 /* SplitDetailView.swift */,
@@ -464,6 +469,7 @@
 			children = (
 				AB0000000000000000000003 /* ReceiptEvidenceTests.swift */,
 				AB0000000000000000000004 /* ParserPreferenceTests.swift */,
+				AB0000000000000000000010 /* SplitDraftTests.swift */,
 			);
 			path = SettlrTests;
 			sourceTree = "<group>";
@@ -569,6 +575,7 @@
 			files = (
 				AB0000000000000000000001 /* ReceiptEvidenceTests.swift in Sources */,
 				AB0000000000000000000002 /* ParserPreferenceTests.swift in Sources */,
+				AB0000000000000000000011 /* SplitDraftTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -648,6 +655,7 @@
 				AA000000000000000000BB70 /* BillSplit.swift in Sources */,
 				AA000000000000000000BB71 /* BillSplitVM.swift in Sources */,
 				AA000000000000000000BB72 /* ReceiptScanner.swift in Sources */,
+				AA000000000000000000BB87 /* SplitDraft.swift in Sources */,
 				AA000000000000000000BB73 /* SplitCreateSheet.swift in Sources */,
 				AA000000000000000000BB74 /* SplitListView.swift in Sources */,
 				AA000000000000000000BB75 /* SplitDetailView.swift in Sources */,
