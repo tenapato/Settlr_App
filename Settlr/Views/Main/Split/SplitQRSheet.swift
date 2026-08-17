@@ -28,16 +28,30 @@ struct SplitQRSheet: View {
                         .foregroundStyle(Theme.muted)
 
                     if let image = SplitQRCode.image(for: link) {
-                        Image(uiImage: image)
-                            .interpolation(.none) // keep the modules crisp when scaled up
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: 300)
-                            .padding(16)
-                            // A QR needs a light quiet zone to scan reliably, so this
-                            // one panel stays light even in the dark theme.
-                            .background(Color.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        ZStack {
+                            Image(uiImage: image)
+                                .interpolation(.none) // keep the modules crisp when scaled up
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxWidth: 300)
+
+                            Image("SettlrLogo")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 60, height: 60)
+                                .padding(4)
+                                .background(Color.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .accessibilityHidden(true)
+                        }
+                        .padding(16)
+                        // A QR needs a light quiet zone to scan reliably, so this
+                        // one panel stays light even in the dark theme.
+                        .background(Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("QR code to join the bill split")
+                        .accessibilityAddTraits(.isImage)
                     } else {
                         Text("This link couldn't be turned into a QR code. Send it instead.")
                             .font(.system(size: 13))
@@ -83,9 +97,8 @@ enum SplitQRCode {
     @MainActor static func image(for link: URL) -> UIImage? {
         let filter = CIFilter.qrCodeGenerator()
         filter.message = Data(link.absoluteString.utf8)
-        // Medium correction: survives a thumb over one corner without inflating
-        // the module count enough to hurt scanning across a table.
-        filter.correctionLevel = "M"
+        // High correction keeps the code scannable with the centered logo overlay.
+        filter.correctionLevel = "H"
 
         guard let output = filter.outputImage else { return nil }
         // CoreImage emits roughly one pixel per module; scale up before rasterising

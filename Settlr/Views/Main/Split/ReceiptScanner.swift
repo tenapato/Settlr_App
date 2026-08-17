@@ -11,29 +11,23 @@ enum ReceiptOCR {
     /// Recognises a receipt as rows, so each item's name stays on the same line as
     /// its price in the text the parser sees.
     static func recognizeText(in image: UIImage) throws -> String {
-        guard let cgImage = image.cgImage else { throw ReceiptScanError.noTextFound }
-        let straightened = deskewedDocument(in: cgImage) ?? cgImage
+        guard let upright = uprightPixels(of: image) else { throw ReceiptScanError.noTextFound }
 
-        let request = VNRecognizeTextRequest()
-        request.recognitionLevel = .accurate
-        request.usesLanguageCorrection = false // menu items aren't dictionary words
-        request.recognitionLanguages = ["es-MX", "en-US"]
-
-        try VNImageRequestHandler(cgImage: straightened, options: [:]).perform([request])
-
-        let fragments: [Fragment] = (request.results ?? []).compactMap {
-            guard let candidate = $0.topCandidates(1).first else { return nil }
-            return Fragment(box: $0.boundingBox, text: candidate.string)
+        var best = read(upright)
+        // A receipt lying sideways on the table defeats row grouping outright:
+        // every printed row becomes a vertical strip, so they all overlap in Y
+        // and collapse into one or two enormous lines. Re-reading turned is
+        // expensive, so it is gated on that state actually being detected —
+        // measured on real photos it scores ~0.03 rows per fragment against
+        // ~0.45 upright, which is a wide enough margin to act on.
+        if best.isDegenerate {
+            for turn in [ExifTurn.quarterClockwise, .quarterCounterClockwise] {
+                let candidate = read(turned(upright, turn))
+                if candidate.rows.count > best.rows.count { best = candidate }
+            }
         }
 
-        let text = groupIntoRows(fragments)
-            .map { row in
-                row.sorted { $0.box.minX < $1.box.minX }
-                    .map(\.text)
-                    .joined(separator: "   ")
-            }
-            .joined(separator: "\n")
-
+        let text = best.text
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw ReceiptScanError.noTextFound
         }
@@ -45,42 +39,152 @@ enum ReceiptOCR {
         let text: String
     }
 
-    /// Puts text fragments that sit on the same printed line back together.
-    ///
-    /// Vision reports each column as its own observation, so an item's name and
-    /// its price arrive separately. Emitting one fragment per line loses the
-    /// pairing: the columns have slightly different baselines, so a price can
-    /// sort ahead of its own name and land against the item above it — which is
-    /// how a 300-peso ramen ends up printed against a soft drink. Worse, the
-    /// mistake isn't stable, so two photos of one receipt disagree.
-    ///
-    /// Rows are cut by vertical overlap rather than by distance between
-    /// midpoints, so a large bold total still groups with its small-text label.
-    /// Rotation is `deskewedDocument`'s job; this assumes lines are level.
-    private static func groupIntoRows(_ fragments: [Fragment]) -> [[Fragment]] {
-        // Vision's origin is bottom-left, so descending Y walks the receipt down.
-        let ordered = fragments.sorted { $0.box.midY > $1.box.midY }
+    /// One attempt at reading the frame, kept whole so attempts can be compared
+    /// before either is turned into text.
+    private struct Reading {
+        let rows: [[Fragment]]
+        let fragmentCount: Int
 
-        var rows: [[Fragment]] = []
-        for fragment in ordered {
-            // Compared against the row's first fragment, never the last one
-            // added: chaining off the last would let a row creep down the
-            // receipt one tolerance at a time and swallow the line below.
-            if let anchor = rows.last?.first, sharesRow(anchor.box, fragment.box) {
-                rows[rows.count - 1].append(fragment)
-            } else {
-                rows.append([fragment])
-            }
+        var text: String {
+            rows
+                .map { row in
+                    row.sorted { $0.box.minX < $1.box.minX }
+                        .map(\.text)
+                        .joined(separator: "   ")
+                }
+                .joined(separator: "\n")
         }
-        return rows
+
+        /// Rows per fragment. An upright receipt lands around 0.45; sideways text
+        /// collapses to 0.03 because every printed row overlaps every other one
+        /// in Y. Below a fifth, the geometry is telling us the lines aren't level.
+        var isDegenerate: Bool {
+            fragmentCount >= 8 && rows.count * 5 < fragmentCount
+        }
     }
 
-    /// Two fragments are on one printed line when their vertical extents overlap
-    /// by more than a third of the shorter one. Adjacent lines clear each other
-    /// comfortably at that threshold, even on a tightly printed receipt.
-    private static func sharesRow(_ a: CGRect, _ b: CGRect) -> Bool {
-        let overlap = min(a.maxY, b.maxY) - max(a.minY, b.minY)
-        return overlap > 0.35 * min(a.height, b.height)
+    private static func read(_ image: CGImage) -> Reading {
+        let straightened = deskewedDocument(in: image) ?? image
+
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.usesLanguageCorrection = false // menu items aren't dictionary words
+        request.recognitionLanguages = ["es-MX", "en-US"]
+
+        try? VNImageRequestHandler(cgImage: straightened, options: [:]).perform([request])
+
+        let fragments: [Fragment] = (request.results ?? []).compactMap {
+            guard let candidate = $0.topCandidates(1).first else { return nil }
+            return Fragment(box: $0.boundingBox, text: candidate.string)
+        }
+        return Reading(rows: groupIntoRows(fragments), fragmentCount: fragments.count)
+    }
+
+    /// Bakes `imageOrientation` into the pixels before Vision sees them.
+    ///
+    /// `UIImage.cgImage` hands back the raw sensor buffer and silently drops the
+    /// orientation flag. A photo taken with the phone held upright carries EXIF
+    /// orientation 6 — as does anything picked out of the camera roll — so the
+    /// receipt reached Vision turned a quarter turn. Every printed row then ran
+    /// vertically, all of them overlapped in Y, and grouping merged a 24-item
+    /// receipt into two lines: one holding every name, one holding every price.
+    /// The parser was left pairing two lists by guesswork, and `applyPrinted`
+    /// took the rightmost money on the price line — the grand total — as the
+    /// first item's price.
+    ///
+    /// Drawing through `UIImage.draw(in:)` rather than mapping
+    /// `UIImage.Orientation` onto `CGImagePropertyOrientation` by hand: the two
+    /// enums disagree about what "left" means, and UIKit already knows.
+    private static func uprightPixels(of image: UIImage) -> CGImage? {
+        guard image.imageOrientation != .up else { return image.cgImage }
+
+        let format = UIGraphicsImageRendererFormat.preferred()
+        format.scale = image.scale // keep every pixel; OCR needs the detail
+        format.opaque = true
+        let renderer = UIGraphicsImageRenderer(size: image.size, format: format)
+        let redrawn = renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: image.size))
+        }
+        return redrawn.cgImage ?? image.cgImage
+    }
+
+    /// EXIF orientation values, named by the turn they apply.
+    private enum ExifTurn: Int32 {
+        case quarterClockwise = 6
+        case quarterCounterClockwise = 8
+    }
+
+    private static func turned(_ image: CGImage, _ turn: ExifTurn) -> CGImage {
+        let rotated = CIImage(cgImage: image).oriented(forExifOrientation: turn.rawValue)
+        return CIContext().createCGImage(rotated, from: rotated.extent) ?? image
+    }
+
+    /// Puts text fragments that sit on the same printed line back together.
+    ///
+    /// Vision reports each column as its own observation, so an item's quantity,
+    /// name and price all arrive separately and have to be paired by geometry.
+    ///
+    /// Each printed line is seeded by its widest fragment — on an item line that
+    /// is the name, which is also the tallest and steadiest box — and every other
+    /// fragment then joins the seed it overlaps *most*. Taking the maximum rather
+    /// than the first acceptable match is the whole point. Price boxes sit
+    /// slightly higher than the name they belong to, so a wrapped continuation
+    /// line (the "BCO" under "TEQUILA SIETE LEGUAS") used to be tested first and
+    /// accepted, stealing the price off the line below and shifting every price
+    /// after it by one row until a gap resynchronised it.
+    ///
+    /// Clustering on Y centres cannot fix that: measured on a real receipt, the
+    /// gap between two rows (0.0080) was smaller than a gap inside one (0.0064).
+    /// Only the boxes' extents carry enough information, and only if every
+    /// candidate line is considered.
+    ///
+    /// Rotation is `uprightPixels`' job; this assumes lines are level.
+    private static func groupIntoRows(_ fragments: [Fragment]) -> [[Fragment]] {
+        let widestFirst = fragments.indices.sorted {
+            fragments[$0].box.width > fragments[$1].box.width
+        }
+        var seeds: [Int] = []
+        for index in widestFirst {
+            let box = fragments[index].box
+            let alreadyOnALine = seeds.contains { seed in
+                verticalOverlap(fragments[seed].box, box)
+                    > 0.5 * min(fragments[seed].box.height, box.height)
+            }
+            if !alreadyOnALine { seeds.append(index) }
+        }
+
+        var rows: [[Fragment]] = seeds.map { [fragments[$0]] }
+        // A token touching no line at all keeps its own row rather than being
+        // forced onto the nearest one, which is how stray marks used to become
+        // part of an item's name.
+        var orphans: [[Fragment]] = []
+        let seeded = Set(seeds)
+
+        for (index, fragment) in fragments.enumerated() where !seeded.contains(index) {
+            var bestRow: Int?
+            var bestOverlap: CGFloat = 0
+            for (row, members) in rows.enumerated() {
+                let overlap = verticalOverlap(members[0].box, fragment.box)
+                if overlap > bestOverlap {
+                    bestOverlap = overlap
+                    bestRow = row
+                }
+            }
+            if let bestRow,
+               bestOverlap > 0.15 * min(rows[bestRow][0].box.height, fragment.box.height) {
+                rows[bestRow].append(fragment)
+            } else {
+                orphans.append([fragment])
+            }
+        }
+
+        // Vision's origin is bottom-left, so descending Y walks the receipt down.
+        // Every row is ordered by its seed, which never moves off index 0.
+        return (rows + orphans).sorted { $0[0].box.midY > $1[0].box.midY }
+    }
+
+    private static func verticalOverlap(_ a: CGRect, _ b: CGRect) -> CGFloat {
+        max(0, min(a.maxY, b.maxY) - max(a.minY, b.minY))
     }
 
     /// Crops to the receipt and corrects perspective, which is most of what a

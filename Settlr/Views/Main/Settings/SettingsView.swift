@@ -1,5 +1,9 @@
 import SwiftUI
 
+enum AppPreferenceKey {
+    static let saveCapturedReceiptsToPhotos = "saveCapturedReceiptsToPhotos"
+}
+
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
@@ -7,6 +11,8 @@ struct SettingsView: View {
     @State private var showDeleteAccountConfirm = false
     @State private var isDeletingAccount = false
     @State private var deleteAccountError: String?
+    @AppStorage(AppPreferenceKey.saveCapturedReceiptsToPhotos)
+    private var saveCapturedReceiptsToPhotos = true
 
     var body: some View {
         NavigationStack {
@@ -113,6 +119,29 @@ struct SettingsView: View {
                                 workspaceId: workspace.id,
                                 role: workspace.role
                             )
+                        }
+
+                        SectionCard {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Receipts")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(Color(hex: "#8e9197"))
+                                    .textCase(.uppercase)
+                                    .tracking(0.8)
+
+                                Toggle(isOn: $saveCapturedReceiptsToPhotos) {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text("Save captures to Photos")
+                                            .font(.system(size: 16, weight: .medium))
+                                            .foregroundStyle(Color(hex: "#ecedee"))
+                                        Text("Keep a copy of new receipt photos in your library.")
+                                            .font(.system(size: 13))
+                                            .foregroundStyle(Color(hex: "#8e9197"))
+                                    }
+                                }
+                                .tint(Color(hex: "#c8ff5a"))
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
                         // Sign out

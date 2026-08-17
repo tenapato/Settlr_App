@@ -1,4 +1,5 @@
 import AVFoundation
+import Photos
 import PhotosUI
 import SwiftUI
 
@@ -24,6 +25,8 @@ struct ReceiptCaptureView: View {
     @State private var pickedPhoto: PhotosPickerItem?
     @State private var isLoadingPhoto = false
     @State private var pickerError: String?
+    @AppStorage(AppPreferenceKey.saveCapturedReceiptsToPhotos)
+    private var saveCapturedReceiptsToPhotos = true
 
     var body: some View {
         ZStack {
@@ -191,7 +194,11 @@ struct ReceiptCaptureView: View {
     private var shutter: some View {
         Button {
             camera.capture { image in
-                if let image { onCapture(image) }
+                guard let image else { return }
+                if saveCapturedReceiptsToPhotos {
+                    ReceiptPhotoLibrary.save(image)
+                }
+                onCapture(image)
             }
         } label: {
             ZStack {
@@ -240,6 +247,18 @@ struct ReceiptCaptureView: View {
                 Link("Open Settings", destination: url)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.accent)
+            }
+        }
+    }
+}
+
+private enum ReceiptPhotoLibrary {
+    /// Saving is best-effort and never delays OCR or interrupts the split flow.
+    static func save(_ image: UIImage) {
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+            guard status == .authorized || status == .limited else { return }
+            PHPhotoLibrary.shared().performChanges {
+                PHAssetChangeRequest.creationRequestForAsset(from: image)
             }
         }
     }
