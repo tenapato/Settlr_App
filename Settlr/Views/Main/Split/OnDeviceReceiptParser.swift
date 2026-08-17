@@ -10,9 +10,9 @@ import FoundationModels
 /// than waiting on a Workers AI round trip. Guided generation also constrains
 /// the shape directly, so there is no JSON to coax out of a prompt.
 ///
-/// It is never the only path — Apple Intelligence needs a recent device with the
-/// feature switched on, so `parse` returns nil whenever that isn't true and the
-/// caller falls back to the server.
+/// Apple Intelligence needs a recent device with the feature switched on, so
+/// `parse` returns nil whenever that isn't true. The caller decides whether the
+/// selected preference allows a server fallback.
 enum OnDeviceReceiptParser {
     /// True when this device can actually run the model right now.
     static var isAvailable: Bool {
@@ -210,7 +210,8 @@ private extension ReceiptDraft {
                 ScannedReceiptItem(
                     name: String(name.prefix(120)),
                     quantity: max(1, min(item.quantity, 99)),
-                    unitPriceCents: lineTotalCents
+                    unitPriceCents: lineTotalCents,
+                    verification: .unverified
                 ),
                 lineTotalCents: lineTotalCents
             )
@@ -218,6 +219,7 @@ private extension ReceiptDraft {
         let skipped = unreadable
 
         return ScannedReceipt(
+            parser: .onDevice,
             merchant: trimmedMerchant.isEmpty ? nil : String(trimmedMerchant.prefix(120)),
             items: parsed,
             taxCents: max(0, ReceiptPrices.centsFromPrinted(tax) ?? 0),

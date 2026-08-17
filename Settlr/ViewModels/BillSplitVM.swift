@@ -154,38 +154,49 @@ final class BillSplitVM {
 
     // MARK: - Receipt scanning
 
-    /// Set once a scan runs, so the UI can say where the parsing happened.
-    var lastScanWasOnDevice = false
+    /// Kept only for this view model's editor session so a failed parse can be
+    /// retried without running Vision again or retaining the receipt image.
+    var lastReceiptOCRText: String?
+    var lastScanParser: ReceiptParserKind?
+    var lastScanNeedsReview = false
+
+    /// Compatibility for existing scan UI while callers move to parser metadata.
+    var lastScanWasOnDevice: Bool { lastScanParser == .onDevice }
 
     /// Structures OCR text into items.
     ///
-    /// Prefers Apple's on-device model: it's faster, spends none of the user's
-    /// monthly AI quota, and the receipt never leaves the phone. Falls back to
-    /// the server whenever Apple Intelligence isn't available on this device —
-    /// and also if it fails, because a working scan matters more than where it
-    /// ran. Throws only when both routes fail.
+    /// Automatic prefers Apple's on-device model and falls back to the server.
+    /// Explicit On-device and On-server preferences use only the selected path.
     ///
     /// Both routes go through `ReceiptReconciler` against the same OCR text, so
     /// whichever model read the receipt, every price comes off the receipt
     /// itself and the draft the organizer sees adds up the same way.
     @MainActor
     func scanReceipt(workspaceId: String, text: String) async throws -> ScannedReceipt {
-        do {
-            if let onDevice = try await OnDeviceReceiptParser.parse(ocrText: text),
-               !onDevice.items.isEmpty {
-                lastScanWasOnDevice = true
-                return ReceiptReconciler.reconcile(onDevice, ocrText: text)
-            }
-        } catch {
-            // Fall through to the server rather than failing the scan outright.
-        }
-
-        lastScanWasOnDevice = false
-        let fromServer: ScannedReceipt = try await api.fetch(
-            Endpoints.billSplitScanReceipt(workspaceId),
-            method: "POST",
-            body: ScanReceiptBody(text: text)
+        lastReceiptOCRText = text
+        lastScanParser = nil
+        lastScanNeedsReview = false
+        let storedPreference = UserDefaults.standard.string(
+            forKey: ReceiptParserPreference.storageKey
         )
-        return ReceiptReconciler.reconcile(fromServer, ocrText: text)
+        let preference = storedPreference.flatMap(ReceiptParserPreference.init(rawValue:)) ?? .automatic
+        let router = ReceiptParserRouter(
+            onDevice: { ocrText in
+                try await OnDeviceReceiptParser.parse(ocrText: ocrText)
+            },
+            server: { [api] ocrText in
+                let result: ScannedReceipt = try await api.fetch(
+                    Endpoints.billSplitScanReceipt(workspaceId),
+                    method: "POST",
+                    body: ScanReceiptBody(text: ocrText)
+                )
+                return result
+            }
+        )
+        let result = try await router.parse(text, preference: preference)
+        lastScanParser = result.parser
+        lastScanNeedsReview = !result.warnings.isEmpty
+            || result.items.contains { $0.verification == .unverified }
+        return result
     }
 }

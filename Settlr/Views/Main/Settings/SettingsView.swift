@@ -2,6 +2,7 @@ import SwiftUI
 
 enum AppPreferenceKey {
     static let saveCapturedReceiptsToPhotos = "saveCapturedReceiptsToPhotos"
+    static let receiptParser = ReceiptParserPreference.storageKey
 }
 
 struct SettingsView: View {
@@ -13,6 +14,8 @@ struct SettingsView: View {
     @State private var deleteAccountError: String?
     @AppStorage(AppPreferenceKey.saveCapturedReceiptsToPhotos)
     private var saveCapturedReceiptsToPhotos = true
+    @AppStorage(AppPreferenceKey.receiptParser)
+    private var receiptParser = ReceiptParserPreference.automatic.rawValue
 
     var body: some View {
         NavigationStack {
@@ -128,6 +131,39 @@ struct SettingsView: View {
                                     .foregroundStyle(Color(hex: "#8e9197"))
                                     .textCase(.uppercase)
                                     .tracking(0.8)
+
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text("Receipt parsing")
+                                                .font(.system(size: 16, weight: .medium))
+                                                .foregroundStyle(Color(hex: "#ecedee"))
+                                            Text("Automatic keeps parsing on your device when possible.")
+                                                .font(.system(size: 13))
+                                                .foregroundStyle(Color(hex: "#8e9197"))
+                                        }
+                                        Spacer()
+                                        Picker("Receipt parsing", selection: $receiptParser) {
+                                            ForEach(ReceiptParserPreference.allCases) { preference in
+                                                Text(preference.displayName).tag(preference.rawValue)
+                                            }
+                                        }
+                                        .labelsHidden()
+                                        .tint(Color(hex: "#c8ff5a"))
+                                    }
+
+                                    if receiptParser == ReceiptParserPreference.onDevice.rawValue {
+                                        Text("Receipt text stays on this phone. If the device model is unavailable, you'll be offered Automatic or On server instead.")
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(Color(hex: "#8e9197"))
+                                    } else if receiptParser == ReceiptParserPreference.server.rawValue {
+                                        Text("Only recognized receipt text is sent for parsing. The photo stays on this phone.")
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(Color(hex: "#8e9197"))
+                                    }
+                                }
+
+                                Divider().overlay(Color(hex: "#2b2e33"))
 
                                 Toggle(isOn: $saveCapturedReceiptsToPhotos) {
                                     VStack(alignment: .leading, spacing: 3) {

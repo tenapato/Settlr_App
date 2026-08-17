@@ -44,6 +44,8 @@ struct SplitCreateSheet: View {
     @State private var isScanning = false
     @State private var hasScanned = false
     @State private var scanNotice: String?
+    @State private var scanNeedsReview = false
+    @State private var showReceiptSettings = false
     @State private var errorMessage: String?
     /// Local rather than `vm.isSaving`: saving now means writing to disk and
     /// then trying the network, which the view model doesn't run.
@@ -173,6 +175,9 @@ struct SplitCreateSheet: View {
                     errorMessage: nil
                 )
             }
+            .sheet(isPresented: $showReceiptSettings) {
+                SettingsView()
+            }
         }
         .preferredColorScheme(.dark)
         .task { await loadCards() }
@@ -211,6 +216,15 @@ struct SplitCreateSheet: View {
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if scanNeedsReview {
+                Button("Receipt parsing settings") {
+                    showReceiptSettings = true
+                }
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.accent)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
@@ -257,7 +271,12 @@ struct SplitCreateSheet: View {
             totalEdited = true
         }
 
-        var notes = ["Check every line before you send this to anyone."]
+        let unverifiedCount = parsed.items.filter { $0.verification == .unverified }.count
+        scanNeedsReview = unverifiedCount > 0 || !parsed.warnings.isEmpty
+        var notes = ["Parsed \(parsed.parser.displayName.lowercased()). Check every line before you send this to anyone."]
+        if unverifiedCount > 0 {
+            notes.append("\(unverifiedCount) item\(unverifiedCount == 1 ? "" : "s") need\(unverifiedCount == 1 ? "s" : "") review.")
+        }
         notes.append(contentsOf: parsed.warnings)
         scanNotice = notes.joined(separator: " ")
     }

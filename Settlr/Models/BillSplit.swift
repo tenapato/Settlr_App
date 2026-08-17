@@ -188,19 +188,141 @@ struct BillSplitStatusBody: Encodable { let status: String }
 
 struct ScanReceiptBody: Encodable { let text: String }
 
+enum ReceiptParserPreference: String, CaseIterable, Identifiable {
+    static let storageKey = "receiptParserPreference"
+
+    case automatic
+    case onDevice
+    case server
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .automatic: "Automatic"
+        case .onDevice: "On device"
+        case .server: "On server"
+        }
+    }
+}
+
+enum ReceiptParserKind: String, Codable {
+    case onDevice = "on_device"
+    case server
+
+    var displayName: String {
+        switch self {
+        case .onDevice: "On device"
+        case .server: "On server"
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let value = try container.decode(String.self)
+        switch value {
+        case "on_device", "onDevice": self = .onDevice
+        case "server", "cloudflare": self = .server
+        default:
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Unknown receipt parser kind: \(value)"
+            )
+        }
+    }
+}
+
+enum ReceiptVerification: String, Codable {
+    case verified
+    case unverified
+}
+
 struct ScannedReceiptItem: Decodable {
     let name: String
     let quantity: Int
     let unitPriceCents: Int
+    let verification: ReceiptVerification
+
+    init(
+        name: String,
+        quantity: Int,
+        unitPriceCents: Int,
+        verification: ReceiptVerification = .unverified
+    ) {
+        self.name = name
+        self.quantity = quantity
+        self.unitPriceCents = unitPriceCents
+        self.verification = verification
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case name, quantity, unitPriceCents, verification
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        name = try values.decode(String.self, forKey: .name)
+        quantity = try values.decode(Int.self, forKey: .quantity)
+        unitPriceCents = try values.decode(Int.self, forKey: .unitPriceCents)
+        verification = try values.decodeIfPresent(ReceiptVerification.self, forKey: .verification) ?? .unverified
+    }
 }
 
 struct ScannedReceipt: Decodable {
+    let parser: ReceiptParserKind
     let merchant: String?
     let items: [ScannedReceiptItem]
     let taxCents: Int
     let tipCents: Int
     let totalCents: Int
     let warnings: [String]
+
+    init(
+        parser: ReceiptParserKind,
+        merchant: String?,
+        items: [ScannedReceiptItem],
+        taxCents: Int,
+        tipCents: Int,
+        totalCents: Int,
+        warnings: [String]
+    ) {
+        self.parser = parser
+        self.merchant = merchant
+        self.items = items
+        self.taxCents = taxCents
+        self.tipCents = tipCents
+        self.totalCents = totalCents
+        self.warnings = warnings
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case parser, merchant, items, taxCents, tipCents, totalCents, warnings
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        // Missing metadata means an older response from the existing server
+        // endpoint. Locally-created device results always set their parser.
+        parser = try values.decodeIfPresent(ReceiptParserKind.self, forKey: .parser) ?? .server
+        merchant = try values.decodeIfPresent(String.self, forKey: .merchant)
+        items = try values.decode([ScannedReceiptItem].self, forKey: .items)
+        taxCents = try values.decode(Int.self, forKey: .taxCents)
+        tipCents = try values.decode(Int.self, forKey: .tipCents)
+        totalCents = try values.decode(Int.self, forKey: .totalCents)
+        warnings = try values.decodeIfPresent([String].self, forKey: .warnings) ?? []
+    }
+
+    func attributed(to parser: ReceiptParserKind) -> ScannedReceipt {
+        ScannedReceipt(
+            parser: parser,
+            merchant: merchant,
+            items: items,
+            taxCents: taxCents,
+            tipCents: tipCents,
+            totalCents: totalCents,
+            warnings: warnings
+        )
+    }
 }
 
 // MARK: - Public share-link models (used by the deep-link claim screen)

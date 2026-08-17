@@ -87,6 +87,7 @@ enum ReceiptReconciler {
         }
 
         return ScannedReceipt(
+            parser: receipt.parser,
             merchant: receipt.merchant,
             items: receipt.items,
             taxCents: best.chargesTax ? tax : 0,
@@ -146,8 +147,10 @@ enum ReceiptPrices {
 
     /// One printed row, reduced to what it names and what it charges.
     private struct Row {
+        let printedName: String
         let label: String
-        let amountCents: Int
+        let quantity: Int
+        let lineTotalCents: Int
         var claimed = false
     }
 
@@ -162,14 +165,43 @@ enum ReceiptPrices {
               cents > 0
         else { return nil }
 
-        // Strip the amounts and any leading count, leaving just the name.
-        var label = money.stringByReplacingMatches(in: line, range: range, withTemplate: " ")
-        label = label.replacingOccurrences(
-            of: "^\\s*\\d+\\s*[xX*]?\\s",
-            with: " ",
-            options: .regularExpression
+        // Work only with text before the rightmost amount. Any earlier money
+        // token is a printed unit-price column, not part of the item name.
+        var nameColumn = String(line[..<swiftRange.lowerBound])
+        let nameRange = NSRange(nameColumn.startIndex..., in: nameColumn)
+        nameColumn = money.stringByReplacingMatches(
+            in: nameColumn,
+            range: nameRange,
+            withTemplate: " "
         )
-        return Row(label: ReceiptLineFilter.normalize(label), amountCents: cents)
+
+        // Quantity evidence is accepted only at the leading edge. A product
+        // number at the end of a name (for example `XX AMB 23`) stays a name.
+        let leadingQuantity = try! NSRegularExpression(
+            pattern: "^\\s*(\\d{1,3})(?:\\s*[xX×*])?\\s+(?=\\p{L})"
+        )
+        let quantityRange = NSRange(nameColumn.startIndex..., in: nameColumn)
+        var quantity = 1
+        if let match = leadingQuantity.firstMatch(in: nameColumn, range: quantityRange),
+           let digitsRange = Range(match.range(at: 1), in: nameColumn),
+           let printedQuantity = Int(nameColumn[digitsRange]),
+           (1...99).contains(printedQuantity),
+           let fullRange = Range(match.range, in: nameColumn) {
+            quantity = printedQuantity
+            nameColumn.removeSubrange(fullRange)
+        }
+
+        let printedName = nameColumn
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+        let label = ReceiptLineFilter.normalize(printedName)
+        guard !label.isEmpty else { return nil }
+        return Row(
+            printedName: printedName,
+            label: label,
+            quantity: quantity,
+            lineTotalCents: cents
+        )
     }
 
     static func applyPrinted(to receipt: ScannedReceipt, ocrText: String) -> ScannedReceipt {
@@ -178,60 +210,196 @@ enum ReceiptPrices {
         guard !rows.isEmpty else { return receipt }
 
         var unverified = 0
+        var evidenceWarnings: [String] = []
         let items: [ScannedReceiptItem] = receipt.items.map { item in
             let target = ReceiptLineFilter.normalize(item.name)
-            // Two or three characters of a misread name would match half the
-            // receipt; below that the item is safer unverified than mismatched.
-            guard target.count >= 4 else {
-                unverified += 1
-                return item
-            }
 
             // Exact first, so "CARAJILLO" can't consume the row that belongs to
             // "CARAJILLO MEXICANO" just because it was printed above it. Rows are
             // consumed as they match, so a dish printed twice keeps two prices.
+            // Short labels may match exactly, but never by containment.
             let index = rows.firstIndex { !$0.claimed && $0.label == target }
-                ?? rows.firstIndex { !$0.claimed && ($0.label.contains(target) || target.contains($0.label)) }
+                ?? (target.count >= 4
+                    ? rows.firstIndex {
+                        !$0.claimed
+                            && $0.label.count >= 4
+                            && ($0.label.contains(target) || target.contains($0.label))
+                    }
+                    : nil)
             guard let index else {
                 unverified += 1
-                return item
+                return ScannedReceiptItem(
+                    name: item.name,
+                    quantity: item.quantity,
+                    unitPriceCents: item.unitPriceCents,
+                    verification: .unverified
+                )
             }
 
             rows[index].claimed = true
-            return rebuilt(item, lineTotalCents: rows[index].amountCents)
+            let row = rows[index]
+            if row.quantity > 1, row.lineTotalCents % row.quantity != 0 {
+                evidenceWarnings.append(
+                    "\(row.printedName) has a quantity that doesn't divide its printed total, so it was kept as one line for review."
+                )
+            }
+            return rebuilt(
+                item,
+                lineTotalCents: row.lineTotalCents,
+                printedQuantity: row.quantity,
+                printedName: row.printedName,
+                verification: .verified
+            )
         }
 
         let notes = unverified > 0
             ? ["\(unverified) line(s) couldn't be matched to a printed row — check their prices."]
             : []
         return ScannedReceipt(
+            parser: receipt.parser,
             merchant: receipt.merchant,
             items: items,
             taxCents: receipt.taxCents,
             tipCents: receipt.tipCents,
             totalCents: receipt.totalCents,
-            warnings: receipt.warnings + notes
+            warnings: receipt.warnings + evidenceWarnings + notes
         )
     }
 
     /// A row's money is its line total. A quantity that doesn't divide it evenly
     /// is dropped rather than the amount: what somebody owes has to be exact,
     /// what the row says they ordered is only ever a label.
-    static func rebuilt(_ item: ScannedReceiptItem, lineTotalCents: Int) -> ScannedReceiptItem {
-        if item.quantity > 1, lineTotalCents % item.quantity == 0 {
+    static func rebuilt(
+        _ item: ScannedReceiptItem,
+        lineTotalCents: Int,
+        printedQuantity: Int? = nil,
+        printedName: String? = nil,
+        verification: ReceiptVerification? = nil
+    ) -> ScannedReceiptItem {
+        let quantity = max(1, printedQuantity ?? item.quantity)
+        let name = printedName ?? item.name
+        let status = verification ?? item.verification
+        if quantity > 1, lineTotalCents % quantity == 0 {
             return ScannedReceiptItem(
-                name: item.name,
-                quantity: item.quantity,
-                unitPriceCents: lineTotalCents / item.quantity
+                name: name,
+                quantity: quantity,
+                unitPriceCents: lineTotalCents / quantity,
+                verification: status
             )
         }
-        return ScannedReceiptItem(name: item.name, quantity: 1, unitPriceCents: lineTotalCents)
+        return ScannedReceiptItem(
+            name: name,
+            quantity: 1,
+            unitPriceCents: lineTotalCents,
+            verification: status
+        )
+    }
+}
+
+enum ReceiptParserRoutingError: LocalizedError {
+    case onDeviceUnavailable
+    case onDeviceInvalid
+    case onDeviceFailed
+    case serverReturnedNoUsableRows
+
+    var errorDescription: String? {
+        switch self {
+        case .onDeviceUnavailable:
+            "On-device parsing isn't available. Choose Automatic or On server in Settings. Your receipt text was not uploaded."
+        case .onDeviceInvalid:
+            "On-device parsing couldn't verify any item rows. Choose Automatic or On server in Settings. Your receipt text was not uploaded."
+        case .onDeviceFailed:
+            "On-device parsing couldn't finish. Choose Automatic or On server in Settings. Your receipt text was not uploaded."
+        case .serverReturnedNoUsableRows:
+            "On server parsing couldn't verify any item rows. Check the receipt or enter the items manually."
+        }
+    }
+}
+
+/// Selects a parser without owning OCR or network transport. Injected closures
+/// make the privacy boundary explicit: the server closure is never reached in
+/// On-device mode, while Automatic alone may use it as a fallback.
+@MainActor
+struct ReceiptParserRouter {
+    typealias Parser = (String) async throws -> ScannedReceipt?
+
+    let onDevice: Parser
+    let server: Parser
+
+    func parse(
+        _ ocrText: String,
+        preference: ReceiptParserPreference
+    ) async throws -> ScannedReceipt {
+        switch preference {
+        case .automatic:
+            do {
+                if let raw = try await onDevice(ocrText) {
+                    let result = reconciled(raw, parser: .onDevice, ocrText: ocrText)
+                    if hasUsableRows(result) { return result }
+                }
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                // Automatic is the only mode authorized to try the server after
+                // a device-model failure.
+            }
+            return try await parseOnServer(ocrText)
+
+        case .onDevice:
+            do {
+                guard let raw = try await onDevice(ocrText) else {
+                    throw ReceiptParserRoutingError.onDeviceUnavailable
+                }
+                let result = reconciled(raw, parser: .onDevice, ocrText: ocrText)
+                guard hasUsableRows(result) else {
+                    throw ReceiptParserRoutingError.onDeviceInvalid
+                }
+                return result
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch let error as ReceiptParserRoutingError {
+                throw error
+            } catch {
+                throw ReceiptParserRoutingError.onDeviceFailed
+            }
+
+        case .server:
+            return try await parseOnServer(ocrText)
+        }
+    }
+
+    private func parseOnServer(_ ocrText: String) async throws -> ScannedReceipt {
+        guard let raw = try await server(ocrText) else {
+            throw ReceiptParserRoutingError.serverReturnedNoUsableRows
+        }
+        let result = reconciled(raw, parser: .server, ocrText: ocrText)
+        // An unverified server row still belongs in the editable review form;
+        // only a completely empty/invalid response blocks the scan.
+        guard result.items.contains(where: { $0.quantity > 0 && $0.unitPriceCents > 0 }) else {
+            throw ReceiptParserRoutingError.serverReturnedNoUsableRows
+        }
+        return result
+    }
+
+    private func reconciled(
+        _ receipt: ScannedReceipt,
+        parser: ReceiptParserKind,
+        ocrText: String
+    ) -> ScannedReceipt {
+        ReceiptReconciler.reconcile(receipt.attributed(to: parser), ocrText: ocrText)
+    }
+
+    private func hasUsableRows(_ receipt: ScannedReceipt) -> Bool {
+        receipt.items.contains {
+            $0.verification == .verified && $0.quantity > 0 && $0.unitPriceCents > 0
+        }
     }
 }
 
 private extension ScannedReceipt {
     func adding(warnings extra: [String]) -> ScannedReceipt {
         ScannedReceipt(
+            parser: parser,
             merchant: merchant,
             items: items,
             taxCents: taxCents,
