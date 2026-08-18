@@ -262,6 +262,14 @@ struct SplitAccountingPresentation: Equatable {
         }
     }
 
+    var eachOwnSummaryTitle: String { "Everyone paid their own share" }
+
+    var eachOwnOtherSharesLabel: String { "Everyone else's shares" }
+
+    var eachOwnShareLabel: String { "Your share" }
+
+    var eachOwnExpenseNote: String { "Only your share was recorded as an expense." }
+
     func expenseSubtitle(
         participantCount: Int,
         guestCount: Int,
@@ -352,7 +360,7 @@ struct SplitAccountingPresentation: Equatable {
         switch payerMode {
         case .eachOwn:
             return isOpen
-                ? "Freezes everyone's share and records your own share as an expense. No reimbursements are recorded."
+                ? "Freezes everyone's share and records your own share as an expense. Everyone pays their own share directly."
                 : "Reopening removes the expense recorded for your share until you finish again."
         case .organizerPaid:
             return isOpen

@@ -48,7 +48,15 @@ final class EachOwnPresentationTests: XCTestCase {
         // This catches either split screen drifting back to reimbursement copy
         // even though the persisted payer says everyone paid directly.
         let presentation = SplitAccountingPresentation(payerMode: .eachOwn)
+        XCTAssertEqual(presentation.eachOwnSummaryTitle, "Everyone paid their own share")
+        XCTAssertEqual(presentation.eachOwnOtherSharesLabel, "Everyone else's shares")
+        XCTAssertEqual(presentation.eachOwnShareLabel, "Your share")
+        XCTAssertEqual(presentation.eachOwnExpenseNote, "Only your share was recorded as an expense.")
         let renderedCopy = [
+            presentation.eachOwnSummaryTitle,
+            presentation.eachOwnOtherSharesLabel,
+            presentation.eachOwnShareLabel,
+            presentation.eachOwnExpenseNote,
             presentation.expenseSubtitle(
                 participantCount: 3,
                 guestCount: 2,
@@ -81,6 +89,8 @@ final class EachOwnPresentationTests: XCTestCase {
             "Owes you",
             "Nobody has joined yet",
             "owed to you",
+            "reimbursement",
+            "reimbursements",
         ] {
             XCTAssertFalse(renderedCopy.localizedCaseInsensitiveContains(prohibited))
         }

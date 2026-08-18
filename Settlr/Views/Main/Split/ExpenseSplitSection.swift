@@ -198,11 +198,12 @@ struct ExpenseSplitSection: View {
     /// here as context for it, never as something you are owed back.
     private func eachOwnRows(_ split: BillSplit) -> some View {
         let yours = split.organizer?.owedCents ?? 0
+        let presentation = split.accountingPresentation
         return VStack(spacing: 8) {
             amountRow("Bill total", split.totalCents, currency: split.currency)
-            amountRow("Everyone else's shares", max(0, split.totalCents - yours), currency: split.currency)
-            emphasisRow("Your share", yours, currency: split.currency)
-            Text("Only your share was recorded as an expense.")
+            amountRow(presentation.eachOwnOtherSharesLabel, max(0, split.totalCents - yours), currency: split.currency)
+            emphasisRow(presentation.eachOwnShareLabel, yours, currency: split.currency)
+            Text(presentation.eachOwnExpenseNote)
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.faint)
                 .frame(maxWidth: .infinity, alignment: .leading)

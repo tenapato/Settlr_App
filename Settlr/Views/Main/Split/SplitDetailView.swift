@@ -390,8 +390,9 @@ struct SplitDetailView: View {
     /// to, and which one of those is yours. No progress bar, no "to go" — there
     /// is no debt here, and showing one would invent an obligation nobody has.
     private func eachOwnSummary(_ split: BillSplit) -> some View {
+        let presentation = split.accountingPresentation
         VStack(alignment: .leading, spacing: 10) {
-            SectionEyebrow("Everyone paid their own")
+            SectionEyebrow(presentation.eachOwnSummaryTitle)
             ForEach(split.participants) { person in
                 HStack {
                     Text(person.name)
@@ -412,7 +413,7 @@ struct SplitDetailView: View {
                         .foregroundStyle(person.isOrganizer ? Theme.accent : Theme.muted)
                 }
             }
-            Text("Only your own share was recorded as an expense.")
+            Text(presentation.eachOwnExpenseNote)
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.faint)
                 .padding(.top, 2)
