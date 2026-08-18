@@ -391,7 +391,7 @@ struct SplitDetailView: View {
     /// is no debt here, and showing one would invent an obligation nobody has.
     private func eachOwnSummary(_ split: BillSplit) -> some View {
         let presentation = split.accountingPresentation
-        VStack(alignment: .leading, spacing: 10) {
+        return VStack(alignment: .leading, spacing: 10) {
             SectionEyebrow(presentation.eachOwnSummaryTitle)
             ForEach(split.participants) { person in
                 HStack {
@@ -622,8 +622,6 @@ struct SplitDetailView: View {
     // MARK: - Items
 
     private func itemsSection(_ split: BillSplit) -> some View {
-        let organizerId = split.organizer?.id
-        let mine = Set(split.organizer?.claimedItemIds ?? [])
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
                 // Nothing is claimed on an even split — the lines are just the

@@ -1,4 +1,4 @@
-import AuthenticationServices
+@preconcurrency import AuthenticationServices
 import Foundation
 
 enum APIError: LocalizedError {
