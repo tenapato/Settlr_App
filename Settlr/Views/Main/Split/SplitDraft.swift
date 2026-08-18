@@ -5,6 +5,14 @@ import Foundation
 /// Money stays in integer cents here. Text-field formatting belongs to the
 /// view, while this type owns the server contract and reconciliation rules.
 struct SplitDraft {
+    struct ClaimImpact: Equatable {
+        let itemIDsRequiringConfirmation: [String]
+        let itemNamesRequiringConfirmation: [String]
+        let removedItemIDs: [String]
+
+        var requiresConfirmation: Bool { !itemIDsRequiringConfirmation.isEmpty }
+    }
+
     struct Item: Identifiable, Equatable {
         let localID: UUID
         var serverID: String?
@@ -226,7 +234,43 @@ struct SplitDraft {
         )
     }
 
-    func makeEditBody(version: Int) -> EditBillSplitBody {
+    /// Compares the current draft with the server snapshot that opened the
+    /// editor. Claim clearing is intentionally derived at save time, rather
+    /// than from field bindings, so typing and cancelling never destroys the
+    /// existing claims.
+    func claimImpact(comparedTo split: BillSplit) -> ClaimImpact {
+        let originalItems = split.items.sorted { $0.sortOrder < $1.sortOrder }
+        let currentByID = Dictionary(uniqueKeysWithValues: items.compactMap { item in
+            item.serverID.map { ($0, item) }
+        })
+        var affectedIDs: [String] = []
+        var affectedNames: [String] = []
+        var removedIDs: [String] = []
+
+        for original in originalItems where original.claimedQuantity > 0 {
+            guard let current = currentByID[original.id] else {
+                affectedIDs.append(original.id)
+                affectedNames.append(original.name)
+                removedIDs.append(original.id)
+                continue
+            }
+            let changed = current.quantity != original.quantity
+                || current.unitPriceCents != original.unitPriceCents
+                || current.allocationMode != original.allocationMode
+            if changed {
+                affectedIDs.append(original.id)
+                affectedNames.append(current.name.isEmpty ? original.name : current.name)
+            }
+        }
+
+        return ClaimImpact(
+            itemIDsRequiringConfirmation: affectedIDs,
+            itemNamesRequiringConfirmation: affectedNames,
+            removedItemIDs: removedIDs
+        )
+    }
+
+    func makeEditBody(version: Int, clearClaimsFor: Set<String> = []) -> EditBillSplitBody {
         EditBillSplitBody(
             version: version,
             merchant: merchant.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -248,7 +292,7 @@ struct SplitDraft {
                     quantity: max(1, $0.quantity),
                     unitPriceCents: max(0, $0.unitPriceCents),
                     allocationMode: $0.allocationMode,
-                    clearClaims: $0.clearClaims ? true : nil
+                    clearClaims: $0.serverID.map { clearClaimsFor.contains($0) } == true ? true : nil
                 )
             },
             participants: participants.enumerated().map { index, participant in

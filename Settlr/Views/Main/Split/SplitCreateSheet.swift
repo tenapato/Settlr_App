@@ -33,6 +33,8 @@ struct SplitCreateSheet: View {
     @State private var showReceiptSettings = false
     @State private var errorMessage: String?
     @State private var showKeepMismatchConfirmation = false
+    @State private var showClaimChangeConfirmation = false
+    @State private var pendingClaimClearIDs: Set<String> = []
     @State private var hasInitialized = false
     /// Captured when the editor opens. The detail view keeps refreshing behind
     /// this sheet, but a newer DTO must not silently lend its version to an
@@ -181,6 +183,18 @@ struct SplitCreateSheet: View {
                 Button("Keep receipt total") { draft.confirmKeepReceiptTotal() }
             } message: {
                 Text("The item lines and total differ materially. Keep this total only after checking the receipt for missing or duplicated rows.")
+            }
+            .alert("Clear existing claims?", isPresented: $showClaimChangeConfirmation) {
+                Button("Cancel", role: .cancel) {
+                    pendingClaimClearIDs = []
+                }
+                Button("Save and clear claims", role: .destructive) {
+                    let ids = pendingClaimClearIDs
+                    pendingClaimClearIDs = []
+                    submitEdit(clearClaimsFor: ids)
+                }
+            } message: {
+                Text(claimChangeMessage)
             }
         }
         .preferredColorScheme(.dark)
@@ -521,7 +535,6 @@ struct SplitCreateSheet: View {
                         Button("\(n)×") {
                             guard n != item.wrappedValue.quantity else { return }
                             item.wrappedValue.quantity = n
-                            item.wrappedValue.clearClaims = item.wrappedValue.serverID != nil
                             draft.mismatchAcknowledged = false
                         }
                     }
@@ -560,12 +573,10 @@ struct SplitCreateSheet: View {
                 Button("Claim individual units") {
                     guard item.wrappedValue.allocationMode != "units" else { return }
                     item.wrappedValue.allocationMode = "units"
-                    item.wrappedValue.clearClaims = item.wrappedValue.serverID != nil
                 }
                 Button("Share the whole item") {
                     guard item.wrappedValue.allocationMode != "shared" else { return }
                     item.wrappedValue.allocationMode = "shared"
-                    item.wrappedValue.clearClaims = item.wrappedValue.serverID != nil
                 }
             } label: {
                 Label(
@@ -596,7 +607,6 @@ struct SplitCreateSheet: View {
                 let newValue = centsFromText(value)
                 if draft.items[index].unitPriceCents != newValue {
                     draft.items[index].unitPriceCents = newValue
-                    draft.items[index].clearClaims = draft.items[index].serverID != nil
                     draft.mismatchAcknowledged = false
                 }
             }
@@ -927,22 +937,13 @@ struct SplitCreateSheet: View {
                 errorMessage = "Reload this split before editing."
                 return
             }
-            errorMessage = nil
-            isSubmitting = true
-            Task {
-                defer { isSubmitting = false }
-                let saved = await vm.updateDraft(
-                    workspaceId: workspaceId,
-                    splitId: editingSplit.id,
-                    body: bodyDraft.makeEditBody(version: openedEditVersion)
-                )
-                if saved, let updated = vm.detail {
-                    onSaved(.created(updated))
-                    dismiss()
-                } else {
-                    errorMessage = vm.errorMessage
-                }
+            let impact = bodyDraft.claimImpact(comparedTo: editingSplit)
+            if impact.requiresConfirmation {
+                pendingClaimClearIDs = Set(impact.itemIDsRequiringConfirmation)
+                showClaimChangeConfirmation = true
+                return
             }
+            submitEdit(clearClaimsFor: [])
             return
         }
 
@@ -968,6 +969,41 @@ struct SplitCreateSheet: View {
                 // The server looked at this and said no. Stay open with every
                 // field intact so it can be fixed — exactly as before.
                 errorMessage = message
+            }
+        }
+    }
+
+    private var claimChangeMessage: String {
+        let names = editingSplit.map { draft.claimImpact(comparedTo: $0).itemNamesRequiringConfirmation } ?? []
+        let summary = names.isEmpty ? "the changed or removed items" : names.joined(separator: ", ")
+        return summary + " already have claims. Saving these financial changes will clear only those claims so everyone can claim the corrected bill again. Cancel keeps the current draft and claims."
+    }
+
+    private func submitEdit(clearClaimsFor: Set<String>) {
+        guard let editingSplit else { return }
+        let bodyDraft = submissionDraft
+        guard network.isOnline else {
+            errorMessage = "Editing needs an internet connection."
+            return
+        }
+        guard let openedEditVersion else {
+            errorMessage = "Reload this split before editing."
+            return
+        }
+        errorMessage = nil
+        isSubmitting = true
+        Task {
+            defer { isSubmitting = false }
+            let saved = await vm.updateDraft(
+                workspaceId: workspaceId,
+                splitId: editingSplit.id,
+                body: bodyDraft.makeEditBody(version: openedEditVersion, clearClaimsFor: clearClaimsFor)
+            )
+            if saved, let updated = vm.detail {
+                onSaved(.created(updated))
+                dismiss()
+            } else {
+                errorMessage = vm.errorMessage
             }
         }
     }

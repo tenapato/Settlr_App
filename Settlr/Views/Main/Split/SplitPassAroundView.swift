@@ -359,7 +359,7 @@ struct SplitPassAroundView: View {
             }
 
             if current.unclaimedItemsCents > 0 {
-                Text("\(formatSplitMoney(current.unclaimedItemsCents)) of the bill is still unclaimed.")
+                Text("\(formatSplitMoney(current.unclaimedItemsCents)) of the bill is still unassigned.")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)

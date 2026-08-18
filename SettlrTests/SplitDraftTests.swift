@@ -139,6 +139,45 @@ final class SplitDraftTests: XCTestCase {
         XCTAssertEqual(body.participants[1].name, "Person 2")
     }
 
+    func testFinancialEditPlanOnlyMarksChangedOrRemovedClaimedItems() throws {
+        let split = try decodeSplit()
+        var draft = SplitDraft(split: split)
+
+        // Metadata edits do not affect claims. A price change does, while an
+        // unchanged claimed item and an unclaimed changed item do not need a
+        // destructive confirmation.
+        draft.items[0].unitPriceCents = 550
+        draft.items[1].unitPriceCents = 1_100
+        let plan = draft.claimImpact(comparedTo: split)
+
+        XCTAssertEqual(plan.itemIDsRequiringConfirmation, ["item-1"])
+        XCTAssertEqual(plan.itemNamesRequiringConfirmation, ["Tacos 23"])
+        XCTAssertTrue(plan.removedItemIDs.isEmpty)
+    }
+
+    func testFinancialEditPlanIncludesRemovedClaimedItems() throws {
+        let split = try decodeSplit()
+        var draft = SplitDraft(split: split)
+        draft.items.removeAll { $0.serverID == "item-1" }
+
+        let plan = draft.claimImpact(comparedTo: split)
+
+        XCTAssertEqual(plan.itemIDsRequiringConfirmation, ["item-1"])
+        XCTAssertEqual(plan.removedItemIDs, ["item-1"])
+    }
+
+    func testEditBodyClearsOnlyConfirmedFinancialChanges() throws {
+        let split = try decodeSplit()
+        var draft = SplitDraft(split: split)
+        draft.items[0].unitPriceCents = 550
+        draft.items[1].unitPriceCents = 1_100
+
+        let body = draft.makeEditBody(version: split.version, clearClaimsFor: ["item-1"])
+
+        XCTAssertEqual(body.items[0].clearClaims, true)
+        XCTAssertNil(body.items[1].clearClaims)
+    }
+
     private func makeDraft(itemTotal: Int, selectedTotal: Int) -> SplitDraft {
         var draft = SplitDraft(scan: ScannedReceipt(
             parser: .onDevice,
