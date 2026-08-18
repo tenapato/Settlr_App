@@ -20,6 +20,8 @@ struct SplitScanFlow: View {
     @State private var busyMessage: String?
     @State private var busyImage: UIImage?
     @State private var errorMessage: String?
+    @State private var photoRecovery = ReceiptPhotoRecovery()
+    @State private var showPhotoRecovery = false
     /// Carried into the create sheet when the scan couldn't run — the user needs
     /// to know why the form is empty.
     @State private var notice: String?
@@ -28,14 +30,26 @@ struct SplitScanFlow: View {
         ReceiptCaptureView(
             onCapture: handleCapture,
             onManualEntry: {
-                prefill = nil
-                showCreate = true
+                enterManually()
             },
             onOpenSplits: { showList = true },
             busyMessage: busyMessage,
             busyImage: busyImage,
+            busyPrivacyLegend: vm.scanPrivacyLegend,
             errorMessage: errorMessage
         )
+        .confirmationDialog(
+            "Photo parsing failed",
+            isPresented: $showPhotoRecovery,
+            titleVisibility: .visible
+        ) {
+            Button("Retry photo") { runRecovery(preference: .serverPhoto) }
+            Button("On server (text only)") { runRecovery(preference: .server) }
+            Button("Manual entry") { enterManually() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The captured photo is kept only in this scan session while you choose how to continue.")
+        }
         .sheet(isPresented: $showCreate) {
             SplitCreateSheet(workspaceId: workspaceId, vm: vm, prefill: prefill, notice: notice) { outcome in
                 showCreate = false
@@ -46,13 +60,17 @@ struct SplitScanFlow: View {
         .sheet(isPresented: $showList) {
             SplitListView(workspaceId: workspaceId)
         }
+        .onDisappear { photoRecovery.clear() }
     }
 
     private func handleCapture(_ image: UIImage) {
+        vm.beginReceiptScan()
         errorMessage = nil
+        photoRecovery.clear()
         busyImage = image
         withAnimation(.easeOut(duration: 0.2)) { busyMessage = "Reading the receipt…" }
         Task {
+            var recognizedText: String?
             defer {
                 busyMessage = nil
                 busyImage = nil
@@ -63,22 +81,70 @@ struct SplitScanFlow: View {
                 let text = try await Task.detached(priority: .userInitiated) {
                     try ReceiptOCR.recognizeText(in: image)
                 }.value
+                recognizedText = text
 
                 busyMessage = "Finding the items…"
-                let parsed = try await vm.scanReceipt(workspaceId: workspaceId, text: text)
+                let parsed = try await vm.scanReceipt(workspaceId: workspaceId, text: text, image: image)
+                photoRecovery.clear()
                 prefill = parsed
                 showCreate = true
-            } catch let error where APIError.isOffline(error) {
-                // Vision read the receipt fine; only the fallback parser needed
-                // the network. Another photo would fail identically, so move on
-                // to the form rather than parking the user on the camera.
-                notice = "No signal, so the items couldn't be read automatically — type them in."
-                prefill = nil
-                showCreate = true
             } catch {
-                // Stay on the camera so the obvious next move is another shot.
-                errorMessage = error.localizedDescription
+                if let recognizedText, vm.lastScanPreference == .serverPhoto {
+                    retainPhotoRecovery(image: image, ocrText: recognizedText, error: error)
+                } else if APIError.isOffline(error) {
+                    // Text-only Automatic fallback has no photo recovery path.
+                    notice = "No signal, so the items couldn't be read automatically — type them in."
+                    prefill = nil
+                    showCreate = true
+                } else {
+                    // OCR failed or a non-photo parser failed; another capture is
+                    // the only retry that preserves the selected privacy mode.
+                    errorMessage = error.localizedDescription
+                }
             }
         }
+    }
+
+    private func retainPhotoRecovery(image: UIImage, ocrText: String, error: Error) {
+        photoRecovery.retain(image: image, ocrText: ocrText)
+        errorMessage = error.localizedDescription
+        showPhotoRecovery = true
+    }
+
+    private func runRecovery(preference: ReceiptParserPreference) {
+        guard let image = photoRecovery.image, let text = photoRecovery.ocrText else { return }
+        vm.beginReceiptScan()
+        errorMessage = nil
+        busyImage = image
+        busyMessage = "Finding the items…"
+        Task {
+            defer {
+                busyMessage = nil
+                busyImage = nil
+            }
+            do {
+                let parsed = try await vm.scanReceipt(
+                    workspaceId: workspaceId,
+                    text: text,
+                    image: preference == .serverPhoto ? image : nil,
+                    preference: preference
+                )
+                photoRecovery.clear()
+                prefill = parsed
+                showCreate = true
+            } catch {
+                errorMessage = error.localizedDescription
+                showPhotoRecovery = true
+            }
+        }
+    }
+
+    private func enterManually() {
+        vm.beginReceiptScan()
+        photoRecovery.clear()
+        errorMessage = nil
+        notice = "Enter the receipt items manually."
+        prefill = nil
+        showCreate = true
     }
 }

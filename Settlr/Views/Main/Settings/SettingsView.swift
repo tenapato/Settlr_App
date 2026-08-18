@@ -132,7 +132,7 @@ struct SettingsView: View {
                                     .textCase(.uppercase)
                                     .tracking(0.8)
 
-                                VStack(alignment: .leading, spacing: 6) {
+                                VStack(alignment: .leading, spacing: 10) {
                                     HStack {
                                         VStack(alignment: .leading, spacing: 3) {
                                             Text("Receipt parsing")
@@ -145,11 +145,26 @@ struct SettingsView: View {
                                         Spacer()
                                         Picker("Receipt parsing", selection: $receiptParser) {
                                             ForEach(ReceiptParserPreference.allCases) { preference in
-                                                Text(preference.displayName).tag(preference.rawValue)
+                                                Text(preference.displayName)
+                                                    .tag(preference.rawValue)
                                             }
                                         }
                                         .labelsHidden()
                                         .tint(Color(hex: "#c8ff5a"))
+                                    }
+
+                                    if receiptParser == ReceiptParserPreference.serverPhoto.rawValue {
+                                        Text("Experimental")
+                                            .font(.system(size: 9, weight: .bold))
+                                            .textCase(.uppercase)
+                                            .foregroundStyle(Color(hex: "#c8ff5a"))
+                                            .padding(.horizontal, 7)
+                                            .padding(.vertical, 3)
+                                            .background(
+                                                Color(hex: "#c8ff5a").opacity(0.14),
+                                                in: Capsule()
+                                            )
+                                            .accessibilityLabel("Experimental receipt parser")
                                     }
 
                                     if receiptParser == ReceiptParserPreference.onDevice.rawValue {
@@ -158,6 +173,10 @@ struct SettingsView: View {
                                             .foregroundStyle(Color(hex: "#8e9197"))
                                     } else if receiptParser == ReceiptParserPreference.server.rawValue {
                                         Text("Only recognized receipt text is sent for parsing. The photo stays on this phone.")
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(Color(hex: "#8e9197"))
+                                    } else if receiptParser == ReceiptParserPreference.serverPhoto.rawValue {
+                                        Text("The receipt photo and recognized text are sent securely to the server for AI parsing. The server does not store the photo. If Save captures to Photos is enabled, a local copy is saved to your photo library. The AI provider does not use it to train its models.")
                                             .font(.system(size: 12))
                                             .foregroundStyle(Color(hex: "#8e9197"))
                                     }

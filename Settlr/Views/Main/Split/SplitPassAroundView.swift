@@ -259,9 +259,22 @@ struct SplitPassAroundView: View {
 
     private func claimRow(_ item: BillSplitItem, person: BillSplitParticipant) -> some View {
         let control = claimState(item, person: person)
+        let claimable = current.isOpen && !current.isEvenSplit
         let sharers = current.participants.filter { claimQuantity($0, item: item) > 0 }
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
+                if control.isShared {
+                    CompactSharedClaimControl(
+                        presentation: control.sharedPresentation,
+                        isEnabled: claimable && !vm.isSaving,
+                        isLoading: claimable && vm.isSaving
+                    )
+                } else {
+                    ClaimSelectionCircle(
+                        isSelected: control.mine > 0,
+                        isEnabled: claimable && !vm.isSaving && (control.mine > 0 || control.canSelectUnit)
+                    )
+                }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.name)
                         .font(.system(size: 16, weight: control.mine > 0 ? .semibold : .regular))
@@ -278,37 +291,23 @@ struct SplitPassAroundView: View {
                     }
                 }
                 Spacer(minLength: 4)
+                if claimable, !control.isShared, control.mine > 0 {
+                    CompactUnitClaimStepper(
+                        quantity: control.mine,
+                        canDecrement: control.canDecrement && !vm.isSaving,
+                        canIncrement: control.canIncrement && !vm.isSaving,
+                        decrement: { setClaim(item, person: person, quantity: control.decrementedQuantity) },
+                        increment: { setClaim(item, person: person, quantity: control.incrementedQuantity) }
+                    )
+                    Text("\(control.total)×")
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Theme.faint)
+                }
                 Text(formatSplitMoney(item.lineTotalCents))
                     .font(.system(size: 15, design: .monospaced))
                     .foregroundStyle(Theme.muted)
             }
 
-            if control.isShared {
-                Button(control.sharedActionTitle) {
-                    setClaim(item, person: person, quantity: control.sharedDesiredQuantity)
-                }
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(control.mine > 0 ? Theme.muted : Theme.bg)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 9)
-                .background(control.mine > 0 ? Theme.surface2 : Theme.accent)
-                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-                .disabled(vm.isSaving)
-            } else {
-                HStack(spacing: 12) {
-                    quantityButton("minus", enabled: control.canDecrement) {
-                        setClaim(item, person: person, quantity: control.decrementedQuantity)
-                    }
-                    Spacer()
-                    quantityLabel("Mine", control.mine)
-                    quantityLabel("Available", control.available)
-                    quantityLabel("Total", control.total)
-                    Spacer()
-                    quantityButton("plus", enabled: control.canIncrement) {
-                        setClaim(item, person: person, quantity: control.incrementedQuantity)
-                    }
-                }
-            }
         }
         .padding(14)
         .background(control.mine > 0 ? Theme.accent.opacity(0.1) : Theme.surface)
@@ -317,32 +316,14 @@ struct SplitPassAroundView: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(control.mine > 0 ? Theme.accent.opacity(0.35) : Theme.line, lineWidth: 1)
         )
-    }
-
-    private func quantityButton(
-        _ systemName: String,
-        enabled: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 15, weight: .bold))
-                .frame(width: 34, height: 34)
-                .background(Theme.surface2)
-                .clipShape(Circle())
-        }
-        .foregroundStyle(enabled ? Theme.accent : Theme.faint)
-        .disabled(!enabled || vm.isSaving)
-    }
-
-    private func quantityLabel(_ label: String, _ value: Int) -> some View {
-        VStack(spacing: 2) {
-            Text("\(value)")
-                .font(.system(size: 16, weight: .semibold, design: .monospaced))
-                .foregroundStyle(Theme.ink)
-            Text(label)
-                .font(.system(size: 10))
-                .foregroundStyle(Theme.faint)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard claimable, !vm.isSaving else { return }
+            if control.isShared {
+                setClaim(item, person: person, quantity: control.sharedDesiredQuantity)
+            } else if control.canSelectUnit {
+                setClaim(item, person: person, quantity: control.unitSelectionQuantity)
+            }
         }
     }
 

@@ -90,6 +90,7 @@ struct APIServerError: LocalizedError {
 }
 
 final class APIClient {
+    @MainActor
     static let shared = APIClient()
     private init() {}
 
@@ -248,6 +249,44 @@ final class APIClient {
         if http.statusCode == 401 { throw unauthorized(data: data) }
         guard (200..<300).contains(http.statusCode) else {
             throw serverError(status: http.statusCode, data: data)
+        }
+    }
+
+    func uploadReceiptPhoto<Response: Decodable>(
+        _ path: String,
+        photo: PreparedReceiptPhoto,
+        ocrText: String,
+        timeout: TimeInterval = 75
+    ) async throws -> Response {
+        let boundary = "SettlrReceipt-\(UUID().uuidString)"
+        let body = ReceiptPhotoUpload.multipartBody(
+            boundary: boundary,
+            photo: photo,
+            ocrText: ocrText
+        )
+        var req = try makeRequest(
+            path,
+            method: "POST",
+            headers: [
+                "Content-Type": "multipart/form-data; boundary=\(boundary)",
+            ],
+            timeout: timeout
+        )
+        req.setValue(String(body.count), forHTTPHeaderField: "Content-Length")
+        req.httpBody = body
+
+        let (data, response) = try await Self.transport(req)
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.server("No response")
+        }
+        if http.statusCode == 401 { throw unauthorized(data: data) }
+        guard (200..<300).contains(http.statusCode) else {
+            throw serverError(status: http.statusCode, data: data)
+        }
+        do {
+            return try decoder.decode(Response.self, from: data)
+        } catch {
+            throw APIError.decoding(error)
         }
     }
 

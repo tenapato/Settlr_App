@@ -74,6 +74,34 @@ final class PassAroundStateTests: XCTestCase {
         XCTAssertEqual(full.incrementedQuantity, 1)
     }
 
+    func testUnitSelectionStartsAtOneAndStepperBoundsRemainExplicit() {
+        let unselected = SplitClaimControlState(
+            allocationMode: "units",
+            totalQuantity: 3,
+            claimedQuantity: 0,
+            participantQuantity: 0
+        )
+        XCTAssertEqual(unselected.unitSelectionQuantity, 1)
+
+        let selected = SplitClaimControlState(
+            allocationMode: "units",
+            totalQuantity: 3,
+            claimedQuantity: 2,
+            participantQuantity: 2
+        )
+        XCTAssertEqual(selected.unitSelectionQuantity, 2)
+        XCTAssertEqual(selected.decrementedQuantity, 1)
+        XCTAssertEqual(selected.incrementedQuantity, 3)
+
+        let full = SplitClaimControlState(
+            allocationMode: "units",
+            totalQuantity: 2,
+            claimedQuantity: 2,
+            participantQuantity: 0
+        )
+        XCTAssertFalse(full.canSelectUnit)
+    }
+
     func testSharedControlUsesExplicitShareAndRemoveActions() {
         // This catches shared plates being rendered as exclusive quantity rows
         // or using an ambiguous whole-row checkbox.
@@ -95,6 +123,28 @@ final class PassAroundStateTests: XCTestCase {
         )
         XCTAssertEqual(claimed.sharedActionTitle, "Remove share")
         XCTAssertEqual(claimed.sharedDesiredQuantity, 0)
+    }
+
+    func testSharedControlUsesCompactSelectionPresentation() {
+        let unselected = SplitClaimControlState(
+            allocationMode: "shared",
+            totalQuantity: 1,
+            claimedQuantity: 0,
+            participantQuantity: 0
+        )
+        XCTAssertEqual(unselected.sharedPresentation.title, "Add me")
+        XCTAssertFalse(unselected.sharedPresentation.isSelected)
+
+        let selected = SplitClaimControlState(
+            allocationMode: "shared",
+            totalQuantity: 1,
+            claimedQuantity: 1,
+            participantQuantity: 1
+        )
+        XCTAssertEqual(selected.sharedPresentation.title, "Included")
+        XCTAssertTrue(selected.sharedPresentation.isSelected)
+        XCTAssertEqual(selected.sharedPresentation.accessibilityLabel, "Remove me")
+        XCTAssertEqual(selected.sharedPresentation.accessibilityLabel(isEnabled: false), "Shared item unavailable")
     }
 
     func testClaimBodyEncodesDesiredQuantityInsteadOfLegacyBoolean() throws {

@@ -1,4 +1,33 @@
 import Foundation
+import UIKit
+
+struct ReceiptScanRoutingState: Equatable {
+    var preference: ReceiptParserPreference?
+    var attempt: ReceiptParserKind?
+
+    mutating func clearPhotoAttemptAfterFailure() {
+        if attempt == .serverPhoto { attempt = nil }
+    }
+}
+
+/// In-memory recovery material for one active scan/editor session. This type is
+/// intentionally neither Codable nor connected to `PendingSplitQueue`.
+struct ReceiptPhotoRecovery {
+    private(set) var image: UIImage?
+    private(set) var ocrText: String?
+
+    var isAvailable: Bool { image != nil && ocrText != nil }
+
+    mutating func retain(image: UIImage, ocrText: String) {
+        self.image = image
+        self.ocrText = ocrText
+    }
+
+    mutating func clear() {
+        image = nil
+        ocrText = nil
+    }
+}
 
 /// Makes a scanned receipt add up before the organizer ever sees it.
 ///
@@ -14,15 +43,21 @@ import Foundation
 /// items themselves are wrong — a line was missed or read twice — and that is
 /// said out loud rather than quietly folded into everyone's share.
 ///
-/// Applied to on-device and server parses alike, so the two paths can't disagree
-/// about what a receipt means.
+/// Server parses already apply the same deterministic printed-price evidence
+/// before returning. Only on-device results need local OCR price replacement;
+/// server results keep their evidence and run the total/tax/tip check below.
 enum ReceiptReconciler {
     /// Makes a scan add up, in the order the two checks depend on: every price
     /// is taken from the receipt first, then tax and tip are read against the
     /// total. Checking the arithmetic before the prices are trustworthy only
     /// decides which wrong answer to keep.
     static func reconcile(_ receipt: ScannedReceipt, ocrText: String) -> ScannedReceipt {
-        reconcile(ReceiptPrices.applyPrinted(to: receipt, ocrText: ocrText))
+        switch receipt.parser {
+        case .onDevice:
+            return reconcile(ReceiptPrices.applyPrinted(to: receipt, ocrText: ocrText))
+        case .server, .serverPhoto:
+            return reconcile(receipt)
+        }
     }
 
     /// How far a reading may sit from the printed total and still be accepted.
@@ -88,6 +123,8 @@ enum ReceiptReconciler {
 
         return ScannedReceipt(
             parser: receipt.parser,
+            requestedParser: receipt.requestedParser,
+            fallback: receipt.fallback,
             merchant: receipt.merchant,
             items: receipt.items,
             taxCents: best.chargesTax ? tax : 0,
@@ -257,6 +294,8 @@ enum ReceiptPrices {
             : []
         return ScannedReceipt(
             parser: receipt.parser,
+            requestedParser: receipt.requestedParser,
+            fallback: receipt.fallback,
             merchant: receipt.merchant,
             items: items,
             taxCents: receipt.taxCents,
@@ -301,6 +340,7 @@ enum ReceiptParserRoutingError: LocalizedError {
     case onDeviceInvalid
     case onDeviceFailed
     case serverReturnedNoUsableRows
+    case serverPhotoRequiresImage
 
     var errorDescription: String? {
         switch self {
@@ -312,6 +352,8 @@ enum ReceiptParserRoutingError: LocalizedError {
             "On-device parsing couldn't finish. Choose Automatic or On server in Settings. Your receipt text was not uploaded."
         case .serverReturnedNoUsableRows:
             "On server parsing couldn't verify any item rows. Check the receipt or enter the items manually."
+        case .serverPhotoRequiresImage:
+            "Photo parsing needs the captured receipt image. Try scanning the receipt again."
         }
     }
 }
@@ -322,17 +364,38 @@ enum ReceiptParserRoutingError: LocalizedError {
 @MainActor
 struct ReceiptParserRouter {
     typealias Parser = (String) async throws -> ScannedReceipt?
+    typealias PhotoPreparer = (UIImage) throws -> PreparedReceiptPhoto
+    typealias PhotoParser = (String, PreparedReceiptPhoto) async throws -> ScannedReceipt?
 
     let onDevice: Parser
     let server: Parser
+    let preparePhoto: PhotoPreparer
+    let serverPhoto: PhotoParser
+    var onAttempt: ((ReceiptParserKind) -> Void)? = nil
+
+    init(
+        onDevice: @escaping Parser,
+        server: @escaping Parser,
+        preparePhoto: @escaping PhotoPreparer = ReceiptPhotoUpload.prepare,
+        serverPhoto: @escaping PhotoParser = { _, _ in nil },
+        onAttempt: ((ReceiptParserKind) -> Void)? = nil
+    ) {
+        self.onDevice = onDevice
+        self.server = server
+        self.preparePhoto = preparePhoto
+        self.serverPhoto = serverPhoto
+        self.onAttempt = onAttempt
+    }
 
     func parse(
         _ ocrText: String,
-        preference: ReceiptParserPreference
+        preference: ReceiptParserPreference,
+        image: UIImage? = nil
     ) async throws -> ScannedReceipt {
         switch preference {
         case .automatic:
             do {
+                onAttempt?(.onDevice)
                 if let raw = try await onDevice(ocrText) {
                     let result = reconciled(raw, parser: .onDevice, ocrText: ocrText)
                     if hasUsableRows(result) { return result }
@@ -347,6 +410,7 @@ struct ReceiptParserRouter {
 
         case .onDevice:
             do {
+                onAttempt?(.onDevice)
                 guard let raw = try await onDevice(ocrText) else {
                     throw ReceiptParserRoutingError.onDeviceUnavailable
                 }
@@ -365,14 +429,28 @@ struct ReceiptParserRouter {
 
         case .server:
             return try await parseOnServer(ocrText)
+
+        case .serverPhoto:
+            guard let image else { throw ReceiptParserRoutingError.serverPhotoRequiresImage }
+            let photo = try preparePhoto(image)
+            onAttempt?(.serverPhoto)
+            guard let raw = try await serverPhoto(ocrText, photo) else {
+                throw ReceiptParserRoutingError.serverReturnedNoUsableRows
+            }
+            let result = reconciled(raw, parser: raw.parser, ocrText: ocrText)
+            guard result.items.contains(where: { $0.quantity > 0 && $0.unitPriceCents > 0 }) else {
+                throw ReceiptParserRoutingError.serverReturnedNoUsableRows
+            }
+            return result
         }
     }
 
     private func parseOnServer(_ ocrText: String) async throws -> ScannedReceipt {
+        onAttempt?(.server)
         guard let raw = try await server(ocrText) else {
             throw ReceiptParserRoutingError.serverReturnedNoUsableRows
         }
-        let result = reconciled(raw, parser: .server, ocrText: ocrText)
+        let result = reconciled(raw, parser: raw.parser, ocrText: ocrText)
         // An unverified server row still belongs in the editable review form;
         // only a completely empty/invalid response blocks the scan.
         guard result.items.contains(where: { $0.quantity > 0 && $0.unitPriceCents > 0 }) else {
@@ -400,6 +478,8 @@ private extension ScannedReceipt {
     func adding(warnings extra: [String]) -> ScannedReceipt {
         ScannedReceipt(
             parser: parser,
+            requestedParser: requestedParser,
+            fallback: fallback,
             merchant: merchant,
             items: items,
             taxCents: taxCents,

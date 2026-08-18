@@ -32,6 +32,8 @@ struct SplitCreateSheet: View {
     @State private var scanNeedsReview = false
     @State private var showReceiptSettings = false
     @State private var errorMessage: String?
+    @State private var photoRecovery = ReceiptPhotoRecovery()
+    @State private var showPhotoRecovery = false
     @State private var showKeepMismatchConfirmation = false
     @State private var showClaimChangeConfirmation = false
     @State private var pendingClaimClearIDs: Set<String> = []
@@ -147,7 +149,11 @@ struct SplitCreateSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }.foregroundStyle(Theme.muted)
+                    Button("Cancel") {
+                        photoRecovery.clear()
+                        dismiss()
+                    }
+                    .foregroundStyle(Theme.muted)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     // Says what will actually happen. Offline the split is saved
@@ -175,6 +181,18 @@ struct SplitCreateSheet: View {
                     errorMessage: nil
                 )
             }
+            .confirmationDialog(
+                "Photo parsing failed",
+                isPresented: $showPhotoRecovery,
+                titleVisibility: .visible
+            ) {
+                Button("Retry photo") { runPhotoRecovery(preference: .serverPhoto) }
+                Button("On server (text only)") { runPhotoRecovery(preference: .server) }
+                Button("Manual entry") { continueWithManualEntry() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("The captured photo is kept only in this editor session while you choose how to continue.")
+            }
             .sheet(isPresented: $showReceiptSettings) {
                 SettingsView()
             }
@@ -200,6 +218,7 @@ struct SplitCreateSheet: View {
         .preferredColorScheme(.dark)
         .task { await loadCards() }
         .onAppear { applyInitialDraftOnce() }
+        .onDisappear { photoRecovery.clear() }
     }
 
     private var saveButtonTitle: String {
@@ -241,6 +260,13 @@ struct SplitCreateSheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
+            if let legend = vm.scanPrivacyLegend {
+                Text(legend)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.faint)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
             if scanNeedsReview {
                 Button("Receipt parsing settings") {
                     showReceiptSettings = true
@@ -253,19 +279,58 @@ struct SplitCreateSheet: View {
     }
 
     private func handleCapture(_ image: UIImage) {
+        vm.beginReceiptScan()
+        photoRecovery.clear()
+        isScanning = true
+        errorMessage = nil
+        Task {
+            defer { isScanning = false }
+            var recognizedText: String?
+            do {
+                let text = try await Task.detached(priority: .userInitiated) {
+                    try ReceiptOCR.recognizeText(in: image)
+                }.value
+                recognizedText = text
+                applyScan(try await vm.scanReceipt(workspaceId: workspaceId, text: text, image: image))
+            } catch {
+                if let recognizedText, vm.lastScanPreference == .serverPhoto {
+                    photoRecovery.retain(image: image, ocrText: recognizedText)
+                    errorMessage = error.localizedDescription
+                    showPhotoRecovery = true
+                } else {
+                    errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func runPhotoRecovery(preference: ReceiptParserPreference) {
+        guard let image = photoRecovery.image, let text = photoRecovery.ocrText else { return }
+        vm.beginReceiptScan()
         isScanning = true
         errorMessage = nil
         Task {
             defer { isScanning = false }
             do {
-                let text = try await Task.detached(priority: .userInitiated) {
-                    try ReceiptOCR.recognizeText(in: image)
-                }.value
-                applyScan(try await vm.scanReceipt(workspaceId: workspaceId, text: text))
+                let parsed = try await vm.scanReceipt(
+                    workspaceId: workspaceId,
+                    text: text,
+                    image: preference == .serverPhoto ? image : nil,
+                    preference: preference
+                )
+                applyScan(parsed)
             } catch {
                 errorMessage = error.localizedDescription
+                showPhotoRecovery = true
             }
         }
+    }
+
+    private func continueWithManualEntry() {
+        vm.beginReceiptScan()
+        photoRecovery.clear()
+        errorMessage = nil
+        scanNotice = "Enter the receipt items manually."
     }
 
     /// Fills the form from a scan that already happened in the capture flow.
@@ -289,6 +354,7 @@ struct SplitCreateSheet: View {
     }
 
     private func applyScan(_ parsed: ScannedReceipt) {
+        photoRecovery.clear()
         hasScanned = true
         if draft.merchant.trimmingCharacters(in: .whitespaces).isEmpty, let scanned = parsed.merchant {
             draft.merchant = scanned

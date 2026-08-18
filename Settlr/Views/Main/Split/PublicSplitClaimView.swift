@@ -335,8 +335,19 @@ struct PublicSplitClaimView: View {
         let interactive = participantId != nil && split.isOpen && claimable
         return VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 12) {
-                if pendingItemIds.contains(item.id) {
+                if control.isShared, claimable {
+                    CompactSharedClaimControl(
+                        presentation: control.sharedPresentation,
+                        isEnabled: interactive && !pendingItemIds.contains(item.id),
+                        isLoading: pendingItemIds.contains(item.id)
+                    )
+                } else if pendingItemIds.contains(item.id) {
                     ProgressView().tint(Theme.muted).frame(width: 19)
+                } else if claimable {
+                    ClaimSelectionCircle(
+                        isSelected: control.mine > 0,
+                        isEnabled: interactive && (control.mine > 0 || control.canSelectUnit)
+                    )
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -368,74 +379,36 @@ struct PublicSplitClaimView: View {
 
                 Spacer(minLength: 4)
 
+                if interactive, !control.isShared, control.mine > 0 {
+                    CompactUnitClaimStepper(
+                        quantity: control.mine,
+                        canDecrement: control.canDecrement && !pendingItemIds.contains(item.id),
+                        canIncrement: control.canIncrement && !pendingItemIds.contains(item.id),
+                        decrement: { setClaim(item, quantity: control.decrementedQuantity) },
+                        increment: { setClaim(item, quantity: control.incrementedQuantity) }
+                    )
+                    Text("\(control.total)×")
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Theme.faint)
+                }
+
                 Text(formatSplitMoney(item.lineTotalCents, currency: split.currency))
                     .font(.system(size: 14, design: .monospaced))
                     .foregroundStyle(Theme.ink)
             }
 
-            if interactive {
-                if control.isShared {
-                    Button(control.sharedActionTitle) {
-                        setClaim(item, quantity: control.sharedDesiredQuantity)
-                    }
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(control.mine > 0 ? Theme.muted : Theme.bg)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(control.mine > 0 ? Theme.surface2 : Theme.accent)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .disabled(pendingItemIds.contains(item.id))
-                } else {
-                    HStack(spacing: 10) {
-                        publicQuantityButton(
-                            "minus",
-                            enabled: control.canDecrement && !pendingItemIds.contains(item.id)
-                        ) {
-                            setClaim(item, quantity: control.decrementedQuantity)
-                        }
-                        Spacer()
-                        publicQuantityLabel("Mine", control.mine)
-                        publicQuantityLabel("Available", control.available)
-                        publicQuantityLabel("Total", control.total)
-                        Spacer()
-                        publicQuantityButton(
-                            "plus",
-                            enabled: control.canIncrement && !pendingItemIds.contains(item.id)
-                        ) {
-                            setClaim(item, quantity: control.incrementedQuantity)
-                        }
-                    }
-                }
-            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
-    }
-
-    private func publicQuantityButton(
-        _ systemName: String,
-        enabled: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 13, weight: .bold))
-                .frame(width: 30, height: 30)
-                .background(Theme.surface2)
-                .clipShape(Circle())
-        }
-        .foregroundStyle(enabled ? Theme.accent : Theme.faint)
-        .disabled(!enabled)
-    }
-
-    private func publicQuantityLabel(_ label: String, _ value: Int) -> some View {
-        VStack(spacing: 1) {
-            Text("\(value)")
-                .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                .foregroundStyle(Theme.ink)
-            Text(label)
-                .font(.system(size: 9))
-                .foregroundStyle(Theme.faint)
+        .background(control.mine > 0 ? Theme.accent.opacity(0.05) : Color.clear)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard interactive, !pendingItemIds.contains(item.id) else { return }
+            if control.isShared {
+                setClaim(item, quantity: control.sharedDesiredQuantity)
+            } else if control.canSelectUnit {
+                setClaim(item, quantity: control.unitSelectionQuantity)
+            }
         }
     }
 

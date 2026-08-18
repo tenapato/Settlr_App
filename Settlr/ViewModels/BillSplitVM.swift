@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UIKit
 
 /// Drives the organizer's split screens: the list, one open detail, and the
 /// create flow. Every number shown comes back from the server — the app never
@@ -262,28 +263,65 @@ final class BillSplitVM {
     /// retried without running Vision again or retaining the receipt image.
     var lastReceiptOCRText: String?
     var lastScanParser: ReceiptParserKind?
+    var receiptScanRouting = ReceiptScanRoutingState()
+    var lastScanAttempt: ReceiptParserKind? {
+        get { receiptScanRouting.attempt }
+        set { receiptScanRouting.attempt = newValue }
+    }
+    var lastScanPreference: ReceiptParserPreference? {
+        get { receiptScanRouting.preference }
+        set { receiptScanRouting.preference = newValue }
+    }
+    var lastScanRequestedParser: ReceiptParserKind?
+    var lastScanFallback: ReceiptParserKind?
     var lastScanNeedsReview = false
 
     /// Compatibility for existing scan UI while callers move to parser metadata.
     var lastScanWasOnDevice: Bool { lastScanParser == .onDevice }
+    var scanPrivacyLegend: String? {
+        if let lastScanParser {
+            return ReceiptPrivacyLegend.text(
+                for: lastScanParser,
+                requestedParser: lastScanRequestedParser,
+                fallback: lastScanFallback
+            )
+        }
+        return ReceiptPrivacyLegend.attemptText(for: lastScanAttempt)
+    }
+
+    @MainActor
+    func beginReceiptScan() {
+        lastReceiptOCRText = nil
+        lastScanParser = nil
+        receiptScanRouting = ReceiptScanRoutingState()
+        lastScanRequestedParser = nil
+        lastScanFallback = nil
+        lastScanNeedsReview = false
+    }
 
     /// Structures OCR text into items.
     ///
     /// Automatic prefers Apple's on-device model and falls back to the server.
     /// Explicit On-device and On-server preferences use only the selected path.
     ///
-    /// Both routes go through `ReceiptReconciler` against the same OCR text, so
-    /// whichever model read the receipt, every price comes off the receipt
-    /// itself and the draft the organizer sees adds up the same way.
+    /// On-device results use local OCR price evidence. Server results already
+    /// carry deterministic server evidence and only need total reconciliation.
     @MainActor
-    func scanReceipt(workspaceId: String, text: String) async throws -> ScannedReceipt {
+    func scanReceipt(
+        workspaceId: String,
+        text: String,
+        image: UIImage? = nil,
+        preference preferenceOverride: ReceiptParserPreference? = nil
+    ) async throws -> ScannedReceipt {
+        beginReceiptScan()
         lastReceiptOCRText = text
-        lastScanParser = nil
-        lastScanNeedsReview = false
         let storedPreference = UserDefaults.standard.string(
             forKey: ReceiptParserPreference.storageKey
         )
-        let preference = storedPreference.flatMap(ReceiptParserPreference.init(rawValue:)) ?? .automatic
+        let preference = preferenceOverride
+            ?? storedPreference.flatMap(ReceiptParserPreference.init(rawValue:))
+            ?? .automatic
+        lastScanPreference = preference
         let router = ReceiptParserRouter(
             onDevice: { ocrText in
                 try await OnDeviceReceiptParser.parse(ocrText: ocrText)
@@ -295,10 +333,29 @@ final class BillSplitVM {
                     body: ScanReceiptBody(text: ocrText)
                 )
                 return result
+            },
+            serverPhoto: { [api] ocrText, photo in
+                let result: ScannedReceipt = try await api.uploadReceiptPhoto(
+                    Endpoints.billSplitScanReceipt(workspaceId),
+                    photo: photo,
+                    ocrText: ocrText
+                )
+                return result
+            },
+            onAttempt: { [weak self] parser in
+                self?.lastScanAttempt = parser
             }
         )
-        let result = try await router.parse(text, preference: preference)
+        let result: ScannedReceipt
+        do {
+            result = try await router.parse(text, preference: preference, image: image)
+        } catch {
+            receiptScanRouting.clearPhotoAttemptAfterFailure()
+            throw error
+        }
         lastScanParser = result.parser
+        lastScanRequestedParser = result.requestedParser
+        lastScanFallback = result.fallback
         lastScanNeedsReview = !result.warnings.isEmpty
             || result.items.contains { $0.verification == .unverified }
         return result

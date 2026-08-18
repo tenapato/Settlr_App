@@ -9,6 +9,7 @@ import SwiftUI
 struct ScanningOverlay: View {
     let image: UIImage
     let message: String
+    var privacyLegend: String?
 
     @State private var sweep: CGFloat = 0
     @State private var pulse = false
@@ -29,9 +30,11 @@ struct ScanningOverlay: View {
                         .foregroundStyle(Theme.ink)
                         .contentTransition(.opacity)
                         .animation(.easeInOut(duration: 0.25), value: message)
-                    Text("Everything is read on your phone")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.faint)
+                    if let privacyLegend {
+                        Text(privacyLegend)
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.faint)
+                    }
                 }
             }
         }

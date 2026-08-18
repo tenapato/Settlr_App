@@ -204,8 +204,25 @@ struct SplitClaimControlState: Equatable {
     var canIncrement: Bool { !isShared && available > 0 }
     var decrementedQuantity: Int { canDecrement ? mine - 1 : mine }
     var incrementedQuantity: Int { canIncrement ? mine + 1 : mine }
+    var unitSelectionQuantity: Int { isShared ? sharedDesiredQuantity : (mine > 0 ? mine : 1) }
+    var canSelectUnit: Bool { !isShared && mine == 0 && canIncrement }
     var sharedActionTitle: String { mine > 0 ? "Remove share" : "Share item" }
     var sharedDesiredQuantity: Int { mine > 0 ? 0 : 1 }
+    var sharedPresentation: SharedClaimPresentation {
+        mine > 0
+            ? SharedClaimPresentation(title: "Included", isSelected: true, accessibilityLabel: "Remove me")
+            : SharedClaimPresentation(title: "Add me", isSelected: false, accessibilityLabel: "Add me")
+    }
+}
+
+struct SharedClaimPresentation: Equatable {
+    let title: String
+    let isSelected: Bool
+    let accessibilityLabel: String
+
+    func accessibilityLabel(isEnabled: Bool) -> String {
+        isEnabled ? accessibilityLabel : "Shared item unavailable"
+    }
 }
 
 /// The accounting meaning used by the UI after decoding a server response.
@@ -694,17 +711,18 @@ struct ScanReceiptBody: Encodable { let text: String }
 enum ReceiptParserPreference: String, CaseIterable, Identifiable {
     static let storageKey = "receiptParserPreference"
 
-    case automatic
-    case onDevice
-    case server
+    case automatic, onDevice, server, serverPhoto
 
     var id: String { rawValue }
 
+    var isExperimental: Bool { self == .serverPhoto }
+
     var displayName: String {
-        switch self {
+        return switch self {
         case .automatic: "Automatic"
         case .onDevice: "On device"
         case .server: "On server"
+        case .serverPhoto: "On server + photo"
         }
     }
 }
@@ -712,11 +730,13 @@ enum ReceiptParserPreference: String, CaseIterable, Identifiable {
 enum ReceiptParserKind: String, Codable {
     case onDevice = "on_device"
     case server
+    case serverPhoto = "server_photo"
 
     var displayName: String {
-        switch self {
+        return switch self {
         case .onDevice: "On device"
         case .server: "On server"
+        case .serverPhoto: "On server + photo"
         }
     }
 
@@ -726,12 +746,44 @@ enum ReceiptParserKind: String, Codable {
         switch value {
         case "on_device", "onDevice": self = .onDevice
         case "server", "cloudflare": self = .server
+        case "server_photo", "serverPhoto": self = .serverPhoto
         default:
             throw DecodingError.dataCorruptedError(
                 in: container,
                 debugDescription: "Unknown receipt parser kind: \(value)"
             )
         }
+    }
+}
+
+enum ReceiptPrivacyLegend {
+    static func text(for parser: ReceiptParserKind?) -> String? {
+        guard let parser else { return nil }
+        return switch parser {
+        case .onDevice: "Everything is read on your phone."
+        case .server: "Your photo stays on your phone. Only the recognized text is sent for parsing."
+        case .serverPhoto: "The receipt photo and recognized text are sent securely to the server for AI parsing. The server does not store the photo. If Save captures to Photos is enabled, a local copy is saved to your photo library. The AI provider does not use it to train its models."
+        }
+    }
+
+    static func attemptText(for parser: ReceiptParserKind?) -> String? {
+        guard let parser else { return nil }
+        if parser == .serverPhoto {
+            return "Sending the photo and recognized text to the server. The server does not store the photo. If Save captures to Photos is enabled, a local copy is saved to your photo library."
+        }
+        return text(for: parser)
+    }
+
+    static func text(
+        for parser: ReceiptParserKind?,
+        requestedParser: ReceiptParserKind?,
+        fallback: ReceiptParserKind?
+    ) -> String? {
+        guard let parser else { return nil }
+        if requestedParser == .serverPhoto, fallback == .server {
+            return "The receipt photo and recognized text were sent to the server for parsing. The server used the recognized-text fallback and does not store the photo. If Save captures to Photos is enabled, a local copy is saved to your photo library."
+        }
+        return text(for: parser)
     }
 }
 
@@ -773,6 +825,8 @@ struct ScannedReceiptItem: Decodable {
 
 struct ScannedReceipt: Decodable {
     let parser: ReceiptParserKind
+    let requestedParser: ReceiptParserKind?
+    let fallback: ReceiptParserKind?
     let merchant: String?
     let items: [ScannedReceiptItem]
     let taxCents: Int
@@ -782,6 +836,8 @@ struct ScannedReceipt: Decodable {
 
     init(
         parser: ReceiptParserKind,
+        requestedParser: ReceiptParserKind? = nil,
+        fallback: ReceiptParserKind? = nil,
         merchant: String?,
         items: [ScannedReceiptItem],
         taxCents: Int,
@@ -790,6 +846,8 @@ struct ScannedReceipt: Decodable {
         warnings: [String]
     ) {
         self.parser = parser
+        self.requestedParser = requestedParser
+        self.fallback = fallback
         self.merchant = merchant
         self.items = items
         self.taxCents = taxCents
@@ -799,7 +857,9 @@ struct ScannedReceipt: Decodable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case parser, merchant, items, taxCents, tipCents, totalCents, warnings
+        case parser
+        case requestedParser, fallback
+        case merchant, items, taxCents, tipCents, totalCents, warnings
     }
 
     init(from decoder: Decoder) throws {
@@ -807,6 +867,8 @@ struct ScannedReceipt: Decodable {
         // Missing metadata means an older response from the existing server
         // endpoint. Locally-created device results always set their parser.
         parser = try values.decodeIfPresent(ReceiptParserKind.self, forKey: .parser) ?? .server
+        requestedParser = try values.decodeIfPresent(ReceiptParserKind.self, forKey: .requestedParser)
+        fallback = try values.decodeIfPresent(ReceiptParserKind.self, forKey: .fallback)
         merchant = try values.decodeIfPresent(String.self, forKey: .merchant)
         items = try values.decode([ScannedReceiptItem].self, forKey: .items)
         taxCents = try values.decode(Int.self, forKey: .taxCents)
@@ -818,6 +880,8 @@ struct ScannedReceipt: Decodable {
     func attributed(to parser: ReceiptParserKind) -> ScannedReceipt {
         ScannedReceipt(
             parser: parser,
+            requestedParser: requestedParser,
+            fallback: fallback,
             merchant: merchant,
             items: items,
             taxCents: taxCents,

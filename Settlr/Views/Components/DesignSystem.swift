@@ -1,5 +1,104 @@
 import SwiftUI
 
+/// Compact, non-nested shared-item toggle. The containing item row owns the
+/// tap action so the whole row can be interactive without embedding a Button.
+struct CompactSharedClaimControl: View {
+    let presentation: SharedClaimPresentation
+    var isEnabled: Bool = true
+    var isLoading: Bool = false
+
+    var body: some View {
+        HStack(spacing: 7) {
+            if isLoading {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(Theme.accent)
+            } else {
+                Image(systemName: presentation.isSelected ? "checkmark" : "circle")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(presentation.isSelected ? Theme.accent : Theme.muted)
+            }
+            Text(isLoading ? "Updating…" : presentation.title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(presentation.isSelected ? Theme.accent : Theme.muted)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(presentation.isSelected ? Theme.accent.opacity(0.08) : Color.clear)
+        .overlay(
+            Capsule().strokeBorder(
+                presentation.isSelected ? Theme.accent.opacity(0.45) : Theme.line,
+                lineWidth: 1
+            )
+        )
+        .clipShape(Capsule())
+        .opacity(isEnabled || isLoading ? 1 : 0.45)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            isLoading
+                ? "Updating shared item"
+                : presentation.accessibilityLabel(isEnabled: isEnabled)
+        )
+        .accessibilityAddTraits(isEnabled && !isLoading ? .isButton : [])
+    }
+}
+
+struct ClaimSelectionCircle: View {
+    let isSelected: Bool
+    var isEnabled: Bool = true
+
+    var body: some View {
+        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+            .font(.system(size: 18, weight: .semibold))
+            .foregroundStyle(isSelected ? Theme.accent : Theme.muted)
+            .opacity(isEnabled ? 1 : 0.45)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(isEnabled ? (isSelected ? "Included" : "Add me") : "Item unavailable")
+            .accessibilityAddTraits(isEnabled ? .isButton : [])
+    }
+}
+
+struct CompactUnitClaimStepper: View {
+    let quantity: Int
+    let canDecrement: Bool
+    let canIncrement: Bool
+    let decrement: () -> Void
+    let increment: () -> Void
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Button(action: decrement) {
+                Image(systemName: "minus")
+                    .font(.system(size: 10, weight: .bold))
+                    .frame(width: 23, height: 23)
+            }
+            .disabled(!canDecrement)
+            .accessibilityLabel("Remove one")
+            .foregroundStyle(canDecrement ? Theme.accent : Theme.faint)
+
+            Text("\(quantity)")
+                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .foregroundStyle(Theme.ink)
+                .frame(minWidth: 18)
+                .accessibilityLabel("Mine \(quantity)")
+
+            Button(action: increment) {
+                Image(systemName: "plus")
+                    .font(.system(size: 10, weight: .bold))
+                    .frame(width: 23, height: 23)
+            }
+            .disabled(!canIncrement)
+            .accessibilityLabel("Add one")
+            .foregroundStyle(canIncrement ? Theme.accent : Theme.faint)
+        }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 2)
+        .background(Theme.surface2)
+        .clipShape(Capsule())
+        .accessibilityElement(children: .contain)
+    }
+}
+
 // MARK: - Theme tokens
 //
 // Single source of truth for Settlr's palette. `Color(hex:)` is defined app-wide

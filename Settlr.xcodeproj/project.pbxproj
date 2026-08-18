@@ -13,6 +13,8 @@
 		AB0000000000000000000013 /* PassAroundStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000012 /* PassAroundStateTests.swift */; };
 		AB0000000000000000000015 /* EachOwnPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000014 /* EachOwnPresentationTests.swift */; };
 		AB0000000000000000000017 /* TipPresetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000016 /* TipPresetTests.swift */; };
+		AC0000000000000000000001 /* ReceiptPhotoUpload.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC0000000000000000000002 /* ReceiptPhotoUpload.swift */; };
+		AC0000000000000000000003 /* ReceiptPhotoUploadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC0000000000000000000004 /* ReceiptPhotoUploadTests.swift */; };
 		AA000000000000000000BB01 /* SettlrApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR01 /* SettlrApp.swift */; };
 		AA000000000000000000BB02 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR02 /* ContentView.swift */; };
 		AA000000000000000000BB03 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR03 /* APIClient.swift */; };
@@ -120,6 +122,8 @@
 		AB0000000000000000000014 /* EachOwnPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EachOwnPresentationTests.swift; sourceTree = "<group>"; };
 		AB0000000000000000000016 /* TipPresetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TipPresetTests.swift; sourceTree = "<group>"; };
 		AB0000000000000000000005 /* SettlrTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SettlrTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AC0000000000000000000002 /* ReceiptPhotoUpload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptPhotoUpload.swift; sourceTree = "<group>"; };
+		AC0000000000000000000004 /* ReceiptPhotoUploadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptPhotoUploadTests.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR01 /* SettlrApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettlrApp.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR02 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR03 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
@@ -259,6 +263,7 @@
 			isa = PBXGroup;
 			children = (
 				AA000000000000000000FR03 /* APIClient.swift */,
+				AC0000000000000000000002 /* ReceiptPhotoUpload.swift */,
 				AA000000000000000000FR04 /* Endpoints.swift */,
 				AA000000000000000000FR05 /* TokenStore.swift */,
 				AA000000000000000000FR42 /* LastWorkspaceStore.swift */,
@@ -475,6 +480,7 @@
 			children = (
 				AB0000000000000000000003 /* ReceiptEvidenceTests.swift */,
 				AB0000000000000000000004 /* ParserPreferenceTests.swift */,
+				AC0000000000000000000004 /* ReceiptPhotoUploadTests.swift */,
 				AB0000000000000000000010 /* SplitDraftTests.swift */,
 				AB0000000000000000000012 /* PassAroundStateTests.swift */,
 				AB0000000000000000000014 /* EachOwnPresentationTests.swift */,
@@ -584,6 +590,7 @@
 			files = (
 				AB0000000000000000000001 /* ReceiptEvidenceTests.swift in Sources */,
 				AB0000000000000000000002 /* ParserPreferenceTests.swift in Sources */,
+				AC0000000000000000000003 /* ReceiptPhotoUploadTests.swift in Sources */,
 				AB0000000000000000000011 /* SplitDraftTests.swift in Sources */,
 				AB0000000000000000000013 /* PassAroundStateTests.swift in Sources */,
 				AB0000000000000000000015 /* EachOwnPresentationTests.swift in Sources */,
@@ -598,6 +605,7 @@
 				AA000000000000000000BB01 /* SettlrApp.swift in Sources */,
 				AA000000000000000000BB02 /* ContentView.swift in Sources */,
 				AA000000000000000000BB03 /* APIClient.swift in Sources */,
+				AC0000000000000000000001 /* ReceiptPhotoUpload.swift in Sources */,
 				AA000000000000000000BB04 /* Endpoints.swift in Sources */,
 				AA000000000000000000BB05 /* TokenStore.swift in Sources */,
 				AA000000000000000000BB06 /* User.swift in Sources */,

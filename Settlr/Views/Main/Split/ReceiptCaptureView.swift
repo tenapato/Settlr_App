@@ -18,6 +18,7 @@ struct ReceiptCaptureView: View {
     var busyMessage: String?
     /// The shot being read, shown under the scan animation.
     var busyImage: UIImage?
+    var busyPrivacyLegend: String?
     var errorMessage: String?
 
     @Environment(\.dismiss) private var dismiss
@@ -52,7 +53,11 @@ struct ReceiptCaptureView: View {
 
             if let busyMessage {
                 if let busyImage {
-                    ScanningOverlay(image: busyImage, message: busyMessage)
+                    ScanningOverlay(
+                        image: busyImage,
+                        message: busyMessage,
+                        privacyLegend: busyPrivacyLegend
+                    )
                 } else {
                     busyOverlay(busyMessage)
                 }
@@ -269,16 +274,18 @@ private enum ReceiptPhotoLibrary {
 /// Owns the capture session. Session setup and teardown run off the main thread
 /// — `startRunning` blocks, and on the main queue it stutters the presentation
 /// animation the camera is appearing in.
+/// Camera work is serialized by `queue`; observable state and callbacks stay on
+/// the main actor. That invariant is the basis for the Sendable conformance.
 @Observable
-final class CameraController: NSObject {
+final class CameraController: NSObject, @unchecked Sendable {
     enum State: Equatable { case starting, running, denied, unavailable }
 
-    private(set) var state: State = .starting
+    @MainActor private(set) var state: State = .starting
 
     let session = AVCaptureSession()
     private let output = AVCapturePhotoOutput()
     private let queue = DispatchQueue(label: "cash.settlr.camera")
-    private var captureHandler: ((UIImage?) -> Void)?
+    @MainActor private var captureHandler: (@MainActor (UIImage?) -> Void)?
     private var isConfigured = false
 
     @MainActor
@@ -309,6 +316,7 @@ final class CameraController: NSObject {
         }
     }
 
+    @MainActor
     func stop() {
         queue.async { [self] in
             if session.isRunning { session.stopRunning() }
@@ -340,12 +348,13 @@ final class CameraController: NSObject {
         return true
     }
 
-    func capture(completion: @escaping (UIImage?) -> Void) {
+    @MainActor
+    func capture(completion: @escaping @MainActor (UIImage?) -> Void) {
         guard state == .running else { return completion(nil) }
         captureHandler = completion
-        let settings = AVCapturePhotoSettings()
-        settings.flashMode = .auto
         queue.async { [self] in
+            let settings = AVCapturePhotoSettings()
+            settings.flashMode = .auto
             output.capturePhoto(with: settings, delegate: self)
         }
     }
@@ -357,8 +366,9 @@ extension CameraController: AVCapturePhotoCaptureDelegate {
         didFinishProcessingPhoto photo: AVCapturePhoto,
         error: Error?
     ) {
-        let image = photo.fileDataRepresentation().flatMap(UIImage.init(data:))
+        let data = photo.fileDataRepresentation()
         DispatchQueue.main.async { [self] in
+            let image = data.flatMap(UIImage.init(data:))
             captureHandler?(image)
             captureHandler = nil
         }

@@ -674,6 +674,20 @@ struct SplitDetailView: View {
         let claimable = !split.isEvenSplit
         return VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 12) {
+                if claimable {
+                    if control.isShared {
+                        CompactSharedClaimControl(
+                            presentation: control.sharedPresentation,
+                            isEnabled: split.isOpen && !vm.isSaving,
+                            isLoading: split.isOpen && vm.isSaving
+                        )
+                    } else {
+                        ClaimSelectionCircle(
+                            isSelected: control.mine > 0,
+                            isEnabled: split.isOpen && !vm.isSaving && (control.mine > 0 || control.canSelectUnit)
+                        )
+                    }
+                }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.quantity > 1 ? "\(item.quantity)× \(item.name)" : item.name)
                         .font(.system(size: 15))
@@ -703,42 +717,37 @@ struct SplitDetailView: View {
 
                 Spacer(minLength: 4)
 
+                if claimable, !control.isShared, control.mine > 0 {
+                    CompactUnitClaimStepper(
+                        quantity: control.mine,
+                        canDecrement: control.canDecrement && split.isOpen && !vm.isSaving,
+                        canIncrement: control.canIncrement && split.isOpen && !vm.isSaving,
+                        decrement: { setOrganizerClaim(item: item, quantity: control.decrementedQuantity) },
+                        increment: { setOrganizerClaim(item: item, quantity: control.incrementedQuantity) }
+                    )
+                    Text("\(control.total)×")
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Theme.faint)
+                }
+
                 Text(formatSplitMoney(item.lineTotalCents, currency: split.currency))
                     .font(.system(size: 14, design: .monospaced))
                     .foregroundStyle(Theme.ink)
             }
 
-            if split.isOpen, claimable {
-                if control.isShared {
-                    Button(control.sharedActionTitle) {
-                        setOrganizerClaim(item: item, quantity: control.sharedDesiredQuantity)
-                    }
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(control.mine > 0 ? Theme.muted : Theme.bg)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(control.mine > 0 ? Theme.surface2 : Theme.accent)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .disabled(vm.isSaving)
-                } else {
-                    HStack(spacing: 10) {
-                        organizerQuantityButton("minus", enabled: control.canDecrement) {
-                            setOrganizerClaim(item: item, quantity: control.decrementedQuantity)
-                        }
-                        Spacer()
-                        detailQuantityLabel("Mine", control.mine)
-                        detailQuantityLabel("Available", control.available)
-                        detailQuantityLabel("Total", control.total)
-                        Spacer()
-                        organizerQuantityButton("plus", enabled: control.canIncrement) {
-                            setOrganizerClaim(item: item, quantity: control.incrementedQuantity)
-                        }
-                    }
-                }
-            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
+        .background(control.mine > 0 ? Theme.accent.opacity(0.05) : Color.clear)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard split.isOpen, claimable, !vm.isSaving else { return }
+            if control.isShared {
+                setOrganizerClaim(item: item, quantity: control.sharedDesiredQuantity)
+            } else if control.canSelectUnit {
+                setOrganizerClaim(item: item, quantity: control.unitSelectionQuantity)
+            }
+        }
     }
 
     private func setOrganizerClaim(item: BillSplitItem, quantity: Int) {
@@ -749,33 +758,6 @@ struct SplitDetailView: View {
                 itemId: item.id,
                 quantity: quantity
             )
-        }
-    }
-
-    private func organizerQuantityButton(
-        _ systemName: String,
-        enabled: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 13, weight: .bold))
-                .frame(width: 30, height: 30)
-                .background(Theme.surface2)
-                .clipShape(Circle())
-        }
-        .foregroundStyle(enabled ? Theme.accent : Theme.faint)
-        .disabled(!enabled || vm.isSaving)
-    }
-
-    private func detailQuantityLabel(_ label: String, _ value: Int) -> some View {
-        VStack(spacing: 1) {
-            Text("\(value)")
-                .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                .foregroundStyle(Theme.ink)
-            Text(label)
-                .font(.system(size: 9))
-                .foregroundStyle(Theme.faint)
         }
     }
 
