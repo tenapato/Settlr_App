@@ -247,18 +247,12 @@ struct SplitListView: View {
 
     @ViewBuilder
     private func statusChip(_ split: BillSplitSummary) -> some View {
-        let (label, color): (String, Color) = {
-            switch split.status {
-            case "settled": return ("All settled", Theme.income)
-            case "locked":
-                let owed = split.outstandingCents ?? 0
-                return owed > 0
-                    ? ("\(formatSplitMoney(owed, currency: split.currency)) owed", Theme.warning)
-                    : ("Collecting", Theme.warning)
-            default: return ("Claiming", Theme.accent)
-            }
-        }()
-        Text(label)
+        let color: Color = switch BillSplitSummaryStatusPresentation.tone(for: split) {
+        case .accent: Theme.accent
+        case .warning: Theme.warning
+        case .income: Theme.income
+        }
+        Text(BillSplitSummaryStatusPresentation.label(for: split))
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(color)
             .padding(.horizontal, 8)

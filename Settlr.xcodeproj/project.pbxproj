@@ -13,6 +13,7 @@
 		AB0000000000000000000013 /* PassAroundStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000012 /* PassAroundStateTests.swift */; };
 		AB0000000000000000000015 /* EachOwnPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000014 /* EachOwnPresentationTests.swift */; };
 		AB0000000000000000000017 /* TipPresetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000016 /* TipPresetTests.swift */; };
+		AB0000000000000000000019 /* SplitPaymentMethodTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000018 /* SplitPaymentMethodTests.swift */; };
 		AC0000000000000000000001 /* ReceiptPhotoUpload.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC0000000000000000000002 /* ReceiptPhotoUpload.swift */; };
 		AC0000000000000000000003 /* ReceiptPhotoUploadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC0000000000000000000004 /* ReceiptPhotoUploadTests.swift */; };
 		AA000000000000000000BB01 /* SettlrApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR01 /* SettlrApp.swift */; };
@@ -91,6 +92,7 @@
 		AA000000000000000000BB73 /* SplitCreateSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR73 /* SplitCreateSheet.swift */; };
 		AA000000000000000000BB74 /* SplitListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR74 /* SplitListView.swift */; };
 		AA000000000000000000BB75 /* SplitDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR75 /* SplitDetailView.swift */; };
+		AA000000000000000000BB88 /* SplitPaymentMethodSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR88 /* SplitPaymentMethodSheet.swift */; };
 		AA000000000000000000BB76 /* PublicSplitClaimView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR76 /* PublicSplitClaimView.swift */; };
 		AA000000000000000000BB77 /* ReceiptCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR77 /* ReceiptCaptureView.swift */; };
 		AA000000000000000000BB78 /* SplitScanFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR78 /* SplitScanFlow.swift */; };
@@ -121,6 +123,7 @@
 		AB0000000000000000000012 /* PassAroundStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassAroundStateTests.swift; sourceTree = "<group>"; };
 		AB0000000000000000000014 /* EachOwnPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EachOwnPresentationTests.swift; sourceTree = "<group>"; };
 		AB0000000000000000000016 /* TipPresetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TipPresetTests.swift; sourceTree = "<group>"; };
+		AB0000000000000000000018 /* SplitPaymentMethodTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitPaymentMethodTests.swift; sourceTree = "<group>"; };
 		AB0000000000000000000005 /* SettlrTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SettlrTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AC0000000000000000000002 /* ReceiptPhotoUpload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptPhotoUpload.swift; sourceTree = "<group>"; };
 		AC0000000000000000000004 /* ReceiptPhotoUploadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptPhotoUploadTests.swift; sourceTree = "<group>"; };
@@ -202,6 +205,7 @@
 		AA000000000000000000FR73 /* SplitCreateSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitCreateSheet.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR74 /* SplitListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitListView.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR75 /* SplitDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitDetailView.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR88 /* SplitPaymentMethodSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitPaymentMethodSheet.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR76 /* PublicSplitClaimView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicSplitClaimView.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR77 /* ReceiptCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptCaptureView.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR78 /* SplitScanFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitScanFlow.swift; sourceTree = "<group>"; };
@@ -415,6 +419,7 @@
 				AA000000000000000000FR73 /* SplitCreateSheet.swift */,
 				AA000000000000000000FR74 /* SplitListView.swift */,
 				AA000000000000000000FR75 /* SplitDetailView.swift */,
+				AA000000000000000000FR88 /* SplitPaymentMethodSheet.swift */,
 				AA000000000000000000FR76 /* PublicSplitClaimView.swift */,
 				AA000000000000000000FR77 /* ReceiptCaptureView.swift */,
 				AA000000000000000000FR78 /* SplitScanFlow.swift */,
@@ -485,6 +490,7 @@
 				AB0000000000000000000012 /* PassAroundStateTests.swift */,
 				AB0000000000000000000014 /* EachOwnPresentationTests.swift */,
 				AB0000000000000000000016 /* TipPresetTests.swift */,
+				AB0000000000000000000018 /* SplitPaymentMethodTests.swift */,
 			);
 			path = SettlrTests;
 			sourceTree = "<group>";
@@ -595,6 +601,7 @@
 				AB0000000000000000000013 /* PassAroundStateTests.swift in Sources */,
 				AB0000000000000000000015 /* EachOwnPresentationTests.swift in Sources */,
 				AB0000000000000000000017 /* TipPresetTests.swift in Sources */,
+				AB0000000000000000000019 /* SplitPaymentMethodTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -679,6 +686,7 @@
 				AA000000000000000000BB73 /* SplitCreateSheet.swift in Sources */,
 				AA000000000000000000BB74 /* SplitListView.swift in Sources */,
 				AA000000000000000000BB75 /* SplitDetailView.swift in Sources */,
+				AA000000000000000000BB88 /* SplitPaymentMethodSheet.swift in Sources */,
 				AA000000000000000000BB76 /* PublicSplitClaimView.swift in Sources */,
 				AA000000000000000000BB77 /* ReceiptCaptureView.swift in Sources */,
 				AA000000000000000000BB78 /* SplitScanFlow.swift in Sources */,
@@ -854,7 +862,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Settlr/Settlr.entitlements;
 					CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = 49T6266TLB;
 				ENABLE_PREVIEWS = YES;
@@ -869,7 +877,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.4.2;
+				MARKETING_VERSION = 1.5.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cash.settlr.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -885,7 +893,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Settlr/Settlr.entitlements;
 					CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = 49T6266TLB;
 				ENABLE_PREVIEWS = YES;
@@ -900,7 +908,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.4.2;
+				MARKETING_VERSION = 1.5.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cash.settlr.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

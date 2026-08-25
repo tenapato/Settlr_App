@@ -12,12 +12,53 @@ struct BillSplitSummary: Codable, Identifiable {
     let occurredAt: String
     let totalCents: Int
     let status: String
+    /// Optional for compatibility with list responses cached or returned by an
+    /// older server. Missing values stay unavailable rather than being guessed.
+    let payer: String?
     let participantCount: Int
     let settledCount: Int
     let pendingCount: Int
     /// Null while the split is open — shares are still moving, so there is no
     /// meaningful "still owed" figure yet.
     let outstandingCents: Int?
+
+    var payerMode: BillSplitPayerMode { BillSplitPayerMode(persistedValue: payer) }
+}
+
+/// Pure list-chip presentation. Summary status is accounting-sensitive: a
+/// finished each-own split has nothing for the organizer to collect.
+enum BillSplitSummaryStatusPresentation {
+    enum Tone {
+        case accent
+        case warning
+        case income
+    }
+
+    static func label(for summary: BillSplitSummary) -> String {
+        if summary.status == "open" { return "Claiming" }
+
+        switch summary.payerMode {
+        case .eachOwn:
+            return "Completed"
+        case .organizerPaid:
+            if summary.status == "settled" { return "Settled" }
+            let owed = summary.outstandingCents ?? 0
+            return owed > 0
+                ? "\(formatSplitMoney(owed, currency: summary.currency)) owed"
+                : "Collecting"
+        case .unavailable:
+            return "Needs review"
+        }
+    }
+
+    static func tone(for summary: BillSplitSummary) -> Tone {
+        if summary.status == "open" { return .accent }
+        switch summary.payerMode {
+        case .eachOwn: return .income
+        case .organizerPaid: return summary.status == "settled" ? .income : .warning
+        case .unavailable: return .warning
+        }
+    }
 }
 
 struct BillSplitItem: Codable, Identifiable {
@@ -558,6 +599,27 @@ struct BillSplitListResponse: Decodable { let splits: [BillSplitSummary] }
 struct BillSplitResponse: Decodable { let split: BillSplit }
 
 // MARK: - Request bodies
+
+struct BillSplitPaymentMethodBody: Encodable {
+    let version: Int
+    let paymentChannel: String
+    let creditCardId: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case version, paymentChannel, creditCardId
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(version, forKey: .version)
+        try values.encode(paymentChannel, forKey: .paymentChannel)
+        if let creditCardId {
+            try values.encode(creditCardId, forKey: .creditCardId)
+        } else {
+            try values.encodeNil(forKey: .creditCardId)
+        }
+    }
+}
 
 /// `Codable`, not just `Encodable`: a split composed with no signal is written
 /// to disk in exactly this shape and replayed later, so it has to survive the

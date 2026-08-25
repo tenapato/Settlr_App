@@ -2,6 +2,14 @@ import Foundation
 import Observation
 import UIKit
 
+enum BillSplitPaymentConflictPresentation {
+    static func message(didRefresh: Bool) -> String {
+        didRefresh
+            ? "This split changed on another screen. It has been refreshed; try saving again."
+            : "This split changed on another screen, but it could not be refreshed. Reconnect and try again."
+    }
+}
+
 /// Drives the organizer's split screens: the list, one open detail, and the
 /// create flow. Every number shown comes back from the server — the app never
 /// does share math of its own, so the app, the web link and the ledger can't
@@ -65,16 +73,56 @@ final class BillSplitVM {
     /// Keeping every write on this path means the UI can never drift from the
     /// server's view of the claims.
     @MainActor
-    private func mutate(_ block: () async throws -> BillSplitResponse) async -> Bool {
+    private func mutate(
+        onConflict: ((APIServerError) async -> Void)? = nil,
+        errorDescription: ((Error) -> String)? = nil,
+        _ block: () async throws -> BillSplitResponse
+    ) async -> Bool {
         isSaving = true
         errorMessage = nil
         defer { isSaving = false }
         do {
             detail = try await block().split
             return true
-        } catch {
-            errorMessage = error.localizedDescription
+        } catch let error as APIServerError where error.status == 409 && onConflict != nil {
+            await onConflict?(error)
+            if errorMessage == nil { errorMessage = error.localizedDescription }
             return false
+        } catch {
+            errorMessage = errorDescription?(error) ?? error.localizedDescription
+            return false
+        }
+    }
+
+    @MainActor
+    func updatePaymentMethod(
+        workspaceId: String,
+        splitId: String,
+        body: BillSplitPaymentMethodBody
+    ) async -> Bool {
+        await mutate(
+            onConflict: { _ in
+                let response: BillSplitResponse? = try? await self.api.fetch(
+                    Endpoints.billSplit(workspaceId, splitId)
+                )
+                if let response {
+                    self.detail = response.split
+                    self.errorMessage = BillSplitPaymentConflictPresentation.message(didRefresh: true)
+                } else {
+                    self.errorMessage = BillSplitPaymentConflictPresentation.message(didRefresh: false)
+                }
+            },
+            errorDescription: { error in
+                APIError.isOffline(error)
+                    ? "Payment-method changes require an internet connection."
+                    : error.localizedDescription
+            }
+        ) {
+            try await api.fetch(
+                Endpoints.billSplitPaymentMethod(workspaceId, splitId),
+                method: "PATCH",
+                body: body
+            )
         }
     }
 

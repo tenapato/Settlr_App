@@ -12,6 +12,12 @@ router="Settlr/Views/Main/Split/ReceiptReconciler.swift"
 scan_vm="Settlr/ViewModels/BillSplitVM.swift"
 scan_flow="Settlr/Views/Main/Split/SplitScanFlow.swift"
 create_sheet="Settlr/Views/Main/Split/SplitCreateSheet.swift"
+endpoints="Settlr/Network/Endpoints.swift"
+split_list="Settlr/Views/Main/Split/SplitListView.swift"
+payment_sheet="Settlr/Views/Main/Split/SplitPaymentMethodSheet.swift"
+public_claim="Settlr/Views/Main/Split/PublicSplitClaimView.swift"
+pass_around="Settlr/Views/Main/Split/SplitPassAroundView.swift"
+project="Settlr.xcodeproj/project.pbxproj"
 
 if ! rg -U -q 'private func eachOwnSummary\(_ split: BillSplit\) -> some View \{\n[[:space:]]+let presentation = split\.accountingPresentation\n[[:space:]]+return VStack' "$detail"; then
   echo "SplitDetailView.eachOwnSummary must explicitly return its VStack after local declarations." >&2
@@ -123,6 +129,56 @@ done
 
 if rg -q 'UIImage|ReceiptPhotoRecovery' Settlr/Network/PendingSplitQueue.swift; then
   echo "Receipt images and photo recovery state must never enter the durable pending queue." >&2
+  exit 1
+fi
+
+if ! rg -U -q '(?s)struct BillSplitSummary: Codable, Identifiable \{.*?let payer: String\?.*?var payerMode:' "$bill_split" ||
+   ! rg -q 'enum BillSplitSummaryStatusPresentation' "$bill_split" ||
+   ! rg -q 'struct BillSplitPaymentMethodBody: Encodable' "$bill_split"; then
+  echo "Bill split summaries and payment requests must retain their payer-aware wire contract." >&2
+  exit 1
+fi
+
+if ! rg -q 'static func billSplitPaymentMethod' "$endpoints" ||
+   ! rg -q '/payment-method' "$endpoints"; then
+  echo "Endpoints must expose the bill-split payment-method route." >&2
+  exit 1
+fi
+
+if ! rg -q 'BillSplitSummaryStatusPresentation\.label' "$split_list"; then
+  echo "SplitListView must use the payer-aware summary status helper." >&2
+  exit 1
+fi
+
+if [ ! -f "$payment_sheet" ] ||
+   ! rg -q 'struct SplitPaymentMethodSheet: View' "$payment_sheet" ||
+   ! rg -q 'Endpoints\.creditCards' "$payment_sheet" ||
+   ! rg -q 'OfflineSessionCache\.creditCards' "$payment_sheet" ||
+   ! rg -q 'filter \{ !\$0\.isArchived \}' "$payment_sheet"; then
+  echo "The owner payment-method sheet must load cached cards and refresh them." >&2
+  exit 1
+fi
+
+if ! rg -q 'Endpoints\.billSplitPaymentMethod' "$scan_vm" ||
+   ! rg -q 'where error\.status == 409' "$scan_vm"; then
+  echo "BillSplitVM must call the versioned payment-method endpoint and refresh conflicts." >&2
+  exit 1
+fi
+
+if ! rg -q 'paymentMethodRow\(split\)' "$detail" ||
+   ! rg -q 'SplitPaymentMethodSheet' "$detail"; then
+  echo "Organizer split detail must keep a persistent payment-method row and editor sheet." >&2
+  exit 1
+fi
+
+if rg -q 'CreditCard|creditCards|SplitPaymentMethodSheet|You paid with' "$public_claim" "$pass_around"; then
+  echo "Public and pass-around split screens must not expose organizer payment-card data." >&2
+  exit 1
+fi
+
+if ! rg -q 'SplitPaymentMethodSheet.swift' "$project" ||
+   ! rg -q 'SplitPaymentMethodTests.swift' "$project"; then
+  echo "The payment-method implementation and tests must be registered in the Xcode project." >&2
   exit 1
 fi
 

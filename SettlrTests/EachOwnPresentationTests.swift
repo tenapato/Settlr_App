@@ -2,6 +2,52 @@ import XCTest
 @testable import Settlr
 
 final class EachOwnPresentationTests: XCTestCase {
+    func testSummaryStatusUsesPayerAwareLanguage() throws {
+        // This catches closed each-own splits drifting back to collection copy,
+        // and missing legacy payer data being guessed as organizer-paid.
+        let cases: [(status: String, payer: String?, outstanding: Int?, expected: String)] = [
+            ("open", "me", nil, "Claiming"),
+            ("locked", "each_own", 4_000, "Completed"),
+            ("settled", "each_own", 0, "Completed"),
+            ("locked", "me", 0, "Collecting"),
+            ("settled", "me", 0, "Settled"),
+            ("locked", nil, 0, "Needs review"),
+        ]
+
+        for item in cases {
+            let summary = try decodeSummary(
+                status: item.status,
+                payer: item.payer,
+                outstandingCents: item.outstanding
+            )
+            XCTAssertEqual(
+                BillSplitSummaryStatusPresentation.label(for: summary),
+                item.expected,
+                "status=\(item.status), payer=\(item.payer ?? "missing")"
+            )
+        }
+    }
+
+    func testLockedOrganizerPaidSummaryPreservesAmountOwedCopy() throws {
+        // This catches payer-awareness accidentally flattening the existing
+        // amount-due chip into a generic collecting label.
+        let summary = try decodeSummary(status: "locked", payer: "me", outstandingCents: 4_250)
+
+        XCTAssertEqual(
+            BillSplitSummaryStatusPresentation.label(for: summary),
+            "\(formatSplitMoney(4_250, currency: "MXN")) owed"
+        )
+    }
+
+    func testLegacySummaryWithoutPayerDecodesAsUnavailable() throws {
+        // This catches additive list data breaking old responses or silently
+        // treating their absent payer as if the organizer fronted the bill.
+        let summary = try decodeSummary(status: "locked", payer: nil, outstandingCents: 0)
+
+        XCTAssertNil(summary.payer)
+        XCTAssertEqual(summary.payerMode, .unavailable)
+    }
+
     func testQueuedCreateRoundTripPreservesEachOwnPayer() throws {
         // This catches an offline retry silently dropping `each_own` and later
         // creating an organizer-paid split when connectivity returns.
@@ -126,5 +172,28 @@ final class EachOwnPresentationTests: XCTestCase {
           "unclaimedItemsCents":500,"unallocatedExtrasCents":0,"outstandingCents":0
         }
         """#
+    }
+
+    private func decodeSummary(
+        status: String,
+        payer: String?,
+        outstandingCents: Int?
+    ) throws -> BillSplitSummary {
+        var object: [String: Any] = [
+            "id": "summary",
+            "shareToken": "token",
+            "merchant": "Cafe",
+            "currency": "MXN",
+            "occurredAt": "2026-08-17",
+            "totalCents": 10_000,
+            "status": status,
+            "participantCount": 3,
+            "settledCount": 0,
+            "pendingCount": 2,
+        ]
+        if let payer { object["payer"] = payer }
+        if let outstandingCents { object["outstandingCents"] = outstandingCents }
+        let data = try JSONSerialization.data(withJSONObject: object)
+        return try JSONDecoder().decode(BillSplitSummary.self, from: data)
     }
 }

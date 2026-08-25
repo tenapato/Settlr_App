@@ -18,11 +18,13 @@ struct SplitDetailView: View {
     @State private var showPassAround = false
     @State private var showResult = false
     @State private var showEditor = false
+    @State private var showPaymentMethod = false
     @State private var showSettledEditExplanation = false
     @State private var isRefreshing = false
     @State private var refreshSpin = 0.0
     @Environment(\.scenePhase) private var scenePhase
     @State private var participantToRemove: BillSplitParticipant?
+    @State private var paymentCards: [CreditCard] = []
     @Environment(\.dismiss) private var dismiss
 
     private var split: BillSplit? {
@@ -66,6 +68,16 @@ struct SplitDetailView: View {
                     vm: vm,
                     editingSplit: split,
                     onSaved: { _ in showEditor = false }
+                )
+            }
+        }
+        .sheet(isPresented: $showPaymentMethod) {
+            if let split {
+                SplitPaymentMethodSheet(
+                    workspaceId: workspaceId,
+                    split: split,
+                    vm: vm,
+                    onSaved: { showPaymentMethod = false }
                 )
             }
         }
@@ -155,6 +167,7 @@ struct SplitDetailView: View {
             }
         }
         .task { await vm.loadDetail(workspaceId: workspaceId, splitId: splitId) }
+        .task { await loadPaymentCards() }
         // People claim on their own phones, so this screen has to keep up while
         // you watch it. Quiet refresh, foreground only.
         .task(id: splitId) {
@@ -198,6 +211,7 @@ struct SplitDetailView: View {
                         .foregroundStyle(Theme.expense)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                paymentMethodRow(split)
                 if split.accountingPresentation.summaryMode == .reviewRequired {
                     unavailablePayerCard(split)
                     closedItemsSection(split)
@@ -252,6 +266,49 @@ struct SplitDetailView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
+    }
+
+    private func paymentMethodRow(_ split: BillSplit) -> some View {
+        let value = SplitPaymentMethodEditorState(split: split).displayValue(cards: paymentCards)
+        return VStack(alignment: .leading, spacing: 8) {
+            SectionEyebrow("You paid with")
+            Button { showPaymentMethod = true } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: split.paymentChannel == "credit_card" ? "creditcard" : "banknote")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                    Text(value)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Theme.ink)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.faint)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 15)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Theme.surface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .strokeBorder(Theme.line, lineWidth: 1)
+                    )
+            )
+        }
+    }
+
+    @MainActor
+    private func loadPaymentCards() async {
+        paymentCards = OfflineSessionCache.creditCards(workspaceId: workspaceId)
+        guard let response: CreditCardsResponse = try? await APIClient.shared.fetch(
+            Endpoints.creditCards(workspaceId)
+        ) else { return }
+        OfflineSessionCache.saveCreditCards(response.creditCards, workspaceId: workspaceId)
+        paymentCards = response.creditCards
     }
 
     // MARK: - Share
