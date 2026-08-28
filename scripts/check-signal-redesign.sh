@@ -79,3 +79,9 @@ grep -Fq 'SettlrPulseLoadingView' Settlr/Views/Main/Dashboard/DashboardView.swif
 grep -Fq 'lastUpdated' Settlr/ViewModels/DashboardVM.swift
 grep -Fq 'SpendingBreakdownCard(summary: summary)' Settlr/Views/Main/Dashboard/DashboardView.swift
 grep -Fq '.accessibilityValue(displayMonth)' Settlr/Views/Main/Dashboard/DashboardView.swift
+
+# Task 5: unified Activity composer, feature-aware VM, and Signal timeline.
+grep -Fq 'struct ActivityEvent' Settlr/Models/ActivityEvent.swift
+grep -Fq 'final class ActivityVM' Settlr/ViewModels/ActivityVM.swift
+grep -Fq 'struct SignalTimelineRow' Settlr/Views/Main/Activity/ActivityView.swift
+grep -Fq 'attentionEvents' Settlr/ViewModels/ActivityVM.swift

@@ -273,22 +273,15 @@ struct MainTabView: View {
     @ViewBuilder
     private func activityTabContent(workspaceId: String) -> some View {
         let user = appState.currentUser
-        if ActivitySegment.expenses.isAvailable(for: user)
-            || ActivitySegment.income.isAvailable(for: user) {
-            ActivityView(
-                workspaceId: workspaceId,
-                selectedSegment: $activitySegment,
-                showExpenseForm: $showExpenseForm,
-                showIncomeForm: $showIncomeForm,
-                showSavingsForm: $showSavingsForm,
-                expensesVM: expensesVM,
-                incomeVM: incomeVM
-            )
-        } else {
-            // Until Activity becomes the unified ledger, bill-splits-only users
-            // get the existing split list in the Activity tab.
-            SplitListView(workspaceId: workspaceId)
-        }
+        ActivityView(
+            workspaceId: workspaceId,
+            selectedSegment: $activitySegment,
+            showExpenseForm: $showExpenseForm,
+            showIncomeForm: $showIncomeForm,
+            showSavingsForm: $showSavingsForm,
+            expensesVM: expensesVM,
+            incomeVM: incomeVM
+        )
     }
 }
 

@@ -70,6 +70,22 @@ extension ActivitySegment {
     }
 }
 
+extension ActivityFilter {
+    func isAvailable(for user: MeUser?) -> Bool {
+        switch self {
+        case .all: return true
+        case .expense: return user?.has(.expenses) ?? false
+        case .income: return user?.has(.income) ?? false
+        case .savings: return user?.has(.savings) ?? false
+        case .split: return user?.has(.billSplits) ?? false
+        }
+    }
+
+    static func available(for user: MeUser?) -> [ActivityFilter] {
+        allCases.filter { $0.isAvailable(for: user) }
+    }
+}
+
 extension CardsCategoriesSegment {
     static func available(for user: MeUser?) -> [CardsCategoriesSegment] {
         allCases.filter { $0.isAvailable(for: user) }

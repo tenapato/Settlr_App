@@ -105,11 +105,14 @@
 		AA000000000000000000BB89 /* AppearancePreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR89 /* AppearancePreference.swift */; };
 		AA000000000000000000BB90 /* SignalLoadingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR90 /* SignalLoadingViews.swift */; };
 		AA000000000000000000BB91 /* QuickActionLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR91 /* QuickActionLauncher.swift */; };
+		AA000000000000000000BB92 /* ActivityEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR92 /* ActivityEvent.swift */; };
+		AA000000000000000000BB93 /* ActivityVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR93 /* ActivityVM.swift */; };
 		AA000000000000000000BB7A /* ScanningOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR7A /* ScanningOverlay.swift */; };
 		AA000000000000000000BB7B /* ExpenseSplitSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR7B /* ExpenseSplitSection.swift */; };
 		AB0000000000000000000020 /* AppearancePreferenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000021 /* AppearancePreferenceTests.swift */; };
 		AB0000000000000000000022 /* FeatureAccessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000023 /* FeatureAccessTests.swift */; };
 		AB0000000000000000000024 /* DashboardSummaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000025 /* DashboardSummaryTests.swift */; };
+		AB0000000000000000000026 /* ActivityEventTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000027 /* ActivityEventTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -225,9 +228,12 @@
 		AA000000000000000000FR89 /* AppearancePreference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearancePreference.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR90 /* SignalLoadingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalLoadingViews.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR91 /* QuickActionLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickActionLauncher.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR92 /* ActivityEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityEvent.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR93 /* ActivityVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityVM.swift; sourceTree = "<group>"; };
 		AB0000000000000000000021 /* AppearancePreferenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearancePreferenceTests.swift; sourceTree = "<group>"; };
 		AB0000000000000000000023 /* FeatureAccessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureAccessTests.swift; sourceTree = "<group>"; };
 		AB0000000000000000000025 /* DashboardSummaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardSummaryTests.swift; sourceTree = "<group>"; };
+		AB0000000000000000000027 /* ActivityEventTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityEventTests.swift; sourceTree = "<group>"; };
 		AA000000000000000000PROD /* Settlr.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Settlr.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -306,6 +312,7 @@
 				AA000000000000000000FR56 /* CardPaymentsSummary.swift */,
 				AA000000000000000000FR60 /* Savings.swift */,
 				AA000000000000000000FR70 /* BillSplit.swift */,
+				AA000000000000000000FR92 /* ActivityEvent.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -329,6 +336,7 @@
 				AA000000000000000000FR44 /* TelegramSettingsVM.swift */,
 				AA000000000000000000FR52 /* AnnualDashboardVM.swift */,
 				AA000000000000000000FR71 /* BillSplitVM.swift */,
+				AA000000000000000000FR93 /* ActivityVM.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -499,6 +507,7 @@
 			isa = PBXGroup;
 			children = (
 				AB0000000000000000000025 /* DashboardSummaryTests.swift */,
+				AB0000000000000000000027 /* ActivityEventTests.swift */,
 				AB0000000000000000000023 /* FeatureAccessTests.swift */,
 				AB0000000000000000000003 /* ReceiptEvidenceTests.swift */,
 				AB0000000000000000000004 /* ParserPreferenceTests.swift */,
@@ -613,6 +622,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AB0000000000000000000024 /* DashboardSummaryTests.swift in Sources */,
+				AB0000000000000000000026 /* ActivityEventTests.swift in Sources */,
 				AB0000000000000000000001 /* ReceiptEvidenceTests.swift in Sources */,
 				AB0000000000000000000002 /* ParserPreferenceTests.swift in Sources */,
 				AC0000000000000000000003 /* ReceiptPhotoUploadTests.swift in Sources */,
@@ -701,6 +711,8 @@
 				AA000000000000000000BB65 /* CardsAndCategoriesView.swift in Sources */,
 				AA000000000000000000BB66 /* SavingsRecurringSheet.swift in Sources */,
 				AA000000000000000000BB67 /* ActivityView.swift in Sources */,
+				AA000000000000000000BB92 /* ActivityEvent.swift in Sources */,
+				AA000000000000000000BB93 /* ActivityVM.swift in Sources */,
 				AA000000000000000000BB68 /* IncomeRecurringSheet.swift in Sources */,
 				AA000000000000000000BB69 /* Recurrence.swift in Sources */,
 				AA000000000000000000BB70 /* BillSplit.swift in Sources */,

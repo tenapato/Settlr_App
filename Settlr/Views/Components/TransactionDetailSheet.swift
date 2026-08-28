@@ -5,13 +5,13 @@ import SwiftUI
 private struct TransactionDetailRow: View {
     let label: String
     let value: String
-    var valueColor: Color = Color(hex: "#ecedee")
+    var valueColor: Color = Theme.ink
 
     var body: some View {
         HStack(alignment: .top) {
             Text(label)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color(hex: "#8e9197"))
+                .foregroundStyle(Theme.muted)
             Spacer(minLength: 16)
             Text(value)
                 .font(.system(size: 15, weight: .medium))
@@ -33,10 +33,10 @@ private struct TransactionDetailCard<Content: View>: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(Color(hex: "#15171a"))
+                .fill(Theme.surface)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
-                        .strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1)
+                        .strokeBorder(Theme.line, lineWidth: 1)
                 )
         )
     }
@@ -45,7 +45,7 @@ private struct TransactionDetailCard<Content: View>: View {
 private struct TransactionDetailDivider: View {
     var body: some View {
         Divider()
-            .overlay(Color(hex: "#2a2d32"))
+            .overlay(Theme.line)
             .padding(.leading, 16)
     }
 }
@@ -55,9 +55,8 @@ private extension View {
         self
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
-            .presentationBackground(Color(hex: "#0e0f11"))
+            .presentationBackground(Theme.bg)
             .presentationCornerRadius(24)
-            .preferredColorScheme(.dark)
     }
 }
 
@@ -114,16 +113,16 @@ struct ExpenseDetailSheet: View {
                 VStack(spacing: 20) {
                     header(
                         icon: expense.paymentChannel == "credit_card" ? "creditcard.fill" : "banknote.fill",
-                        tint: Color(hex: "#ff6b6b"),
+                        tint: Theme.expense,
                         amountCents: expense.amountCents,
-                        amountColor: Color(hex: "#ecedee")
+                        amountColor: Theme.ink
                     )
 
                     TransactionDetailCard {
                         HStack(alignment: .top, spacing: 8) {
                             Text(expense.description)
                                 .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(Color(hex: "#ecedee"))
+                                .foregroundStyle(Theme.ink)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             ExpenseMarkerTags(expense: expense)
                         }
@@ -164,19 +163,19 @@ struct ExpenseDetailSheet: View {
                 .padding(.bottom, 14)
             }
             .contentMargins(.bottom, 24, for: .scrollContent)
-            .background(Color(hex: "#0e0f11"))
+            .background(Theme.bg)
             .navigationTitle("Expense")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { showEditForm = true } label: {
                         Image(systemName: "pencil")
-                            .foregroundStyle(Color(hex: "#c8ff5a"))
+                            .foregroundStyle(Theme.accentText)
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
-                        .foregroundStyle(Color(hex: "#c8ff5a"))
+                        .foregroundStyle(Theme.accentText)
                         .fontWeight(.semibold)
                 }
             }
@@ -246,16 +245,16 @@ struct IncomeDetailSheet: View {
                 VStack(spacing: 20) {
                     header(
                         icon: "arrow.down.circle.fill",
-                        tint: Color(hex: "#5ddf8a"),
+                        tint: Theme.income,
                         amountCents: income.amountCents,
-                        amountColor: Color(hex: "#5ddf8a")
+                        amountColor: Theme.income
                     )
 
                     TransactionDetailCard {
                         HStack(alignment: .top, spacing: 8) {
                             Text(income.description)
                                 .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(Color(hex: "#ecedee"))
+                                .foregroundStyle(Theme.ink)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             IncomeMarkerTags(income: income)
                         }
@@ -284,19 +283,19 @@ struct IncomeDetailSheet: View {
                 .padding(.bottom, 14)
             }
             .contentMargins(.bottom, 24, for: .scrollContent)
-            .background(Color(hex: "#0e0f11"))
+            .background(Theme.bg)
             .navigationTitle("Income")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { showEditForm = true } label: {
                         Image(systemName: "pencil")
-                            .foregroundStyle(Color(hex: "#c8ff5a"))
+                            .foregroundStyle(Theme.accentText)
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
-                        .foregroundStyle(Color(hex: "#c8ff5a"))
+                        .foregroundStyle(Theme.accentText)
                         .fontWeight(.semibold)
                 }
             }
@@ -357,6 +356,6 @@ private func header(icon: String, tint: Color, amountCents: Int, amountColor: Co
 }
 
 private func categoryColor(_ hex: String?) -> Color {
-    guard let hex, !hex.isEmpty else { return Color(hex: "#8e9197") }
+    guard let hex, !hex.isEmpty else { return Theme.muted }
     return Color(hex: hex)
 }
