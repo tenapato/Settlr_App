@@ -69,3 +69,11 @@ if ! rg -U -q 'private func submitEdit\(clearClaimsFor: Set<String>\) \{\n[[:spa
     echo "Split submitEdit must normalize gated card state immediately before building its request draft." >&2
     exit 1
 fi
+
+# Task 4: available balance, retained dashboard data, and the existing ticker.
+grep -Fq 'var availableCents: Int' Settlr/Models/DashboardSummary.swift
+grep -Fq 'savingsNetCents' Settlr/Models/DashboardSummary.swift
+grep -Fq 'SpendingInsights.build' Settlr/Views/Main/Dashboard/SpendingInsightsStrip.swift
+grep -Fq 'SignalTraceLoadingView' Settlr/Views/Main/Dashboard/DashboardView.swift
+grep -Fq 'SettlrPulseLoadingView' Settlr/Views/Main/Dashboard/DashboardView.swift
+grep -Fq 'lastUpdated' Settlr/ViewModels/DashboardVM.swift

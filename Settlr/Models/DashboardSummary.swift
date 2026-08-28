@@ -9,6 +9,10 @@ struct SummaryResponse: Decodable {
     let incomeCents: Int
     let expenseCents: Int
     let netCents: Int
+    /// Savings are returned as a signed month movement by `/summary`.
+    /// Older servers omit this optional field, which means no amount is
+    /// subtracted from the available presentation balance.
+    let savingsNetCents: Int
     let incomeCount: Int
     let expenseCount: Int
     let transactionCount: Int
@@ -18,6 +22,9 @@ struct SummaryResponse: Decodable {
     var income: Double { Double(incomeCents) / 100.0 }
     var expenses: Double { Double(expenseCents) / 100.0 }
     var net: Double { Double(netCents) / 100.0 }
+    /// The amount left after this month's savings movement. This is a
+    /// presentation value; server totals remain authoritative.
+    var availableCents: Int { netCents - savingsNetCents }
 
     /// The API does not sort `expensesByCategory`; always read through this.
     var sortedCategories: [CategorySummary] {
@@ -29,6 +36,7 @@ struct SummaryResponse: Decodable {
         incomeCents = try container.decodeIfPresent(Int.self, forKey: .incomeCents) ?? 0
         expenseCents = try container.decodeIfPresent(Int.self, forKey: .expenseCents) ?? 0
         netCents = try container.decodeIfPresent(Int.self, forKey: .netCents) ?? 0
+        savingsNetCents = try container.decodeIfPresent(Int.self, forKey: .savingsNetCents) ?? 0
         incomeCount = try container.decodeIfPresent(Int.self, forKey: .incomeCount) ?? 0
         expenseCount = try container.decodeIfPresent(Int.self, forKey: .expenseCount) ?? 0
         let total = try container.decodeIfPresent(Int.self, forKey: .transactionCount)
@@ -39,7 +47,7 @@ struct SummaryResponse: Decodable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case incomeCents, expenseCents, netCents
+        case incomeCents, expenseCents, netCents, savingsNetCents
         case incomeCount, expenseCount, transactionCount
         case expensesByCategory, expensesByChannel
     }

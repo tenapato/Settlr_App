@@ -109,6 +109,7 @@
 		AA000000000000000000BB7B /* ExpenseSplitSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR7B /* ExpenseSplitSection.swift */; };
 		AB0000000000000000000020 /* AppearancePreferenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000021 /* AppearancePreferenceTests.swift */; };
 		AB0000000000000000000022 /* FeatureAccessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000023 /* FeatureAccessTests.swift */; };
+		AB0000000000000000000024 /* DashboardSummaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000025 /* DashboardSummaryTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -226,6 +227,7 @@
 		AA000000000000000000FR91 /* QuickActionLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickActionLauncher.swift; sourceTree = "<group>"; };
 		AB0000000000000000000021 /* AppearancePreferenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearancePreferenceTests.swift; sourceTree = "<group>"; };
 		AB0000000000000000000023 /* FeatureAccessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureAccessTests.swift; sourceTree = "<group>"; };
+		AB0000000000000000000025 /* DashboardSummaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardSummaryTests.swift; sourceTree = "<group>"; };
 		AA000000000000000000PROD /* Settlr.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Settlr.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -496,6 +498,7 @@
 		AB0000000000000000000006 /* SettlrTests */ = {
 			isa = PBXGroup;
 			children = (
+				AB0000000000000000000025 /* DashboardSummaryTests.swift */,
 				AB0000000000000000000023 /* FeatureAccessTests.swift */,
 				AB0000000000000000000003 /* ReceiptEvidenceTests.swift */,
 				AB0000000000000000000004 /* ParserPreferenceTests.swift */,
@@ -609,6 +612,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AB0000000000000000000024 /* DashboardSummaryTests.swift in Sources */,
 				AB0000000000000000000001 /* ReceiptEvidenceTests.swift in Sources */,
 				AB0000000000000000000002 /* ParserPreferenceTests.swift in Sources */,
 				AC0000000000000000000003 /* ReceiptPhotoUploadTests.swift in Sources */,

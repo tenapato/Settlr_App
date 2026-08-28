@@ -7,6 +7,8 @@ final class DashboardVM {
     var previousSummary: SummaryResponse?
     var isLoading = false
     var errorMessage: String?
+    /// Date of the last successful current-month summary response.
+    var lastUpdated: Date?
     var selectedMonth: String = {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM"
@@ -31,10 +33,14 @@ final class DashboardVM {
         }()
 
         do {
-            summary = try await currentTask
+            let freshSummary = try await currentTask
+            summary = freshSummary
+            lastUpdated = Date()
             errorMessage = nil
         } catch {
-            summary = nil
+            // Keep the last valid summary visible while a refresh fails. The
+            // view presents the error inline so a transient network failure
+            // cannot erase the user's financial context.
             errorMessage = error.localizedDescription
         }
         previousSummary = await previousTask
