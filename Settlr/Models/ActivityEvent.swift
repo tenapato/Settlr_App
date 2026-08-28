@@ -154,8 +154,10 @@ enum ActivityComposer {
                 continue
             }
             let isSplit = expense.billSplitId.flatMap { splitByID[$0] } != nil
-            let payment = expense.paymentChannel == "credit_card" ? "Card" : "Cash"
-            let context = isSplit ? "(payment) · Split" : payment
+            // Prefer the concrete card relationship when present; the channel
+            // is the fallback for cash and older payloads.
+            let payment = expense.creditCardId != nil || expense.paymentChannel == "credit_card" ? "Card" : "Cash"
+            let context = isSplit ? "\(payment) · Split" : payment
             events.append(
                 ActivityEvent(
                     id: "expense:\(expense.id)",

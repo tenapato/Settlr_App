@@ -101,3 +101,39 @@ bash scripts/check-app-source-regressions.sh        PASS
 ruby scripts/test-testflight-workflow.rb            PASS
 git diff --check                                    PASS
 ```
+
+## Fix Round 2
+
+- Suppressed the root Savings presenter while Activity is active. Activity now
+  waits for accounts before presenting an entry form and diverts empty/error
+  account states to the existing `SavingsAccountsSheet` create-account flow.
+- Revoked features clear their open Activity forms and payment filter whenever
+  either expenses or credit cards is unavailable. A feature-bearing 403 refresh
+  returns before applying any in-flight result tuple.
+- Split-derived expense context now uses the actual card relationship/channel
+  (`Card · Split` or `Cash · Split`), covered by the Foundation harness and test.
+- Added generation/workspace guards to shared category and savings-account
+  preloads so old responses cannot overwrite current-workspace form data.
+- Activity-owned saves trigger one Activity reload/recomposition after the
+  existing mutation completes, with workspace guards preventing stale saves from
+  repopulating a switched workspace.
+
+## Fix Round 2
+
+- Suppressed MainTabView's root Savings presenter on Activity. Savings actions
+  wait for account state and divert empty/error workspaces to the existing
+  account-management/create-account sheet; the unusable entry form is never
+  presented without an account.
+- Feature revocation now clears the payment selection when either expenses or
+  credit cards is unavailable, dismisses all now-gated Activity forms, and
+  returns immediately after a feature-bearing 403/session refresh without
+  applying stale result tuples.
+- Split expense composition now derives `Card` from the concrete card ID or
+  credit-card channel and emits `Card · Split`/`Cash · Split` rather than a
+  placeholder context. The Foundation harness asserts both context and ID.
+- Added generation/workspace guards to shared expense/income category and
+  savings account loads, including stale-error suppression. Activity actions
+  verify the current workspace before changing presentation state.
+- Activity-owned mutations disable the shared VM's follow-up reload where
+  applicable, then perform one guarded Activity reload so the new event appears
+  without a duplicate mutation or tab switch.

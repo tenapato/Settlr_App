@@ -19,6 +19,8 @@ final class IncomeVM {
     }()
 
     private let api = APIClient.shared
+    private var categoryLoadGeneration = 0
+    private var categoryWorkspaceID: String?
 
     var hasActiveFilter: Bool {
         !searchText.isEmpty || filterCategoryId != nil
@@ -50,13 +52,26 @@ final class IncomeVM {
     }
 
     @MainActor
+    func resetCategoriesForWorkspace(_ workspaceId: String) {
+        categoryLoadGeneration += 1
+        categoryWorkspaceID = workspaceId
+        categories = []
+    }
+
+    @MainActor
     func loadCategories(workspaceId: String) async {
+        if categoryWorkspaceID != workspaceId {
+            resetCategoriesForWorkspace(workspaceId)
+        }
+        let generation = categoryLoadGeneration
         do {
             let response: CategoriesResponse = try await api.fetch(
                 Endpoints.categories(workspaceId) + "?scope=income"
             )
+            guard generation == categoryLoadGeneration, categoryWorkspaceID == workspaceId else { return }
             categories = response.categories
         } catch {
+            guard generation == categoryLoadGeneration, categoryWorkspaceID == workspaceId else { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -132,14 +147,18 @@ final class IncomeVM {
     // MARK: - Recurring income rules
 
     @MainActor
-    func createRecurring(workspaceId: String, body: CreateRecurringIncomeBody) async -> Bool {
+    func createRecurring(
+        workspaceId: String,
+        body: CreateRecurringIncomeBody,
+        reload: Bool = true
+    ) async -> Bool {
         do {
             let _: RecurringIncomeResponse = try await api.fetch(
                 Endpoints.recurringIncome(workspaceId),
                 method: "POST",
                 body: body
             )
-            await load(workspaceId: workspaceId)
+            if reload { await load(workspaceId: workspaceId) }
             return true
         } catch {
             errorMessage = error.localizedDescription

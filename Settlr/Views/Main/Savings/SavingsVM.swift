@@ -17,6 +17,8 @@ final class SavingsVM {
 
     private let api = APIClient.shared
     private var inFlightLoad: Task<Void, Never>?
+    private var loadGeneration = 0
+    private var activeWorkspaceID: String?
 
     var displayBalanceCents: Int {
         if let id = selectedAccountId,
@@ -41,9 +43,30 @@ final class SavingsVM {
 
     @MainActor
     func load(workspaceId: String) async {
-        let task = Task { @MainActor in await self.performLoad(workspaceId: workspaceId) }
+        if activeWorkspaceID != workspaceId {
+            resetForWorkspace()
+            activeWorkspaceID = workspaceId
+        }
+        loadGeneration += 1
+        let generation = loadGeneration
+        let task = Task { @MainActor in await self.performLoad(workspaceId: workspaceId, generation: generation) }
         inFlightLoad = task
         await task.value
+    }
+
+    @MainActor
+    func resetForWorkspace() {
+        loadGeneration += 1
+        activeWorkspaceID = nil
+        inFlightLoad?.cancel()
+        inFlightLoad = nil
+        accounts = []
+        entries = []
+        recurring = []
+        totalBalanceCents = 0
+        selectedAccountId = nil
+        hasLoadedAccounts = false
+        errorMessage = nil
     }
 
     /// Awaits the in-flight load, if any, so callers can act on settled state instead of
@@ -54,7 +77,7 @@ final class SavingsVM {
     }
 
     @MainActor
-    private func performLoad(workspaceId: String) async {
+    private func performLoad(workspaceId: String, generation: Int) async {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -71,6 +94,7 @@ final class SavingsVM {
                 Endpoints.savingsEntries(workspaceId, accountId: selectedAccountId)
             )
             let (accountsResp, entriesResp) = try await (accountsTask, entriesTask)
+            guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }
             accounts = accountsResp.accounts.sorted { $0.sortOrder < $1.sortOrder }
             totalBalanceCents = accountsResp.totalBalanceCents
             entries = entriesResp.entries
@@ -79,9 +103,11 @@ final class SavingsVM {
                 selectedAccountId = nil
             }
         } catch {
+            guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }
             errorMessage = error.localizedDescription
         }
 
+        guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }
         recurring = await recurringTask?.recurringSavings ?? []
     }
 
@@ -134,14 +160,18 @@ final class SavingsVM {
     }
 
     @MainActor
-    func createEntry(workspaceId: String, body: CreateSavingsEntryBody) async {
+    func createEntry(
+        workspaceId: String,
+        body: CreateSavingsEntryBody,
+        reload: Bool = true
+    ) async {
         do {
             let _: SavingsEntryResponse = try await api.fetch(
                 Endpoints.savingsEntries(workspaceId),
                 method: "POST",
                 body: body
             )
-            await load(workspaceId: workspaceId)
+            if reload { await load(workspaceId: workspaceId) }
         } catch {
             errorMessage = error.localizedDescription
         }

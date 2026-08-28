@@ -90,8 +90,14 @@ grep -Fq 'attentionEvents' Settlr/ViewModels/ActivityVM.swift
 # semantics, and workspace-safe reloads.
 grep -Fq '.sheet(isPresented: $showExpenseForm)' Settlr/Views/Main/Activity/ActivityView.swift
 grep -Fq '.sheet(isPresented: $showIncomeForm)' Settlr/Views/Main/Activity/ActivityView.swift
-grep -Fq '.sheet(isPresented: $showSavingsForm)' Settlr/Views/Main/Activity/ActivityView.swift
+grep -Fq 'activitySavingsFormPresentation' Settlr/Views/Main/Activity/ActivityView.swift
+grep -Fq 'selectedTab != .activity' Settlr/Views/Main/MainTabView.swift
 grep -Fq 'reconcileFeatures(for user: MeUser?)' Settlr/ViewModels/ActivityVM.swift
 grep -Fq 'source == "credit_card"' Settlr/ViewModels/ActivityVM.swift
+grep -Fq 'if !cardsEnabled || !expensesEnabled' Settlr/ViewModels/ActivityVM.swift
+grep -Fq 'return' Settlr/ViewModels/ActivityVM.swift
 grep -Fq 'resetForWorkspace()' Settlr/ViewModels/ActivityVM.swift
 grep -Fq '.task(id: workspaceId)' Settlr/Views/Main/Activity/ActivityView.swift
+grep -Fq 'reloadActivityIfCurrentWorkspace' Settlr/Views/Main/Activity/ActivityView.swift
+grep -Fq 'SavingsAccountsSheet(workspaceId: workspaceId, vm: savingsVM)' Settlr/Views/Main/Activity/ActivityView.swift
+grep -Fq 'reload: false' Settlr/Views/Main/Activity/ActivityView.swift

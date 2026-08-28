@@ -118,7 +118,7 @@ struct MainTabView: View {
     }
 
     private var rootSavingsFormPresentation: Binding<Bool> {
-        Binding(get: { showSavingsForm && selectedTab != .savings }, set: { showSavingsForm = $0 })
+        Binding(get: { showSavingsForm && selectedTab != .savings && selectedTab != .activity }, set: { showSavingsForm = $0 })
     }
 
     // MARK: - Feature availability

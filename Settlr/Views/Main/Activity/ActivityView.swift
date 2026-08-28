@@ -67,6 +67,7 @@ struct ActivityView: View {
     @State private var selectedIncome: Income?
     @State private var selectedSavingsAccount: ActivitySavingsDestination?
     @State private var selectedSplit: ActivitySplitDestination?
+    @State private var showSavingsAccounts = false
 
     private var user: MeUser? { appState.currentUser }
     private var availableTypeFilters: [ActivityFilter] { vm.availableFilters(for: user) }
@@ -74,6 +75,18 @@ struct ActivityView: View {
     private var groupedEvents: [(day: Date, events: [ActivityEvent])] {
         let groups = Dictionary(grouping: filteredEvents) { Calendar.current.startOfDay(for: $0.occurredAt) }
         return groups.keys.sorted(by: >).map { ($0, groups[$0] ?? []) }
+    }
+
+    private var activitySavingsFormPresentation: Binding<Bool> {
+        Binding(
+            get: {
+                showSavingsForm
+                    && user?.has(.savings) == true
+                    && savingsVM.hasLoadedAccounts
+                    && !savingsVM.accounts.isEmpty
+            },
+            set: { showSavingsForm = $0 }
+        )
     }
 
     var body: some View {
@@ -127,7 +140,10 @@ struct ActivityView: View {
                         workspaceId: workspaceId,
                         categories: vm.categories.isEmpty ? expensesVM.categories : vm.categories
                     ) { body in
-                        Task { await expensesVM.create(workspaceId: workspaceId, body: body) }
+                        Task {
+                            await expensesVM.create(workspaceId: workspaceId, body: body)
+                            await reloadActivityIfCurrentWorkspace()
+                        }
                     }
                 }
                 .sheet(isPresented: $showIncomeForm) {
@@ -144,37 +160,45 @@ struct ActivityView: View {
                                         description: body.description,
                                         frequency: repeatEvery.rawValue,
                                         startDate: body.occurredAt,
-                                        categoryId: body.categoryId
+                                        categoryId: body.categoryId,
+                                        reload: false
                                     )
                                 )
                             } else {
                                 await incomeVM.create(workspaceId: workspaceId, body: body)
                             }
+                            await reloadActivityIfCurrentWorkspace()
                         }
                     }
                 }
-                .sheet(isPresented: $showSavingsForm) {
+                .sheet(isPresented: activitySavingsFormPresentation) {
                     SavingsEntryFormSheet(
                         workspaceId: workspaceId,
                         accounts: savingsVM.accounts,
                         defaultAccountId: savingsVM.selectedAccountId,
                         onSave: { body in
-                            Task { await savingsVM.createEntry(workspaceId: workspaceId, body: body) }
+                            Task {
+                                await savingsVM.createEntry(workspaceId: workspaceId, body: body, reload: false)
+                                await reloadActivityIfCurrentWorkspace()
+                            }
                         }
                     )
                 }
+                .sheet(isPresented: $showSavingsAccounts) {
+                    SavingsAccountsSheet(workspaceId: workspaceId, vm: savingsVM)
+                }
         }
         .task(id: workspaceId) {
+            showExpenseForm = false
+            showIncomeForm = false
+            showSavingsForm = false
+            showSavingsAccounts = false
             vm.resetForWorkspace()
             // These VMs are shared with the root quick-action presenters. Clear
             // their workspace-owned picker data before a new workspace load.
-            expensesVM.categories = []
-            incomeVM.categories = []
-            savingsVM.accounts = []
-            savingsVM.entries = []
-            savingsVM.selectedAccountId = nil
-            savingsVM.totalBalanceCents = 0
-            savingsVM.hasLoadedAccounts = false
+            expensesVM.resetCategoriesForWorkspace(workspaceId)
+            incomeVM.resetCategoriesForWorkspace(workspaceId)
+            savingsVM.resetForWorkspace()
             await vm.load(workspaceId: workspaceId, user: user, refreshSession: { await appState.refreshSession() })
             if user?.has(.savings) == true { await savingsVM.load(workspaceId: workspaceId) }
         }
@@ -187,12 +211,31 @@ struct ActivityView: View {
             Task { await incomeVM.loadCategories(workspaceId: workspaceId) }
         }
         .onChange(of: showSavingsForm) { _, open in
-            guard open, user?.has(.savings) == true else { return }
-            Task { await savingsVM.load(workspaceId: workspaceId) }
+            guard open else { return }
+            guard appState.currentUser?.has(.savings) == true else { showSavingsForm = false; return }
+            Task {
+                await savingsVM.load(workspaceId: workspaceId)
+                guard appState.activeWorkspace?.id == workspaceId else { return }
+                guard appState.currentUser?.has(.savings) == true else { showSavingsForm = false; return }
+                if savingsVM.hasLoadedAccounts, savingsVM.accounts.isEmpty {
+                    showSavingsForm = false
+                    showSavingsAccounts = true
+                } else if savingsVM.errorMessage != nil {
+                    showSavingsForm = false
+                    showSavingsAccounts = true
+                }
+            }
         }
         .onChange(of: user?.disabledFeatures) { _, _ in
-            vm.reconcileFeatures(for: user)
-            Task { await vm.load(workspaceId: workspaceId, user: user, refreshSession: { await appState.refreshSession() }) }
+            let refreshedUser = appState.currentUser
+            vm.reconcileFeatures(for: refreshedUser)
+            if refreshedUser?.has(.expenses) != true { showExpenseForm = false }
+            if refreshedUser?.has(.income) != true { showIncomeForm = false }
+            if refreshedUser?.has(.savings) != true {
+                showSavingsForm = false
+                showSavingsAccounts = false
+            }
+            Task { await vm.load(workspaceId: workspaceId, user: appState.currentUser, refreshSession: { await appState.refreshSession() }) }
         }
     }
 
@@ -305,6 +348,11 @@ struct ActivityView: View {
         let composed = ActivityComposer.compose(expenses: vm.expenses, income: vm.incomes, savings: vm.savings, splits: vm.splits)
         vm.timeline = composed.timeline; vm.attentionEvents = composed.attention
     }
+
+    private func reloadActivityIfCurrentWorkspace() async {
+        guard appState.activeWorkspace?.id == workspaceId else { return }
+        await vm.load(workspaceId: workspaceId, user: appState.currentUser, refreshSession: { await appState.refreshSession() })
+    }
 }
 
 private struct ActivityFilterSheet: View {
@@ -324,7 +372,7 @@ private struct ActivityFilterSheet: View {
                         }
                     }
                 }
-                if user?.has(.creditCards) == true {
+                if user?.has(.creditCards) == true && user?.has(.expenses) == true {
                     Section("Payment source") {
                         Button("Any source") { vm.selectedPaymentSource = nil }
                         Button("Cash") { vm.selectedPaymentSource = "cash" }

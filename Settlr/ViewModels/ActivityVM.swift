@@ -91,10 +91,8 @@ final class ActivityVM {
         if !categoriesEnabled { categories = []; selectedCategoryID = nil }
         if !cardsEnabled {
             cards = []
-            if selectedPaymentSource != nil && selectedPaymentSource != "cash" {
-                selectedPaymentSource = nil
-            }
         }
+        if !cardsEnabled || !expensesEnabled { selectedPaymentSource = nil }
         let available = availableFilters(for: user)
         if !available.contains(selectedFilter) { selectedFilter = .all }
 
@@ -209,6 +207,11 @@ final class ActivityVM {
             return server.status == 403 && server.feature != nil
         }) {
             await refreshSession?()
+            // The feature set may have changed while these concurrent requests
+            // were in flight. Keep the already-reconciled cache and let the
+            // refreshed session drive the next load; never apply stale gated
+            // result tuples after a feature-bearing refusal.
+            return
         }
 
         if case .loaded(let response) = results.0 { expenses = response.expenses }

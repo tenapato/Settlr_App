@@ -21,6 +21,8 @@ final class ExpensesVM {
     }()
 
     private let api = APIClient.shared
+    private var categoryLoadGeneration = 0
+    private var categoryWorkspaceID: String?
 
     var hasActiveFilter: Bool {
         !searchText.isEmpty || filterChannel != nil || filterCategoryId != nil || filterCardId != nil
@@ -58,13 +60,26 @@ final class ExpensesVM {
     }
 
     @MainActor
+    func resetCategoriesForWorkspace(_ workspaceId: String) {
+        categoryLoadGeneration += 1
+        categoryWorkspaceID = workspaceId
+        categories = []
+    }
+
+    @MainActor
     func loadCategories(workspaceId: String) async {
+        if categoryWorkspaceID != workspaceId {
+            resetCategoriesForWorkspace(workspaceId)
+        }
+        let generation = categoryLoadGeneration
         do {
             let response: CategoriesResponse = try await api.fetch(
                 Endpoints.categories(workspaceId) + "?scope=expense"
             )
+            guard generation == categoryLoadGeneration, categoryWorkspaceID == workspaceId else { return }
             categories = response.categories
         } catch {
+            guard generation == categoryLoadGeneration, categoryWorkspaceID == workspaceId else { return }
             errorMessage = error.localizedDescription
         }
     }
