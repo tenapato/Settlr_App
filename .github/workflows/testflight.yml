@@ -1,0 +1,231 @@
+name: Deploy iOS app to TestFlight
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: testflight-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Test and deploy
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      PROJECT_PATH: Settlr.xcodeproj
+      SCHEME: Settlr
+      TEAM_ID: 49T6266TLB
+      APP_BUNDLE_ID: cash.settlr.app
+      ARCHIVE_PATH: ${{ runner.temp }}/Settlr.xcarchive
+      EXPORT_PATH: ${{ runner.temp }}/testflight-export
+      EXPORT_OPTIONS_PATH: ${{ runner.temp }}/ExportOptions.plist
+      CERTIFICATE_PATH: ${{ runner.temp }}/apple-distribution.p12
+      PROVISIONING_PROFILE_PATH: ${{ runner.temp }}/settlr-app-store.mobileprovision
+      PROVISIONING_PROFILE_PLIST: ${{ runner.temp }}/settlr-app-store.plist
+      KEYCHAIN_PATH: ${{ runner.temp }}/settlr-signing.keychain-db
+      API_PRIVATE_KEYS_DIR: ${{ runner.temp }}/appstoreconnect/private_keys
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate deployment secrets
+        shell: bash
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+          APPLE_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          APPLE_PROVISIONING_PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+
+          missing=()
+          for secret_name in \
+            APP_STORE_CONNECT_API_KEY_ID \
+            APP_STORE_CONNECT_ISSUER_ID \
+            APP_STORE_CONNECT_API_KEY_BASE64 \
+            APPLE_DISTRIBUTION_CERTIFICATE_BASE64 \
+            APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD \
+            APPLE_PROVISIONING_PROFILE_BASE64
+          do
+            if [[ -z "${!secret_name}" ]]; then
+              missing+=("$secret_name")
+            fi
+          done
+
+          if (( ${#missing[@]} > 0 )); then
+            echo "Missing required GitHub Actions secrets: ${missing[*]}" >&2
+            exit 1
+          fi
+
+      - name: Run tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ./scripts/check-app-source-regressions.sh
+          ruby scripts/test-testflight-workflow.rb
+
+          simulator_id="$({
+            xcrun simctl list devices available -j | ruby -rjson -e '
+              devices = JSON.parse(STDIN.read).fetch("devices").values.flatten
+              iphone = devices.find { |device| device["isAvailable"] && device["name"].start_with?("iPhone") }
+              abort "No available iPhone simulator found" unless iphone
+              puts iphone.fetch("udid")
+            '
+          })"
+
+          xcodebuild test \
+            -project "$PROJECT_PATH" \
+            -scheme "$SCHEME" \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=$simulator_id" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Install signing assets
+        shell: bash
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          PROVISIONING_PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+
+          keychain_password="$(uuidgen)$(uuidgen)"
+
+          printf '%s' "$CERTIFICATE_BASE64" | /usr/bin/base64 -D > "$CERTIFICATE_PATH"
+          printf '%s' "$PROVISIONING_PROFILE_BASE64" | /usr/bin/base64 -D > "$PROVISIONING_PROFILE_PATH"
+
+          security create-keychain -p "$keychain_password" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$keychain_password" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" \
+            -P "$CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s \
+            -k "$keychain_password" \
+            "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+
+          security cms -D -i "$PROVISIONING_PROFILE_PATH" > "$PROVISIONING_PROFILE_PLIST"
+          profile_uuid="$(/usr/libexec/PlistBuddy -c 'Print UUID' "$PROVISIONING_PROFILE_PLIST")"
+          profile_name="$(/usr/libexec/PlistBuddy -c 'Print Name' "$PROVISIONING_PROFILE_PLIST")"
+          profiles_dir="$HOME/Library/MobileDevice/Provisioning Profiles"
+          installed_profile="$profiles_dir/$profile_uuid.mobileprovision"
+          mkdir -p "$profiles_dir"
+          cp "$PROVISIONING_PROFILE_PATH" "$installed_profile"
+
+          echo "PROFILE_UUID=$profile_uuid" >> "$GITHUB_ENV"
+          echo "PROFILE_NAME=$profile_name" >> "$GITHUB_ENV"
+          echo "INSTALLED_PROFILE_PATH=$installed_profile" >> "$GITHUB_ENV"
+
+      - name: Install App Store Connect API key
+        shell: bash
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+        run: |
+          set -euo pipefail
+
+          api_key_path="$API_PRIVATE_KEYS_DIR/AuthKey_$API_KEY_ID.p8"
+          mkdir -p "$API_PRIVATE_KEYS_DIR"
+          printf '%s' "$API_KEY_BASE64" | /usr/bin/base64 -D > "$api_key_path"
+          chmod 600 "$api_key_path"
+          echo "API_KEY_PATH=$api_key_path" >> "$GITHUB_ENV"
+
+      - name: Archive app
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          build_number="$(date -u +%Y%m%d).${GITHUB_RUN_NUMBER}"
+          echo "BUILD_NUMBER=$build_number" >> "$GITHUB_ENV"
+
+          xcodebuild archive \
+            -project "$PROJECT_PATH" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath "$ARCHIVE_PATH" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            CURRENT_PROJECT_VERSION="$build_number"
+
+      - name: Upload to TestFlight
+        shell: bash
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+
+          cat > "$EXPORT_OPTIONS_PATH" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>destination</key>
+            <string>upload</string>
+            <key>manageAppVersionAndBuildNumber</key>
+            <false/>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>$APP_BUNDLE_ID</key>
+              <string>$PROFILE_NAME</string>
+            </dict>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>teamID</key>
+            <string>$TEAM_ID</string>
+            <key>uploadSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          PLIST
+
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportPath "$EXPORT_PATH" \
+            -exportOptionsPlist "$EXPORT_OPTIONS_PATH" \
+            -authenticationKeyPath "$API_KEY_PATH" \
+            -authenticationKeyID "$API_KEY_ID" \
+            -authenticationKeyIssuerID "$API_ISSUER_ID"
+
+      - name: Clean up signing assets
+        if: always()
+        shell: bash
+        run: |
+          set +e
+
+          if [[ -n "${INSTALLED_PROFILE_PATH:-}" ]]; then
+            rm -f "$INSTALLED_PROFILE_PATH"
+          fi
+          rm -f \
+            "$CERTIFICATE_PATH" \
+            "$PROVISIONING_PROFILE_PATH" \
+            "$PROVISIONING_PROFILE_PLIST" \
+            "$EXPORT_OPTIONS_PATH" \
+            "${API_KEY_PATH:-}"
+          security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true

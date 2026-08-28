@@ -92,14 +92,42 @@ Native SwiftUI app for Settlr — track expenses and income from your phone, bac
    ```
    Make sure the prod worker is deployed before distributing.
 
-### CI/CD (optional)
+### Automatic TestFlight deployment
 
-Use `xcodebuild` in GitHub Actions or similar:
+The workflow in `.github/workflows/testflight.yml` runs the tests and uploads a
+new build to TestFlight on every push to `main`. You can also run it manually
+from the repository's **Actions** tab.
+
+The GitHub repository needs these Actions secrets:
+
+- `APP_STORE_CONNECT_API_KEY_ID`: the Key ID shown in App Store Connect
+- `APP_STORE_CONNECT_ISSUER_ID`: the Issuer ID shown in App Store Connect
+- `APP_STORE_CONNECT_API_KEY_BASE64`: the downloaded `AuthKey_*.p8` file
+- `APPLE_DISTRIBUTION_CERTIFICATE_BASE64`: an exported Apple Distribution `.p12`
+- `APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD`: the password used when exporting the `.p12`
+- `APPLE_PROVISIONING_PROFILE_BASE64`: the App Store Connect `.mobileprovision` profile for `cash.settlr.app`
+
+To prepare the signing files, open **Xcode → Settings → Accounts**, select team
+`49T6266TLB`, and choose **Manage Certificates → + → Apple Distribution**.
+Export that certificate and its private key as a password-protected `.p12` from
+the **My Certificates** section of Keychain Access. Then create an **App Store
+Connect** distribution profile for `cash.settlr.app` in the Apple Developer
+portal, select the same distribution certificate, and download the generated
+`.mobileprovision` file.
+
+Open **Settings → Secrets and variables → Actions** in the GitHub repository,
+then create each secret. Convert the three files to single-line Base64 strings
+without printing their contents in your terminal:
+
 ```bash
-xcodebuild archive \
-  -project App/Settlr.xcodeproj \
-  -scheme Settlr \
-  -archivePath build/Settlr.xcarchive \
-  -configuration Release \
-  CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
+/usr/bin/base64 -i AuthKey_YOUR_KEY_ID.p8 | pbcopy
+/usr/bin/base64 -i SettlrDistribution.p12 | pbcopy
+/usr/bin/base64 -i Settlr_App_Store_CI.mobileprovision | pbcopy
 ```
+
+Run one command at a time and paste the clipboard into the matching GitHub
+secret. Keep the original `.p8` and `.p12` files somewhere secure. Apple only
+lets you download an App Store Connect API private key once.
+
+The workflow creates the build number as `YYYYMMDD.GITHUB_RUN_NUMBER`, so each
+upload has a newer build number without changing the Xcode project file.

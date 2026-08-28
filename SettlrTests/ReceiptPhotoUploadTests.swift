@@ -148,9 +148,9 @@ final class ReceiptPhotoUploadTests: XCTestCase {
         return UIGraphicsImageRenderer(size: CGSize(width: width, height: height), format: format).image { context in
             let half = CGSize(width: width / 2, height: height / 2)
             UIColor.blue.setFill(); context.fill(CGRect(origin: .zero, size: half))
-            UIColor.red.setFill(); context.fill(CGRect(x: width / 2, y: 0, width: half.width, height: half.height))
-            UIColor.green.setFill(); context.fill(CGRect(x: 0, y: height / 2, width: half.width, height: half.height))
-            UIColor.yellow.setFill(); context.fill(CGRect(x: width / 2, y: height / 2, width: half.width, height: half.height))
+            UIColor.red.setFill(); context.fill(CGRect(x: half.width, y: 0, width: half.width, height: half.height))
+            UIColor.green.setFill(); context.fill(CGRect(x: 0, y: half.height, width: half.width, height: half.height))
+            UIColor.yellow.setFill(); context.fill(CGRect(x: half.width, y: half.height, width: half.width, height: half.height))
         }
     }
 
