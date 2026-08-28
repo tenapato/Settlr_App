@@ -17,11 +17,11 @@ struct CompactSharedClaimControl: View {
             } else {
                 Image(systemName: presentation.isSelected ? "checkmark" : "circle")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(presentation.isSelected ? Theme.accent : Theme.muted)
+                    .foregroundStyle(presentation.isSelected ? Theme.accentText : Theme.muted)
             }
             Text(isLoading ? "Updating…" : presentation.title)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(presentation.isSelected ? Theme.accent : Theme.muted)
+                .foregroundStyle(presentation.isSelected ? Theme.accentText : Theme.muted)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
@@ -51,7 +51,7 @@ struct ClaimSelectionCircle: View {
     var body: some View {
         Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
             .font(.system(size: 18, weight: .semibold))
-            .foregroundStyle(isSelected ? Theme.accent : Theme.muted)
+            .foregroundStyle(isSelected ? Theme.accentText : Theme.muted)
             .opacity(isEnabled ? 1 : 0.45)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(isEnabled ? (isSelected ? "Included" : "Add me") : "Item unavailable")
@@ -75,7 +75,7 @@ struct CompactUnitClaimStepper: View {
             }
             .disabled(!canDecrement)
             .accessibilityLabel("Remove one")
-            .foregroundStyle(canDecrement ? Theme.accent : Theme.faint)
+            .foregroundStyle(canDecrement ? Theme.accentText : Theme.faint)
 
             Text("\(quantity)")
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
@@ -90,7 +90,7 @@ struct CompactUnitClaimStepper: View {
             }
             .disabled(!canIncrement)
             .accessibilityLabel("Add one")
-            .foregroundStyle(canIncrement ? Theme.accent : Theme.faint)
+            .foregroundStyle(canIncrement ? Theme.accentText : Theme.faint)
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 2)
@@ -134,6 +134,7 @@ enum Theme {
     static let faint     = Color.settlr(light: 0x929890, dark: 0x5E6466)
     static let accent    = Color.settlr(light: 0xA8D522, dark: 0xCAFF3A)
     static let accentText = Color.settlr(light: 0x597500, dark: 0xCAFF3A)
+    static let buttonInk = Color.settlr(light: 0x11140A, dark: 0x080A08)
     static let income    = Color.settlr(light: 0x2F7A4A, dark: 0x65D98A)
     static let expense   = Color.settlr(light: 0xB52F3A, dark: 0xFF7070)
     static let warning   = Color.settlr(light: 0x9A6500, dark: 0xFFB547)
@@ -225,7 +226,7 @@ struct PrimaryButtonStyle: ButtonStyle {
         var body: some View {
             configuration.label
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Theme.bg)
+                .foregroundStyle(Theme.buttonInk)
                 .frame(maxWidth: .infinity)
                 .frame(height: 52)
                 .background(RoundedRectangle(cornerRadius: 14).fill(Theme.accent))
