@@ -102,8 +102,11 @@
 		AA000000000000000000BB82 /* SplitPassAroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR82 /* SplitPassAroundView.swift */; };
 		AA000000000000000000BB83 /* SplitResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR83 /* SplitResultView.swift */; };
 		AA000000000000000000BB87 /* SplitDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR87 /* SplitDraft.swift */; };
+		AA000000000000000000BB89 /* AppearancePreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR89 /* AppearancePreference.swift */; };
+		AA000000000000000000BB90 /* SignalLoadingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR90 /* SignalLoadingViews.swift */; };
 		AA000000000000000000BB7A /* ScanningOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR7A /* ScanningOverlay.swift */; };
 		AA000000000000000000BB7B /* ExpenseSplitSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR7B /* ExpenseSplitSection.swift */; };
+		AB0000000000000000000020 /* AppearancePreferenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000021 /* AppearancePreferenceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -216,6 +219,9 @@
 		AA000000000000000000FR83 /* SplitResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitResultView.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR7A /* ScanningOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanningOverlay.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR7B /* ExpenseSplitSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpenseSplitSection.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR89 /* AppearancePreference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearancePreference.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR90 /* SignalLoadingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalLoadingViews.swift; sourceTree = "<group>"; };
+		AB0000000000000000000021 /* AppearancePreferenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearancePreferenceTests.swift; sourceTree = "<group>"; };
 		AA000000000000000000PROD /* Settlr.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Settlr.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -280,6 +286,7 @@
 			isa = PBXGroup;
 			children = (
 				AA000000000000000000FR06 /* User.swift */,
+				AA000000000000000000FR89 /* AppearancePreference.swift */,
 				AA000000000000000000FR85 /* FeatureAccess.swift */,
 				AA000000000000000000FR07 /* Workspace.swift */,
 				AA000000000000000000FR08 /* Expense.swift */,
@@ -438,6 +445,7 @@
 			isa = PBXGroup;
 			children = (
 				AA000000000000000000FR28 /* FloatingTabBar.swift */,
+				AA000000000000000000FR90 /* SignalLoadingViews.swift */,
 				AA000000000000000000FR29 /* AmountLabel.swift */,
 				AA000000000000000000FR30 /* CategoryBadge.swift */,
 				AA000000000000000000FR31 /* SectionCard.swift */,
@@ -486,6 +494,7 @@
 				AB0000000000000000000003 /* ReceiptEvidenceTests.swift */,
 				AB0000000000000000000004 /* ParserPreferenceTests.swift */,
 				AC0000000000000000000004 /* ReceiptPhotoUploadTests.swift */,
+				AB0000000000000000000021 /* AppearancePreferenceTests.swift */,
 				AB0000000000000000000010 /* SplitDraftTests.swift */,
 				AB0000000000000000000012 /* PassAroundStateTests.swift */,
 				AB0000000000000000000014 /* EachOwnPresentationTests.swift */,
@@ -597,6 +606,7 @@
 				AB0000000000000000000001 /* ReceiptEvidenceTests.swift in Sources */,
 				AB0000000000000000000002 /* ParserPreferenceTests.swift in Sources */,
 				AC0000000000000000000003 /* ReceiptPhotoUploadTests.swift in Sources */,
+				AB0000000000000000000020 /* AppearancePreferenceTests.swift in Sources */,
 				AB0000000000000000000011 /* SplitDraftTests.swift in Sources */,
 				AB0000000000000000000013 /* PassAroundStateTests.swift in Sources */,
 				AB0000000000000000000015 /* EachOwnPresentationTests.swift in Sources */,
@@ -616,6 +626,7 @@
 				AA000000000000000000BB04 /* Endpoints.swift in Sources */,
 				AA000000000000000000BB05 /* TokenStore.swift in Sources */,
 				AA000000000000000000BB06 /* User.swift in Sources */,
+				AA000000000000000000BB89 /* AppearancePreference.swift in Sources */,
 				AA000000000000000000BB85 /* FeatureAccess.swift in Sources */,
 				AA000000000000000000BB07 /* Workspace.swift in Sources */,
 				AA000000000000000000BB08 /* Expense.swift in Sources */,
@@ -641,6 +652,7 @@
 				AA000000000000000000BB26 /* IncomeFormSheet.swift in Sources */,
 				AA000000000000000000BB27 /* SettingsView.swift in Sources */,
 				AA000000000000000000BB28 /* FloatingTabBar.swift in Sources */,
+				AA000000000000000000BB90 /* SignalLoadingViews.swift in Sources */,
 				AA000000000000000000BB29 /* AmountLabel.swift in Sources */,
 				AA000000000000000000BB30 /* CategoryBadge.swift in Sources */,
 				AA000000000000000000BB31 /* SectionCard.swift in Sources */,

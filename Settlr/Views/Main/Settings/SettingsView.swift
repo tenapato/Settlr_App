@@ -16,11 +16,17 @@ struct SettingsView: View {
     private var saveCapturedReceiptsToPhotos = true
     @AppStorage(AppPreferenceKey.receiptParser)
     private var receiptParser = ReceiptParserPreference.automatic.rawValue
+    @AppStorage("settlr.appearance")
+    private var appearanceRawValue = SettlrAppearance.dark.rawValue
+
+    private var appearance: SettlrAppearance {
+        SettlrAppearance(rawValue: appearanceRawValue) ?? .dark
+    }
 
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(hex: "#0e0f11").ignoresSafeArea()
+                Theme.bg.ignoresSafeArea()
 
                 ScrollView {
                     VStack(spacing: 20) {
@@ -30,31 +36,51 @@ struct SettingsView: View {
                                 VStack(alignment: .leading, spacing: 12) {
                                     Text("Account")
                                         .font(.system(size: 12, weight: .semibold))
-                                        .foregroundStyle(Color(hex: "#8e9197"))
+                                        .foregroundStyle(Theme.muted)
                                         .textCase(.uppercase)
                                         .tracking(0.8)
 
                                     HStack(spacing: 14) {
                                         ZStack {
                                             Circle()
-                                                .fill(Color(hex: "#c8ff5a").opacity(0.12))
+                                                .fill(Theme.accent.opacity(0.12))
                                                 .frame(width: 48, height: 48)
                                             Text(String(user.name.prefix(1)).uppercased())
                                                 .font(.system(size: 20, weight: .semibold))
-                                                .foregroundStyle(Color(hex: "#c8ff5a"))
+                                                .foregroundStyle(Theme.accentText)
                                         }
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(user.name)
                                                 .font(.system(size: 16, weight: .semibold))
-                                                .foregroundStyle(Color(hex: "#ecedee"))
+                                                .foregroundStyle(Theme.ink)
                                             Text(user.email)
                                                 .font(.system(size: 13))
-                                                .foregroundStyle(Color(hex: "#8e9197"))
+                                                .foregroundStyle(Theme.muted)
                                         }
                                     }
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             }
+                        }
+
+                        SectionCard {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Appearance")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(Theme.muted)
+                                    .textCase(.uppercase)
+                                    .tracking(0.8)
+
+                                Picker("Appearance", selection: $appearanceRawValue) {
+                                    ForEach(SettlrAppearance.allCases) { option in
+                                        Text(option.title).tag(option.rawValue)
+                                    }
+                                }
+                                .pickerStyle(.segmented)
+                                .tint(Theme.accent)
+                                .accessibilityValue(appearance.title)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
                         // Workspace section
@@ -63,7 +89,7 @@ struct SettingsView: View {
                                 VStack(alignment: .leading, spacing: 12) {
                                     Text("Workspace")
                                         .font(.system(size: 12, weight: .semibold))
-                                        .foregroundStyle(Color(hex: "#8e9197"))
+                                        .foregroundStyle(Theme.muted)
                                         .textCase(.uppercase)
                                         .tracking(0.8)
 
@@ -71,19 +97,19 @@ struct SettingsView: View {
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(workspace.name)
                                                 .font(.system(size: 16, weight: .semibold))
-                                                .foregroundStyle(Color(hex: "#ecedee"))
+                                                .foregroundStyle(Theme.ink)
                                             Text(workspace.kind.capitalized)
                                                 .font(.system(size: 13))
-                                                .foregroundStyle(Color(hex: "#8e9197"))
+                                                .foregroundStyle(Theme.muted)
                                         }
                                         Spacer()
                                         Text(workspace.role.capitalized)
                                             .font(.system(size: 13, weight: .medium))
-                                            .foregroundStyle(Color(hex: "#c8ff5a"))
+                                            .foregroundStyle(Theme.accentText)
                                             .padding(.horizontal, 10)
                                             .padding(.vertical, 4)
                                             .background(
-                                                Capsule().fill(Color(hex: "#c8ff5a").opacity(0.12))
+                                                Capsule().fill(Theme.accent.opacity(0.12))
                                             )
                                     }
 
@@ -98,17 +124,17 @@ struct SettingsView: View {
                                             Spacer()
                                             Image(systemName: "chevron.right")
                                                 .font(.system(size: 12, weight: .semibold))
-                                                .foregroundStyle(Color(hex: "#5a5d63"))
+                                                .foregroundStyle(Theme.faint)
                                         }
-                                        .foregroundStyle(Color(hex: "#ecedee"))
+                                        .foregroundStyle(Theme.ink)
                                         .padding(.horizontal, 14)
                                         .padding(.vertical, 12)
                                         .background(
                                             RoundedRectangle(cornerRadius: 12)
-                                                .fill(Color(hex: "#1c1f23"))
+                                                .fill(Theme.surface2)
                                                 .overlay(
                                                     RoundedRectangle(cornerRadius: 12)
-                                                        .strokeBorder(Color(hex: "#3a3d44"), lineWidth: 1)
+                                                        .strokeBorder(Theme.line, lineWidth: 1)
                                                 )
                                         )
                                     }
@@ -128,7 +154,7 @@ struct SettingsView: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 Text("Receipts")
                                     .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(Color(hex: "#8e9197"))
+                                    .foregroundStyle(Theme.muted)
                                     .textCase(.uppercase)
                                     .tracking(0.8)
 
@@ -137,10 +163,10 @@ struct SettingsView: View {
                                         VStack(alignment: .leading, spacing: 3) {
                                             Text("Receipt parsing")
                                                 .font(.system(size: 16, weight: .medium))
-                                                .foregroundStyle(Color(hex: "#ecedee"))
+                                                .foregroundStyle(Theme.ink)
                                             Text("Automatic keeps parsing on your device when possible.")
                                                 .font(.system(size: 13))
-                                                .foregroundStyle(Color(hex: "#8e9197"))
+                                                .foregroundStyle(Theme.muted)
                                         }
                                         Spacer()
                                         Picker("Receipt parsing", selection: $receiptParser) {
@@ -150,18 +176,18 @@ struct SettingsView: View {
                                             }
                                         }
                                         .labelsHidden()
-                                        .tint(Color(hex: "#c8ff5a"))
+                                        .tint(Theme.accent)
                                     }
 
                                     if receiptParser == ReceiptParserPreference.serverPhoto.rawValue {
                                         Text("Experimental")
                                             .font(.system(size: 9, weight: .bold))
                                             .textCase(.uppercase)
-                                            .foregroundStyle(Color(hex: "#c8ff5a"))
+                                            .foregroundStyle(Theme.accentText)
                                             .padding(.horizontal, 7)
                                             .padding(.vertical, 3)
                                             .background(
-                                                Color(hex: "#c8ff5a").opacity(0.14),
+                                                Theme.accent.opacity(0.14),
                                                 in: Capsule()
                                             )
                                             .accessibilityLabel("Experimental receipt parser")
@@ -170,31 +196,31 @@ struct SettingsView: View {
                                     if receiptParser == ReceiptParserPreference.onDevice.rawValue {
                                         Text("Receipt text stays on this phone. If the device model is unavailable, you'll be offered Automatic or On server instead.")
                                             .font(.system(size: 12))
-                                            .foregroundStyle(Color(hex: "#8e9197"))
+                                            .foregroundStyle(Theme.muted)
                                     } else if receiptParser == ReceiptParserPreference.server.rawValue {
                                         Text("Only recognized receipt text is sent for parsing. The photo stays on this phone.")
                                             .font(.system(size: 12))
-                                            .foregroundStyle(Color(hex: "#8e9197"))
+                                            .foregroundStyle(Theme.muted)
                                     } else if receiptParser == ReceiptParserPreference.serverPhoto.rawValue {
                                         Text("The receipt photo and recognized text are sent securely to the server for AI parsing. The server does not store the photo. If Save captures to Photos is enabled, a local copy is saved to your photo library. The AI provider does not use it to train its models.")
                                             .font(.system(size: 12))
-                                            .foregroundStyle(Color(hex: "#8e9197"))
+                                            .foregroundStyle(Theme.muted)
                                     }
                                 }
 
-                                Divider().overlay(Color(hex: "#2b2e33"))
+                                Divider().overlay(Theme.line)
 
                                 Toggle(isOn: $saveCapturedReceiptsToPhotos) {
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text("Save captures to Photos")
                                             .font(.system(size: 16, weight: .medium))
-                                            .foregroundStyle(Color(hex: "#ecedee"))
+                                            .foregroundStyle(Theme.ink)
                                         Text("Keep a copy of new receipt photos in your library.")
                                             .font(.system(size: 13))
-                                            .foregroundStyle(Color(hex: "#8e9197"))
+                                            .foregroundStyle(Theme.muted)
                                     }
                                 }
-                                .tint(Color(hex: "#c8ff5a"))
+                                .tint(Theme.accent)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
@@ -211,7 +237,7 @@ struct SettingsView: View {
                                         .font(.system(size: 16, weight: .medium))
                                     Spacer()
                                 }
-                                .foregroundStyle(Color(hex: "#ff6b6b"))
+                                .foregroundStyle(Theme.expense)
                             }
                         }
 
@@ -220,14 +246,14 @@ struct SettingsView: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 Text("Danger Zone")
                                     .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(Color(hex: "#8e9197"))
+                                    .foregroundStyle(Theme.muted)
                                     .textCase(.uppercase)
                                     .tracking(0.8)
 
                                 if let error = deleteAccountError {
                                     Text(error)
                                         .font(.system(size: 13))
-                                        .foregroundStyle(Color(hex: "#ff6b6b"))
+                                        .foregroundStyle(Theme.expense)
                                 }
 
                                 Button {
@@ -240,10 +266,10 @@ struct SettingsView: View {
                                             .font(.system(size: 16, weight: .medium))
                                         Spacer()
                                         if isDeletingAccount {
-                                            ProgressView().tint(Color(hex: "#ff6b6b"))
+                                            ProgressView().tint(Theme.expense)
                                         }
                                     }
-                                    .foregroundStyle(Color(hex: "#ff6b6b"))
+                                    .foregroundStyle(Theme.expense)
                                 }
                                 .disabled(isDeletingAccount)
                             }
@@ -261,7 +287,7 @@ struct SettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
-                        .foregroundStyle(Color(hex: "#c8ff5a"))
+                        .foregroundStyle(Theme.accentText)
                 }
             }
             .confirmationDialog("Sign Out", isPresented: $showSignOutConfirm) {
@@ -300,6 +326,5 @@ struct SettingsView: View {
                 Text("This permanently deletes your account and all workspaces you own. This cannot be undone.")
             }
         }
-        .preferredColorScheme(.dark)
     }
 }
