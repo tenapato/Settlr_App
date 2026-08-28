@@ -23,6 +23,8 @@ final class ActivityVM {
     var selectedPaymentSource: String?
 
     private let api = APIClient.shared
+    private var loadGeneration = 0
+    private var activeWorkspaceID: String?
 
     var hasActiveFilter: Bool {
         selectedFilter != .all
@@ -42,7 +44,15 @@ final class ActivityVM {
             if let kind = selectedFilter.kind, event.kind != kind { return false }
             if !selectedPeriod.includes(event.occurredAt) { return false }
             if let category = selectedCategoryID, event.categoryID != category { return false }
-            if let source = selectedPaymentSource, event.paymentSource != source { return false }
+            if let source = selectedPaymentSource {
+                // The generic Card chip must continue to work when the cards
+                // endpoint is unavailable: events retain their server card ID.
+                if source == "credit_card" {
+                    guard event.kind == .expense, event.paymentSource != nil, event.paymentSource != "cash" else { return false }
+                } else if event.paymentSource != source {
+                    return false
+                }
+            }
             return true
         }
     }
@@ -63,6 +73,54 @@ final class ActivityVM {
         selectedPaymentSource = nil
     }
 
+    /// Immediately removes data and selections a feature revocation makes
+    /// invalid. This runs before the replacement network load, so stale gated
+    /// content cannot remain visible during the refresh window.
+    func reconcileFeatures(for user: MeUser?) {
+        let expensesEnabled = user?.has(.expenses) == true
+        let incomeEnabled = user?.has(.income) == true
+        let savingsEnabled = user?.has(.savings) == true
+        let splitsEnabled = user?.has(.billSplits) == true
+        let categoriesEnabled = user?.has(.categories) == true
+        let cardsEnabled = user?.has(.creditCards) == true
+
+        if !expensesEnabled { expenses = [] }
+        if !incomeEnabled { incomes = [] }
+        if !savingsEnabled { savings = []; savingsAccounts = [] }
+        if !splitsEnabled { splits = [] }
+        if !categoriesEnabled { categories = []; selectedCategoryID = nil }
+        if !cardsEnabled {
+            cards = []
+            if selectedPaymentSource != nil && selectedPaymentSource != "cash" {
+                selectedPaymentSource = nil
+            }
+        }
+        let available = availableFilters(for: user)
+        if !available.contains(selectedFilter) { selectedFilter = .all }
+
+        let composed = ActivityComposer.compose(expenses: expenses, income: incomes, savings: savings, splits: splits)
+        timeline = composed.timeline
+        attentionEvents = composed.attention
+    }
+
+    func resetForWorkspace() {
+        loadGeneration += 1
+        activeWorkspaceID = nil
+        timeline = []
+        attentionEvents = []
+        expenses = []
+        incomes = []
+        savings = []
+        savingsAccounts = []
+        splits = []
+        categories = []
+        cards = []
+        isLoading = false
+        hasLoaded = false
+        errorMessage = nil
+        clearFilters()
+    }
+
     /// Fetches only routes the current feature set permits. Each resource is
     /// independent so a missing optional feature cannot blank cached content.
     func load(
@@ -77,9 +135,20 @@ final class ActivityVM {
         let canLoadCategories = user?.has(.categories) == true
         let canLoadCards = user?.has(.creditCards) == true && canLoadExpenses
 
+        if activeWorkspaceID != workspaceId {
+            resetForWorkspace()
+            activeWorkspaceID = workspaceId
+        }
+        reconcileFeatures(for: user)
+        loadGeneration += 1
+        let generation = loadGeneration
         isLoading = true
         errorMessage = nil
-        defer { isLoading = false; hasLoaded = true }
+        defer {
+            guard generation == loadGeneration else { return }
+            isLoading = false
+            hasLoaded = true
+        }
 
         async let expenseResult = fetch(
             ExpensesResponse.self,
@@ -125,6 +194,7 @@ final class ActivityVM {
         )
 
         let results = await (expenseResult, incomeResult, savingsResult, savingsAccountsResult, splitResult, categoryResult, cardResult)
+        guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }
         let failures = [
             results.0.failure,
             results.1.failure,

@@ -85,3 +85,13 @@ grep -Fq 'struct ActivityEvent' Settlr/Models/ActivityEvent.swift
 grep -Fq 'final class ActivityVM' Settlr/ViewModels/ActivityVM.swift
 grep -Fq 'struct SignalTimelineRow' Settlr/Views/Main/Activity/ActivityView.swift
 grep -Fq 'attentionEvents' Settlr/ViewModels/ActivityVM.swift
+
+# Task 5 fix round 1: leaf form ownership, gate revocation, card-source
+# semantics, and workspace-safe reloads.
+grep -Fq '.sheet(isPresented: $showExpenseForm)' Settlr/Views/Main/Activity/ActivityView.swift
+grep -Fq '.sheet(isPresented: $showIncomeForm)' Settlr/Views/Main/Activity/ActivityView.swift
+grep -Fq '.sheet(isPresented: $showSavingsForm)' Settlr/Views/Main/Activity/ActivityView.swift
+grep -Fq 'reconcileFeatures(for user: MeUser?)' Settlr/ViewModels/ActivityVM.swift
+grep -Fq 'source == "credit_card"' Settlr/ViewModels/ActivityVM.swift
+grep -Fq 'resetForWorkspace()' Settlr/ViewModels/ActivityVM.swift
+grep -Fq '.task(id: workspaceId)' Settlr/Views/Main/Activity/ActivityView.swift

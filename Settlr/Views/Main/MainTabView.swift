@@ -280,7 +280,8 @@ struct MainTabView: View {
             showIncomeForm: $showIncomeForm,
             showSavingsForm: $showSavingsForm,
             expensesVM: expensesVM,
-            incomeVM: incomeVM
+            incomeVM: incomeVM,
+            savingsVM: savingsVM
         )
     }
 }

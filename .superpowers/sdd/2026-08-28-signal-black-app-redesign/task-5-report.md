@@ -72,3 +72,32 @@ directory remains untouched and unstaged.
 
 Full Xcode type-check, XCTest execution, simulator verification, and VoiceOver
 manual checks remain deferred to the agreed manual-build stage.
+
+## Fix Round 1
+
+- Activity now owns Expense, Income, and Savings form sheets while visible;
+  category/account preloads run without switching tabs, and root presenters stay
+  inactive on the Activity tab so a form is presented once.
+- Feature revocation immediately clears gated cached arrays and invalid type,
+  category, and payment-source selections before the replacement load.
+- Generic Card filtering recognizes events whose payment source is a server
+  card ID, including when the card list request fails; card-specific filters
+  remain available when the list succeeds and disappear when credit cards are
+  disabled.
+- Timeline amounts now live on the context line, and split-derived expenses
+  preserve their actual Cash/Card context.
+- Workspace-keyed tasks reset Activity and Savings state so switching workspaces
+  cannot display the prior workspace's events; stale load generations are
+  ignored.
+- Added coverage for split expense payment-source preservation and added
+  structural guards for the fix-round wiring.
+
+Fix Round 1 checks:
+
+```text
+swiftc -parse (changed Task 5 Swift files)          PASS
+bash scripts/check-signal-redesign.sh               PASS
+bash scripts/check-app-source-regressions.sh        PASS
+ruby scripts/test-testflight-workflow.rb            PASS
+git diff --check                                    PASS
+```

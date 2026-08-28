@@ -26,19 +26,17 @@ struct SignalTimelineRow: View {
             .frame(width: 18)
             .padding(.top, 6)
             VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(event.title).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.ink).lineLimit(1)
-                    Spacer(minLength: 4)
-                    Text(formatSplitMoney(event.amountCents))
-                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(event.amountCents >= 0 ? Theme.income : Theme.ink)
-                        .lineLimit(1).minimumScaleFactor(0.7)
-                }
+                Text(event.title).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.ink).lineLimit(1)
                 HStack(spacing: 7) {
                     Text(event.context)
                     Text("·")
                     Text(event.occurredAt, format: .dateTime.hour().minute())
                     if let marker = event.marker { Text("·"); Text(marker).foregroundStyle(Theme.accentText) }
+                    Spacer(minLength: 4)
+                    Text(formatSplitMoney(event.amountCents))
+                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(event.amountCents >= 0 ? Theme.income : Theme.ink)
+                        .lineLimit(1).minimumScaleFactor(0.7)
                 }
                 .font(.system(size: 12)).foregroundStyle(Theme.muted)
             }
@@ -60,6 +58,7 @@ struct ActivityView: View {
     @Binding var showSavingsForm: Bool
     let expensesVM: ExpensesVM
     let incomeVM: IncomeVM
+    let savingsVM: SavingsVM
 
     @Environment(AppState.self) private var appState
     @State private var vm = ActivityVM()
@@ -102,7 +101,7 @@ struct ActivityView: View {
                         }
                     }
                 }
-                .sheet(isPresented: $showFilterSheet) { ActivityFilterSheet(vm: vm) }
+                .sheet(isPresented: $showFilterSheet) { ActivityFilterSheet(vm: vm, user: user) }
                 .sheet(item: $selectedExpense) { expense in
                     ExpenseDetailSheet(workspaceId: workspaceId, expense: expense, categories: vm.categories, cards: vm.cards) { updated in
                         if let index = vm.expenses.firstIndex(where: { $0.id == updated.id }) { vm.expenses[index] = updated }
@@ -121,9 +120,78 @@ struct ActivityView: View {
                 .sheet(item: $selectedSplit) { destination in
                     NavigationStack { SplitDetailView(workspaceId: workspaceId, splitId: destination.id, vm: BillSplitVM()) }
                 }
+                // Activity owns leaf-form presentation while it is visible;
+                // MainTabView's root bindings are inactive on this tab.
+                .sheet(isPresented: $showExpenseForm) {
+                    ExpenseFormSheet(
+                        workspaceId: workspaceId,
+                        categories: vm.categories.isEmpty ? expensesVM.categories : vm.categories
+                    ) { body in
+                        Task { await expensesVM.create(workspaceId: workspaceId, body: body) }
+                    }
+                }
+                .sheet(isPresented: $showIncomeForm) {
+                    IncomeFormSheet(
+                        workspaceId: workspaceId,
+                        categories: vm.categories.isEmpty ? incomeVM.categories : vm.categories
+                    ) { body, repeatEvery in
+                        Task {
+                            if let repeatEvery {
+                                _ = await incomeVM.createRecurring(
+                                    workspaceId: workspaceId,
+                                    body: CreateRecurringIncomeBody(
+                                        amountCents: body.amountCents,
+                                        description: body.description,
+                                        frequency: repeatEvery.rawValue,
+                                        startDate: body.occurredAt,
+                                        categoryId: body.categoryId
+                                    )
+                                )
+                            } else {
+                                await incomeVM.create(workspaceId: workspaceId, body: body)
+                            }
+                        }
+                    }
+                }
+                .sheet(isPresented: $showSavingsForm) {
+                    SavingsEntryFormSheet(
+                        workspaceId: workspaceId,
+                        accounts: savingsVM.accounts,
+                        defaultAccountId: savingsVM.selectedAccountId,
+                        onSave: { body in
+                            Task { await savingsVM.createEntry(workspaceId: workspaceId, body: body) }
+                        }
+                    )
+                }
         }
-        .task { await vm.load(workspaceId: workspaceId, user: user, refreshSession: { await appState.refreshSession() }) }
+        .task(id: workspaceId) {
+            vm.resetForWorkspace()
+            // These VMs are shared with the root quick-action presenters. Clear
+            // their workspace-owned picker data before a new workspace load.
+            expensesVM.categories = []
+            incomeVM.categories = []
+            savingsVM.accounts = []
+            savingsVM.entries = []
+            savingsVM.selectedAccountId = nil
+            savingsVM.totalBalanceCents = 0
+            savingsVM.hasLoadedAccounts = false
+            await vm.load(workspaceId: workspaceId, user: user, refreshSession: { await appState.refreshSession() })
+            if user?.has(.savings) == true { await savingsVM.load(workspaceId: workspaceId) }
+        }
+        .onChange(of: showExpenseForm) { _, open in
+            guard open else { return }
+            Task { await expensesVM.loadCategories(workspaceId: workspaceId) }
+        }
+        .onChange(of: showIncomeForm) { _, open in
+            guard open else { return }
+            Task { await incomeVM.loadCategories(workspaceId: workspaceId) }
+        }
+        .onChange(of: showSavingsForm) { _, open in
+            guard open, user?.has(.savings) == true else { return }
+            Task { await savingsVM.load(workspaceId: workspaceId) }
+        }
         .onChange(of: user?.disabledFeatures) { _, _ in
+            vm.reconcileFeatures(for: user)
             Task { await vm.load(workspaceId: workspaceId, user: user, refreshSession: { await appState.refreshSession() }) }
         }
     }
@@ -241,13 +309,14 @@ struct ActivityView: View {
 
 private struct ActivityFilterSheet: View {
     let vm: ActivityVM
+    let user: MeUser?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         @Bindable var vm = vm
         NavigationStack {
             List {
-                if !vm.categories.isEmpty {
+                if user?.has(.categories) == true && !vm.categories.isEmpty {
                     Section("Categories") {
                         Button("All categories") { vm.selectedCategoryID = nil }
                         ForEach(vm.categories) { category in
@@ -255,11 +324,13 @@ private struct ActivityFilterSheet: View {
                         }
                     }
                 }
-                Section("Payment source") {
-                    Button("Any source") { vm.selectedPaymentSource = nil }
-                    Button("Cash") { vm.selectedPaymentSource = "cash" }
-                    if !vm.cards.isEmpty { ForEach(vm.cards) { card in Button(card.label) { vm.selectedPaymentSource = card.id } } }
-                    else { Button("Card") { vm.selectedPaymentSource = "credit_card" } }
+                if user?.has(.creditCards) == true {
+                    Section("Payment source") {
+                        Button("Any source") { vm.selectedPaymentSource = nil }
+                        Button("Cash") { vm.selectedPaymentSource = "cash" }
+                        if !vm.cards.isEmpty { ForEach(vm.cards) { card in Button(card.label) { vm.selectedPaymentSource = card.id } } }
+                        else { Button("Card") { vm.selectedPaymentSource = "credit_card" } }
+                    }
                 }
             }.scrollContentBackground(.hidden).background(Theme.bg).navigationTitle("Filter Activity")
                 .toolbar {

@@ -48,6 +48,20 @@ final class ActivityEventTests: XCTestCase {
         XCTAssertEqual(result.attention.map(\.id), ["split-1"])
     }
 
+    func testSplitExpenseKeepsActualPaymentSourceAndCardID() throws {
+        let expense: Expense = try decode("""
+        {"id":"e-card","description":"Hotel","amountCents":45000,"currency":"MXN","occurredAt":"2026-08-20T20:00:00Z","categoryId":null,"creditCardId":"card-9","paymentChannel":"credit_card","notes":null,"msiInstallment":null,"msiCount":null,"deferredInstallment":null,"deferredCount":null,"billSplitId":"split-9"}
+        """)
+        let split: BillSplitSummary = try decode("""
+        {"id":"split-9","shareToken":"token","shareUrl":null,"merchant":"Hotel","currency":"MXN","occurredAt":"2026-08-20T20:00:00Z","totalCents":45000,"status":"settled","payer":"organizer_paid","participantCount":2,"settledCount":2,"pendingCount":0,"outstandingCents":0}
+        """)
+
+        let event = try XCTUnwrap(ActivityComposer.compose(expenses: [expense], income: [], savings: [], splits: [split]).timeline.first)
+
+        XCTAssertEqual(event.context, "Card · Split")
+        XCTAssertEqual(event.paymentSource, "card-9")
+    }
+
     private func decode<T: Decodable>(_ json: String) throws -> T {
         try decoder.decode(T.self, from: Data(json.utf8))
     }
