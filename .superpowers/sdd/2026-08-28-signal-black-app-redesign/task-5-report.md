@@ -167,3 +167,27 @@ bash scripts/check-app-source-regressions.sh        PASS
 ruby scripts/test-testflight-workflow.rb            PASS
 git diff --check                                    PASS
 ```
+
+## Fix Round 4
+
+- The global Savings launcher now hands off to Activity's existing
+  account-aware `showSavingsForm` binding when Activity is selected. Activity
+  alone decides whether to present the entry form or route to account
+  management, preserving feature gates and avoiding duplicate presenters.
+- Activity expense and income detail sheets now support guarded edit and delete
+  callbacks. PATCH/DELETE responses are ignored when the active workspace has
+  changed, and Activity only applies callbacks while its workspace remains
+  current.
+- Savings account forms disable interactive swipe dismissal while a create or
+  edit request is in flight, alongside the existing duplicate-submit guard and
+  error-preserving behavior.
+
+Fix Round 4 checks:
+
+```text
+swiftc -parse (changed Task 5 Swift files)          PASS
+bash scripts/check-signal-redesign.sh               PASS
+bash scripts/check-app-source-regressions.sh        PASS
+ruby scripts/test-testflight-workflow.rb            PASS
+git diff --check                                    PASS
+```

@@ -152,8 +152,14 @@ struct MainTabView: View {
     }
 
     private func prepareGlobalSavingsForm() {
-        guard selectedTab != .savings, selectedTab != .activity else { return }
         guard appState.currentUser?.has(.savings) == true, !rootWorkspaceID.isEmpty else { return }
+        // Activity owns the account-aware presenter. Reuse its binding so the
+        // global launcher cannot race it with a second root sheet.
+        if selectedTab == .activity {
+            showSavingsForm = true
+            return
+        }
+        guard selectedTab != .savings else { return }
         let workspaceId = rootWorkspaceID
         Task { @MainActor in
             await savingsVM.load(workspaceId: workspaceId)

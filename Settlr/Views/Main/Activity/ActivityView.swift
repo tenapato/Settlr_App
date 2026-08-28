@@ -116,16 +116,43 @@ struct ActivityView: View {
                 }
                 .sheet(isPresented: $showFilterSheet) { ActivityFilterSheet(vm: vm, user: user) }
                 .sheet(item: $selectedExpense) { expense in
-                    ExpenseDetailSheet(workspaceId: workspaceId, expense: expense, categories: vm.categories, cards: vm.cards) { updated in
-                        if let index = vm.expenses.firstIndex(where: { $0.id == updated.id }) { vm.expenses[index] = updated }
-                        recompute()
-                    }
+                    ExpenseDetailSheet(
+                        workspaceId: workspaceId,
+                        expense: expense,
+                        categories: vm.categories,
+                        cards: vm.cards,
+                        onUpdated: { updated in
+                            guard appState.activeWorkspace?.id == workspaceId else { return }
+                            if let index = vm.expenses.firstIndex(where: { $0.id == updated.id }) { vm.expenses[index] = updated }
+                            recompute()
+                        },
+                        onDeleted: {
+                            guard appState.activeWorkspace?.id == workspaceId else { return }
+                            vm.expenses.removeAll { $0.id == expense.id }
+                            selectedExpense = nil
+                            recompute()
+                        },
+                        isWorkspaceCurrent: { appState.activeWorkspace?.id == workspaceId }
+                    )
                 }
                 .sheet(item: $selectedIncome) { income in
-                    IncomeDetailSheet(workspaceId: workspaceId, income: income, categories: vm.categories) { updated in
-                        if let index = vm.incomes.firstIndex(where: { $0.id == updated.id }) { vm.incomes[index] = updated }
-                        recompute()
-                    }
+                    IncomeDetailSheet(
+                        workspaceId: workspaceId,
+                        income: income,
+                        categories: vm.categories,
+                        onUpdated: { updated in
+                            guard appState.activeWorkspace?.id == workspaceId else { return }
+                            if let index = vm.incomes.firstIndex(where: { $0.id == updated.id }) { vm.incomes[index] = updated }
+                            recompute()
+                        },
+                        onDeleted: {
+                            guard appState.activeWorkspace?.id == workspaceId else { return }
+                            vm.incomes.removeAll { $0.id == income.id }
+                            selectedIncome = nil
+                            recompute()
+                        },
+                        isWorkspaceCurrent: { appState.activeWorkspace?.id == workspaceId }
+                    )
                 }
                 .sheet(item: $selectedSavingsAccount) { destination in
                     SavingsActivityDestinationView(account: vm.savingsAccounts.first { $0.id == destination.id }, accountID: destination.id, entries: vm.savings)

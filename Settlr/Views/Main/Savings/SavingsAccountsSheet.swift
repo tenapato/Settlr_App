@@ -301,6 +301,7 @@ struct SavingsAccountFormSheet: View {
             .onAppear { nameFocused = true }
         }
         .preferredColorScheme(.dark)
+        .interactiveDismissDisabled(isSaving)
     }
 }
 

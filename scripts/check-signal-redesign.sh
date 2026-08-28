@@ -116,3 +116,11 @@ grep -Fq 'prepareGlobalSavingsForm()' Settlr/Views/Main/MainTabView.swift
 grep -Fq 'savingsVM.hasLoadedAccounts' Settlr/Views/Main/MainTabView.swift
 grep -Fq '@State private var isSavingAccount = false' Settlr/Views/Main/Savings/SavingsAccountsSheet.swift
 grep -Fq 'isSaving: isSavingAccount' Settlr/Views/Main/Savings/SavingsAccountsSheet.swift
+
+# Task 5 fix round 4: Activity-owned Savings handoff, workspace-safe detail
+# mutations, and non-dismissible in-flight account forms.
+grep -Fq 'if selectedTab == .activity' Settlr/Views/Main/MainTabView.swift
+grep -Fq 'onDeleted:' Settlr/Views/Main/Activity/ActivityView.swift
+grep -Fq 'isWorkspaceCurrent:' Settlr/Views/Main/Activity/ActivityView.swift
+grep -Fq 'guard isWorkspaceCurrent() else { return nil }' Settlr/Views/Components/TransactionDetailSheet.swift
+grep -Fq '.interactiveDismissDisabled(isSaving)' Settlr/Views/Main/Savings/SavingsAccountsSheet.swift

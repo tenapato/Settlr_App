@@ -67,22 +67,30 @@ struct ExpenseDetailSheet: View {
     let categories: [Category]
     let cards: [CreditCard]
     let onUpdated: (Expense) -> Void
+    let onDeleted: (() -> Void)?
+    let isWorkspaceCurrent: () -> Bool
 
     @State private var expense: Expense
     @Environment(\.dismiss) private var dismiss
     @State private var showEditForm = false
+    @State private var showDeleteConfirmation = false
+    @State private var isDeleting = false
 
     init(
         workspaceId: String,
         expense: Expense,
         categories: [Category],
         cards: [CreditCard],
-        onUpdated: @escaping (Expense) -> Void
+        onUpdated: @escaping (Expense) -> Void,
+        onDeleted: (() -> Void)? = nil,
+        isWorkspaceCurrent: @escaping () -> Bool = { true }
     ) {
         self.workspaceId = workspaceId
         self.categories = categories
         self.cards = cards
         self.onUpdated = onUpdated
+        self.onDeleted = onDeleted
+        self.isWorkspaceCurrent = isWorkspaceCurrent
         _expense = State(initialValue: expense)
     }
 
@@ -168,9 +176,17 @@ struct ExpenseDetailSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { showEditForm = true } label: {
-                        Image(systemName: "pencil")
-                            .foregroundStyle(Theme.accentText)
+                    HStack(spacing: 18) {
+                        Button { showEditForm = true } label: {
+                            Image(systemName: "pencil")
+                                .foregroundStyle(Theme.accentText)
+                        }
+                        if onDeleted != nil {
+                            Button(role: .destructive) { showDeleteConfirmation = true } label: {
+                                Image(systemName: "trash")
+                            }
+                            .disabled(isDeleting)
+                        }
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -181,6 +197,12 @@ struct ExpenseDetailSheet: View {
             }
         }
         .transactionDetailSheetStyle()
+        .alert("Delete Expense?", isPresented: $showDeleteConfirmation) {
+            Button("Delete", role: .destructive) { Task { await deleteExpense() } }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This expense will be removed from the workspace.")
+        }
         .sheet(isPresented: $showEditForm) {
             ExpenseFormSheet(
                 workspaceId: workspaceId,
@@ -205,9 +227,28 @@ struct ExpenseDetailSheet: View {
                 method: "PATCH",
                 body: body
             )
+            guard isWorkspaceCurrent() else { return nil }
             return response.expense
         } catch {
             return nil
+        }
+    }
+
+    @MainActor
+    private func deleteExpense() async {
+        guard !isDeleting, let onDeleted else { return }
+        isDeleting = true
+        defer { isDeleting = false }
+        do {
+            try await APIClient.shared.send(
+                Endpoints.expense(workspaceId, expense.id),
+                method: "DELETE"
+            )
+            guard isWorkspaceCurrent() else { return }
+            onDeleted()
+            dismiss()
+        } catch {
+            // Keep the detail sheet open so the user can retry after a failure.
         }
     }
 }
@@ -218,20 +259,28 @@ struct IncomeDetailSheet: View {
     let workspaceId: String
     let categories: [Category]
     let onUpdated: (Income) -> Void
+    let onDeleted: (() -> Void)?
+    let isWorkspaceCurrent: () -> Bool
 
     @State private var income: Income
     @Environment(\.dismiss) private var dismiss
     @State private var showEditForm = false
+    @State private var showDeleteConfirmation = false
+    @State private var isDeleting = false
 
     init(
         workspaceId: String,
         income: Income,
         categories: [Category],
-        onUpdated: @escaping (Income) -> Void
+        onUpdated: @escaping (Income) -> Void,
+        onDeleted: (() -> Void)? = nil,
+        isWorkspaceCurrent: @escaping () -> Bool = { true }
     ) {
         self.workspaceId = workspaceId
         self.categories = categories
         self.onUpdated = onUpdated
+        self.onDeleted = onDeleted
+        self.isWorkspaceCurrent = isWorkspaceCurrent
         _income = State(initialValue: income)
     }
 
@@ -288,9 +337,17 @@ struct IncomeDetailSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { showEditForm = true } label: {
-                        Image(systemName: "pencil")
-                            .foregroundStyle(Theme.accentText)
+                    HStack(spacing: 18) {
+                        Button { showEditForm = true } label: {
+                            Image(systemName: "pencil")
+                                .foregroundStyle(Theme.accentText)
+                        }
+                        if onDeleted != nil {
+                            Button(role: .destructive) { showDeleteConfirmation = true } label: {
+                                Image(systemName: "trash")
+                            }
+                            .disabled(isDeleting)
+                        }
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -301,6 +358,12 @@ struct IncomeDetailSheet: View {
             }
         }
         .transactionDetailSheetStyle()
+        .alert("Delete Income?", isPresented: $showDeleteConfirmation) {
+            Button("Delete", role: .destructive) { Task { await deleteIncome() } }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This income will be removed from the workspace.")
+        }
         .sheet(isPresented: $showEditForm) {
             IncomeFormSheet(
                 workspaceId: workspaceId,
@@ -325,9 +388,28 @@ struct IncomeDetailSheet: View {
                 method: "PATCH",
                 body: body
             )
+            guard isWorkspaceCurrent() else { return nil }
             return response.income
         } catch {
             return nil
+        }
+    }
+
+    @MainActor
+    private func deleteIncome() async {
+        guard !isDeleting, let onDeleted else { return }
+        isDeleting = true
+        defer { isDeleting = false }
+        do {
+            try await APIClient.shared.send(
+                Endpoints.incomeItem(workspaceId, income.id),
+                method: "DELETE"
+            )
+            guard isWorkspaceCurrent() else { return }
+            onDeleted()
+            dismiss()
+        } catch {
+            // Keep the detail sheet open so the user can retry after a failure.
         }
     }
 }
