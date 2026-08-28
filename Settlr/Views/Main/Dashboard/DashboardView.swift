@@ -162,6 +162,9 @@ private struct DashboardContent: View {
                 onTap: onOpenCategories
             )
 
+            SpendingBreakdownCard(summary: summary)
+                .padding(.horizontal, 20)
+
             RecentActivityPreview(summary: summary)
                 .padding(.horizontal, 20)
         }
@@ -350,7 +353,9 @@ private struct MonthPickerRow: View {
                     .contentTransition(.numericText())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Selected month")
+            .accessibilityLabel("Select month")
+            .accessibilityValue(displayMonth)
+            .accessibilityHint("Jump to the current month")
 
             Button { selectedMonth = offset(by: 1) } label: {
                 Image(systemName: "chevron.right")

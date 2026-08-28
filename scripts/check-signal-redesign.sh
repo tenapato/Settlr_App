@@ -77,3 +77,5 @@ grep -Fq 'SpendingInsights.build' Settlr/Views/Main/Dashboard/SpendingInsightsSt
 grep -Fq 'SignalTraceLoadingView' Settlr/Views/Main/Dashboard/DashboardView.swift
 grep -Fq 'SettlrPulseLoadingView' Settlr/Views/Main/Dashboard/DashboardView.swift
 grep -Fq 'lastUpdated' Settlr/ViewModels/DashboardVM.swift
+grep -Fq 'SpendingBreakdownCard(summary: summary)' Settlr/Views/Main/Dashboard/DashboardView.swift
+grep -Fq '.accessibilityValue(displayMonth)' Settlr/Views/Main/Dashboard/DashboardView.swift

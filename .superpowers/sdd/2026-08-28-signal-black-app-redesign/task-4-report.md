@@ -35,3 +35,22 @@ Per task instructions, `xcodebuild` and XCTest were not run.
 ## Scope notes
 
 Only Task 4 App source, test, script, project registration, and report files were changed. No Server files were touched, and the pre-existing untracked `.superpowers/brainstorm/` directory was not staged.
+
+## Fix Round 1 — composition strip and month accessibility
+
+- Restored the existing `SpendingBreakdownCard` composition strip beneath the preserved insight ticker. It continues to derive its data from `SummaryResponse.sortedCategories` and uses the existing adaptive `Theme` palette; ticker mechanics were not modified.
+- Added the visible `displayMonth` as the selected-month control's VoiceOver value while retaining a clear selection label.
+- Added structural guards for both dashboard wiring requirements.
+
+Fix Round 1 verification:
+
+```text
+DashboardSummary harness passed
+swiftc -parse (all changed Task 4 Swift files)   PASS
+bash scripts/check-signal-redesign.sh            PASS
+bash scripts/check-app-source-regressions.sh    PASS
+ruby scripts/test-testflight-workflow.rb         PASS
+git diff --check                                 PASS
+```
+
+Per task instructions, `xcodebuild` and XCTest were not run.
