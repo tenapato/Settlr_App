@@ -12,3 +12,6 @@ grep -Fq '.strokeBorder(Theme.line' Settlr/Views/Components/SectionCard.swift
 grep -Fq 'static let buttonInk' Settlr/Views/Components/DesignSystem.swift
 grep -Fq '.foregroundStyle(Theme.buttonInk)' Settlr/Views/Components/DesignSystem.swift
 grep -Fq 'presentation.isSelected ? Theme.accentText' Settlr/Views/Components/DesignSystem.swift
+grep -Fq 'case home, activity, savings, cards' Settlr/Views/Components/FloatingTabBar.swift
+grep -Fq 'struct QuickActionLauncher' Settlr/Views/Components/QuickActionLauncher.swift
+grep -Fq 'Scan and split' Settlr/Views/Components/QuickActionLauncher.swift

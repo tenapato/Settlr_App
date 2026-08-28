@@ -3,11 +3,11 @@ import SwiftUI
 struct MainTabView: View {
     @Environment(AppState.self) private var appState
     @State private var selectedTab: Tab = .home
-    @State private var cardsSegment: CardsCategoriesSegment = .cards
     @State private var activitySegment: ActivitySegment = .expenses
     // Held here, not in the leaf views, so the selected month survives navigation.
     @State private var expensesVM = ExpensesVM()
     @State private var incomeVM = IncomeVM()
+    @State private var savingsVM = SavingsVM()
     @State private var fabOpen = false
     @State private var showExpenseForm = false
     @State private var showIncomeForm = false
@@ -16,24 +16,25 @@ struct MainTabView: View {
     @State private var showSplitScan = false
     @State private var createdSplitId: String?
 
-    private let fabSpring = Animation.spring(response: 0.44, dampingFraction: 0.78)
-    private let fabCloseSpring = Animation.spring(response: 0.36, dampingFraction: 0.86)
-
     var body: some View {
         ZStack(alignment: .bottom) {
             tabContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            fabBackdrop
-
-            fabMenu
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                .padding(.trailing, 16)
-                .padding(.bottom, 16 + 58 + 14)
-
             bottomBar
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
+
+            if !quickActionItems.isEmpty {
+                QuickActionLauncher(
+                    items: quickActionItems,
+                    isOpen: fabOpen,
+                    onSetOpen: setFabOpen
+                )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                    .padding(.trailing, 16)
+                    .padding(.bottom, 16)
+            }
         }
         .background(Color(hex: "#0e0f11"))
         // A tab can disappear under the user: an admin turns a feature off and
@@ -58,32 +59,62 @@ struct MainTabView: View {
             )
             .onDisappear { createdSplitId = nil }
         }
-    }
-
-    private var fabBackdrop: some View {
-        Color.black
-            .opacity(fabOpen ? 0.55 : 0)
-            .ignoresSafeArea()
-            .allowsHitTesting(fabOpen)
-            .onTapGesture { setFabOpen(false) }
-            .animation(fabOpen ? fabSpring : fabCloseSpring, value: fabOpen)
-    }
-
-    private var fabMenu: some View {
-        actionItems
-            .opacity(fabOpen ? 1 : 0)
-            .scaleEffect(fabOpen ? 1 : 0.7, anchor: .bottomTrailing)
-            .offset(y: fabOpen ? 0 : 12)
-            .blur(radius: fabOpen ? 0 : 4)
-            .allowsHitTesting(fabOpen)
-            .accessibilityHidden(!fabOpen)
-            .animation(fabOpen ? fabSpring : fabCloseSpring, value: fabOpen)
+        // Activity's leaf views own these sheets while Activity is visible. The
+        // root presenters cover global quick actions opened from another tab.
+        .sheet(isPresented: rootExpenseFormPresentation) {
+            ExpenseFormSheet(workspaceId: appState.activeWorkspace?.id ?? "", categories: expensesVM.categories) { body in
+                Task { await expensesVM.create(workspaceId: appState.activeWorkspace?.id ?? "", body: body) }
+            }
+        }
+        .sheet(isPresented: rootIncomeFormPresentation) {
+            IncomeFormSheet(workspaceId: appState.activeWorkspace?.id ?? "", categories: incomeVM.categories) { body, repeatEvery in
+                Task {
+                    if let repeatEvery {
+                        _ = await incomeVM.createRecurring(
+                            workspaceId: appState.activeWorkspace?.id ?? "",
+                            body: CreateRecurringIncomeBody(
+                                amountCents: body.amountCents,
+                                description: body.description,
+                                frequency: repeatEvery.rawValue,
+                                startDate: body.occurredAt,
+                                categoryId: body.categoryId
+                            )
+                        )
+                    } else {
+                        await incomeVM.create(workspaceId: appState.activeWorkspace?.id ?? "", body: body)
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: rootSavingsFormPresentation) {
+            SavingsEntryFormSheet(
+                workspaceId: appState.activeWorkspace?.id ?? "",
+                accounts: savingsVM.accounts,
+                defaultAccountId: savingsVM.selectedAccountId,
+                onSave: { body in
+                    Task {
+                        await savingsVM.createEntry(workspaceId: appState.activeWorkspace?.id ?? "", body: body)
+                    }
+                }
+            )
+            .task { await savingsVM.load(workspaceId: appState.activeWorkspace?.id ?? "") }
+        }
     }
 
     private func setFabOpen(_ open: Bool) {
-        withAnimation(open ? fabSpring : fabCloseSpring) {
-            fabOpen = open
-        }
+        fabOpen = open
+    }
+
+    private var rootExpenseFormPresentation: Binding<Bool> {
+        Binding(get: { showExpenseForm && selectedTab != .activity }, set: { showExpenseForm = $0 })
+    }
+
+    private var rootIncomeFormPresentation: Binding<Bool> {
+        Binding(get: { showIncomeForm && selectedTab != .activity }, set: { showIncomeForm = $0 })
+    }
+
+    private var rootSavingsFormPresentation: Binding<Bool> {
+        Binding(get: { showSavingsForm && selectedTab != .savings }, set: { showSavingsForm = $0 })
     }
 
     // MARK: - Feature availability
@@ -99,65 +130,8 @@ struct MainTabView: View {
 
     // MARK: - Action items
 
-    /// One card, hairline dividers, a tinted glyph per row — the same surface
-    /// treatment as every other card in the app, rather than a bespoke widget.
-    /// Tiles-inside-a-card double-boxed each action and looked foreign here.
-    private var actionItems: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(quickActions.enumerated()), id: \.offset) { idx, action in
-                if idx > 0 {
-                    Rectangle()
-                        .fill(Color(hex: "#2a2d32"))
-                        .frame(height: 1)
-                        .padding(.leading, 56)
-                }
-                PaletteActionRow(
-                    label: action.label,
-                    icon: action.icon,
-                    color: action.color,
-                    index: idx,
-                    fabOpen: fabOpen,
-                    onTap: action.handler
-                )
-            }
-        }
-        .frame(width: 216)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(hex: "#15171a"))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1)
-                )
-                .shadow(color: .black.opacity(0.55), radius: 24, y: 10)
-        )
-    }
-
-    private var fabButton: some View {
-        Button { setFabOpen(!fabOpen) } label: {
-            fabIcon
-                .background(Circle().fill(fabOpen ? Color(hex: "#2a2d32") : Color(hex: "#c8ff5a")))
-                .shadow(
-                    color: (fabOpen ? Color.clear : Color(hex: "#c8ff5a")).opacity(0.3),
-                    radius: 16,
-                    y: 4
-                )
-        }
-        .buttonStyle(.plain)
-        .animation(fabOpen ? fabSpring : fabCloseSpring, value: fabOpen)
-    }
-
-    private struct QuickAction {
-        let label: String
-        /// One word, so labels don't collide along the arc.
-        let shortLabel: String
-        let icon: String
-        let color: Color
-        let handler: () -> Void
-    }
-
-    private var quickActions: [QuickAction] {
-        var actions: [QuickAction] = []
+    private var quickActionItems: [QuickActionItem] {
+        var actions: [QuickActionItem] = []
         // Bill splitting lives only here — it is a one-off action, not a place
         // you navigate to, so it stays out of the tab bar.
         if appState.currentUser?.has(.billSplits) ?? false {
@@ -166,9 +140,9 @@ struct MainTabView: View {
             // invisible until the user happens to go looking for it.
             let waiting = appState.currentUser.map { PendingSplitQueue.shared.pendingCount(userId: $0.id) } ?? 0
             actions.append(
-                QuickAction(
-                    label: waiting > 0 ? "Split a Bill (\(waiting) waiting)" : "Split a Bill",
-                    shortLabel: "Split", icon: "doc.viewfinder", color: Color(hex: "#c8ff5a")
+                QuickActionItem(
+                    id: "scan-and-split", title: "Scan and split", subtitle: waiting > 0 ? "(waiting) waiting" : "Scan a receipt",
+                    systemImage: "doc.viewfinder", role: .signature
                 ) {
                     setFabOpen(false)
                     Task {
@@ -184,27 +158,27 @@ struct MainTabView: View {
 
     /// One entry per Activity segment, so a segment the admin turned off can't
     /// leave behind a palette action that jumps to a tab which no longer shows it.
-    private var ledgerActions: [QuickAction] {
-        var actions: [QuickAction] = []
+    private var ledgerActions: [QuickActionItem] {
+        var actions: [QuickActionItem] = []
         let user = appState.currentUser
 
         if ActivitySegment.expenses.isAvailable(for: user) {
             actions.append(
-                QuickAction(label: "Add Expense", shortLabel: "Expense", icon: "arrow.up", color: Color(hex: "#ff6b6b")) {
+                QuickActionItem(id: "expense", title: "Expense", subtitle: "Add an expense", systemImage: "arrow.up", role: .standard) {
                     openLedgerForm(.expenses) { showExpenseForm = true }
                 }
             )
         }
         if ActivitySegment.income.isAvailable(for: user) {
             actions.append(
-                QuickAction(label: "Add Income", shortLabel: "Income", icon: "arrow.down", color: Color(hex: "#5ddf8a")) {
+                QuickActionItem(id: "income", title: "Income", subtitle: "Add income", systemImage: "arrow.down", role: .standard) {
                     openLedgerForm(.income) { showIncomeForm = true }
                 }
             )
         }
         if ActivitySegment.savings.isAvailable(for: user) {
             actions.append(
-                QuickAction(label: "Add Savings", shortLabel: "Savings", icon: "banknote", color: Color(hex: "#22c55e")) {
+                QuickActionItem(id: "savings", title: "Savings", subtitle: "Add savings", systemImage: "banknote", role: .standard) {
                     openLedgerForm(.savings) { showSavingsForm = true }
                 }
             )
@@ -212,11 +186,10 @@ struct MainTabView: View {
         return actions
     }
 
-    /// Closes the palette, switches to the right segment, then presents the form
-    /// once the close animation has cleared the screen.
+    /// Closes the palette and presents the form without changing the originating
+    /// tab. This keeps dismissal returning users to where they started.
     private func openLedgerForm(_ segment: ActivitySegment, present: @escaping () -> Void) {
         setFabOpen(false)
-        selectedTab = .activity
         activitySegment = segment
         Task {
             try? await Task.sleep(nanoseconds: 320_000_000)
@@ -243,7 +216,6 @@ struct MainTabView: View {
                 .glassEffect(.regular.interactive(), in: Capsule())
 
             // Nothing left to create — the palette would open onto an empty card.
-            if !quickActions.isEmpty { fabButton }
         }
     }
 
@@ -257,16 +229,7 @@ struct MainTabView: View {
                         .shadow(color: .black.opacity(0.4), radius: 20, y: 8)
                 )
 
-            if !quickActions.isEmpty { fabButton }
         }
-    }
-
-    private var fabIcon: some View {
-        Image(systemName: "plus")
-            .font(.system(size: 22, weight: .bold))
-            .foregroundStyle(fabOpen ? Color(hex: "#ecedee") : Color(hex: "#0e0f11"))
-            .rotationEffect(.degrees(fabOpen ? 45 : 0))
-            .frame(width: 58, height: 58)
     }
 
     // MARK: - Tab content
@@ -280,12 +243,24 @@ struct MainTabView: View {
                 // The insights ticker still makes sense without the Categories
                 // screen behind it, so it stays — only the jump goes away.
                 guard CardsCategoriesSegment.categories.isAvailable(for: appState.currentUser) else { return }
-                cardsSegment = .categories
                 selectedTab = .cards
             })
         case .activity:
+            activityTabContent(workspaceId: wsId)
+        case .savings:
+            SavingsView(workspaceId: wsId, showForm: $showSavingsForm, embedded: false)
+        case .cards:
+            CardsTabAdapter(workspaceId: wsId)
+        }
+    }
+
+    @ViewBuilder
+    private func activityTabContent(workspaceId: String) -> some View {
+        let user = appState.currentUser
+        if ActivitySegment.expenses.isAvailable(for: user)
+            || ActivitySegment.income.isAvailable(for: user) {
             ActivityView(
-                workspaceId: wsId,
+                workspaceId: workspaceId,
                 selectedSegment: $activitySegment,
                 showExpenseForm: $showExpenseForm,
                 showIncomeForm: $showIncomeForm,
@@ -293,66 +268,74 @@ struct MainTabView: View {
                 expensesVM: expensesVM,
                 incomeVM: incomeVM
             )
-        case .cards:
-            CardsAndCategoriesView(workspaceId: wsId, selectedSegment: $cardsSegment)
-        case .payments:
-            CardPaymentsView(workspaceId: wsId)
+        } else {
+            // Until Activity becomes the unified ledger, bill-splits-only users
+            // get the existing split list in the Activity tab.
+            SplitListView(workspaceId: workspaceId)
         }
     }
 }
 
-// MARK: - Palette row
+private enum CardsTabSection: String, CaseIterable {
+    case cards
+    case payments
 
-/// One action in the FAB palette. Glyph in a tinted disc, label beside it, the
-/// whole row tappable — matching the card rows used elsewhere in the app.
-private struct PaletteActionRow: View {
-    let label: String
-    let icon: String
-    let color: Color
-    let index: Int
-    let fabOpen: Bool
-    let onTap: () -> Void
+    var title: String { self == .cards ? "Cards" : "Payments" }
+}
 
-    @State private var pressed = false
+/// Temporary private adapter. Task 7 will replace this with the public
+/// `CardsRootView` while keeping payment endpoints behind both feature gates.
+private struct CardsTabAdapter: View {
+    let workspaceId: String
+    @Environment(AppState.self) private var appState
+    @State private var section: CardsTabSection = .cards
 
-    // Top row leads on open so the palette unrolls downward toward the thumb.
-    private var animation: Animation {
-        fabOpen
-            ? .spring(response: 0.34, dampingFraction: 0.78).delay(Double(index) * 0.03)
-            : .spring(response: 0.24, dampingFraction: 0.92)
+    private var availableSections: [CardsTabSection] {
+        var sections: [CardsTabSection] = [.cards]
+        if appState.currentUser?.has(.creditCards) == true,
+           appState.currentUser?.has(.cardPayments) == true {
+            sections.append(.payments)
+        }
+        return sections
     }
 
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(color.opacity(0.16))
-                        .frame(width: 30, height: 30)
-                    Image(systemName: icon)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(color)
+        NavigationStack {
+            VStack(spacing: 0) {
+                if availableSections.count > 1 {
+                    Picker("", selection: $section) {
+                        ForEach(availableSections, id: \.self) { item in
+                            Text(item.title).tag(item)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 8)
                 }
-                Text(label)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Color(hex: "#ecedee"))
-                    .lineLimit(1)
-                Spacer(minLength: 0)
+
+                Group {
+                    switch section {
+                    case .cards:
+                        CardsView(workspaceId: workspaceId, embedded: true)
+                    case .payments:
+                        if availableSections.contains(.payments) {
+                            CardPaymentsView(workspaceId: workspaceId)
+                        } else {
+                            CardsView(workspaceId: workspaceId, embedded: true)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .padding(.horizontal, 13)
-            .padding(.vertical, 11)
-            .background(pressed ? Color(hex: "#1c1f23") : .clear)
-            .contentShape(Rectangle())
+            .background(Theme.bg.ignoresSafeArea())
+            .navigationTitle(section.title)
+            .navigationBarTitleDisplayMode(.large)
         }
-        .buttonStyle(.plain)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in pressed = true }
-                .onEnded { _ in pressed = false }
-        )
-        .opacity(fabOpen ? 1 : 0)
-        .offset(y: fabOpen ? 0 : -6)
-        .animation(animation, value: fabOpen)
-        .accessibilityLabel(label)
+        .onAppear { reconcileSection() }
+        .onChange(of: availableSections) { _, _ in reconcileSection() }
+    }
+
+    private func reconcileSection() {
+        if !availableSections.contains(section) { section = .cards }
     }
 }

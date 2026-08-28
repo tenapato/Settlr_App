@@ -42,13 +42,16 @@ extension Tab {
         case .home:
             return true
         case .activity:
-            return !ActivitySegment.available(for: user).isEmpty
+            // Activity is a cross-feature ledger. Bill splits participate even
+            // while the legacy ActivitySegment model remains expense/income/
+            // savings-only until the unified ledger replaces it.
+            return user?.has(.expenses) == true
+                || user?.has(.income) == true
+                || user?.has(.billSplits) == true
+        case .savings:
+            return user?.has(.savings) ?? false
         case .cards:
-            return !CardsCategoriesSegment.available(for: user).isEmpty
-        case .payments:
-            // The card-payment routes carry `requireFeature` for both, so a user
-            // with only one of them would reach a screen that 403s on load.
-            return (user?.has(.cardPayments) ?? false) && (user?.has(.creditCards) ?? false)
+            return user?.has(.creditCards) ?? false
         }
     }
 }

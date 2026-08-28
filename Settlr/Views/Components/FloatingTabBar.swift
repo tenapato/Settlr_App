@@ -1,14 +1,14 @@
 import SwiftUI
 
 enum Tab: CaseIterable {
-    case home, activity, cards, payments
+    case home, activity, savings, cards
 
     var icon: String {
         switch self {
         case .home: return "house.fill"
         case .activity: return "arrow.up.arrow.down"
+        case .savings: return "banknote"
         case .cards: return "creditcard.fill"
-        case .payments: return "calendar"
         }
     }
 
@@ -16,8 +16,8 @@ enum Tab: CaseIterable {
         switch self {
         case .home: return "Home"
         case .activity: return "Activity"
+        case .savings: return "Savings"
         case .cards: return "Cards"
-        case .payments: return "Payments"
         }
     }
 }
