@@ -62,12 +62,17 @@ struct ExpenseFormSheet: View {
                     VStack(spacing: 20) {
                         HeroAmountField(amountText: $amountText, tint: Theme.expense, focus: $amountFocused)
 
-                        FormCard {
-                            FormTextRow(label: "Description", placeholder: "What was it for?", text: $description, focus: $descriptionFocused)
-                            FormRowDivider()
+                        VStack(spacing: 0) {
+                            SignalFormRow(label: "Description") {
+                                TextField("What was it for?", text: $description)
+                                    .focused($descriptionFocused)
+                                    .autocorrectionDisabled()
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(Theme.ink)
+                                    .multilineTextAlignment(.trailing)
+                            }
                             dateRow
                             if !expenseCategories.isEmpty {
-                                FormRowDivider()
                                 categoryRow
                             }
                         }
@@ -108,7 +113,6 @@ struct ExpenseFormSheet: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
         .task { await loadCreditCards() }
         .onAppear { if !isEditing { amountFocused = true } }
         .onChange(of: paymentChannel) { _, newValue in
@@ -123,25 +127,31 @@ struct ExpenseFormSheet: View {
     // MARK: - Rows
 
     private var dateRow: some View {
-        HStack(spacing: 12) {
-            Text("Date")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Theme.muted)
-            Spacer()
+        SignalFormRow(label: "Date") {
             DatePicker("", selection: $selectedDate, displayedComponents: .date)
                 .labelsHidden()
                 .datePickerStyle(.compact)
                 .tint(Theme.accent)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 9)
     }
 
     private var categoryRow: some View {
-        FormMenuRow(label: "Category", value: categoryValueLabel, isPlaceholder: selectedCategoryId == nil) {
-            Button("No category") { selectedCategoryId = nil }
-            ForEach(expenseCategories) { cat in
-                Button(cat.name) { selectedCategoryId = cat.id }
+        SignalFormRow(label: "Category") {
+            Menu {
+                Button("No category") { selectedCategoryId = nil }
+                ForEach(expenseCategories) { cat in
+                    Button(cat.name) { selectedCategoryId = cat.id }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Text(categoryValueLabel)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(selectedCategoryId == nil ? Theme.faint : Theme.ink)
+                        .lineLimit(1)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.faint)
+                }
             }
         }
     }
@@ -174,10 +184,20 @@ struct ExpenseFormSheet: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 4)
             } else {
-                FormCard {
-                    FormMenuRow(label: "Card", value: cardValueLabel, isPlaceholder: selectedCreditCardId == nil) {
+                SignalFormRow(label: "Card") {
+                    Menu {
                         ForEach(creditCards) { card in
                             Button(cardOptionLabel(card)) { selectedCreditCardId = card.id }
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text(cardValueLabel)
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(selectedCreditCardId == nil ? Theme.faint : Theme.ink)
+                                .lineLimit(1)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(Theme.faint)
                         }
                     }
                 }

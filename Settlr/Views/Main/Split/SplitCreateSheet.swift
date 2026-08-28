@@ -108,14 +108,15 @@ struct SplitCreateSheet: View {
                 ScrollView {
                     VStack(spacing: 20) {
                         scanBanner
-                        FormCard {
-                            FormTextRow(
-                                label: "Where",
-                                placeholder: "Restaurant or store",
-                                text: $draft.merchant,
-                                focus: $merchantFocused
-                            )
-                            FormRowDivider()
+                        VStack(spacing: 0) {
+                            SignalFormRow(label: "Where") {
+                                TextField("Restaurant or store", text: $draft.merchant)
+                                    .focused($merchantFocused)
+                                    .autocorrectionDisabled()
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(Theme.ink)
+                                    .multilineTextAlignment(.trailing)
+                            }
                             dateRow
                         }
                         splitModeSection
@@ -215,7 +216,6 @@ struct SplitCreateSheet: View {
                 Text(claimChangeMessage)
             }
         }
-        .preferredColorScheme(.dark)
         .task { await loadCards() }
         .onAppear { applyInitialDraftOnce() }
         .onDisappear { photoRecovery.clear() }
@@ -936,13 +936,19 @@ struct SplitCreateSheet: View {
                 ]
             )
             if draft.paymentChannel == "credit_card" {
-                FormCard {
-                    FormMenuRow(
-                        label: "Card",
-                        value: creditCards.first { $0.id == draft.creditCardId }?.label ?? "Select"
-                    ) {
+                SignalFormRow(label: "Card") {
+                    Menu {
                         ForEach(creditCards) { card in
                             Button(card.label) { draft.creditCardId = card.id }
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text(creditCards.first { $0.id == draft.creditCardId }?.label ?? "Select")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(draft.creditCardId == nil ? Theme.faint : Theme.ink)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(Theme.faint)
                         }
                     }
                 }
@@ -958,7 +964,6 @@ struct SplitCreateSheet: View {
             Spacer()
             DatePicker("", selection: $draft.occurredAt, displayedComponents: .date)
                 .labelsHidden()
-                .colorScheme(.dark)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)

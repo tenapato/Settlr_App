@@ -22,3 +22,11 @@ grep -Fq 'await expensesVM.loadCategories' Settlr/Views/Main/MainTabView.swift
 grep -Fq 'await incomeVM.loadCategories' Settlr/Views/Main/MainTabView.swift
 grep -Fq '.background(Theme.bg)' Settlr/Views/Main/MainTabView.swift
 grep -Fq 'Theme.accentText : Theme.muted' Settlr/Views/Components/FloatingTabBar.swift
+
+# Task 3: Signal amount forms and reusable border-light rows.
+grep -Fq 'struct SignalFormRow' Settlr/Views/Components/FormControls.swift
+grep -Fq '.monospacedDigit()' Settlr/Views/Components/FormControls.swift
+grep -Fq 'accessibilityLabel("Amount in Mexican pesos")' Settlr/Views/Components/FormControls.swift
+grep -Fq 'SignalFormRow' Settlr/Views/Main/Expenses/ExpenseFormSheet.swift
+grep -Fq 'SignalFormRow' Settlr/Views/Main/Income/IncomeFormSheet.swift
+grep -Fq 'SignalFormRow' Settlr/Views/Main/Savings/SavingsEntryFormSheet.swift

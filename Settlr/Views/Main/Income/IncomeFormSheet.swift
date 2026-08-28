@@ -59,30 +59,40 @@ struct IncomeFormSheet: View {
                     VStack(spacing: 20) {
                         HeroAmountField(amountText: $amountText, tint: Theme.income, focus: $amountFocused)
 
-                        FormCard {
-                            FormTextRow(label: "Description", placeholder: "Where from?", text: $description, focus: $descriptionFocused)
-                            FormRowDivider()
+                        VStack(spacing: 0) {
+                            SignalFormRow(label: "Description") {
+                                TextField("Where from?", text: $description)
+                                    .focused($descriptionFocused)
+                                    .autocorrectionDisabled()
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(Theme.ink)
+                                    .multilineTextAlignment(.trailing)
+                            }
                             dateRow
                             if !incomeCategories.isEmpty {
-                                FormRowDivider()
                                 categoryRow
                             }
                             if !isEditing {
-                                FormRowDivider()
                                 FormToggleRow(
                                     label: "Repeat",
                                     caption: "Adds this automatically from the date above.",
                                     isOn: $repeats
                                 )
                                 if repeats {
-                                    FormRowDivider()
-                                    FormMenuRow(
-                                        label: "Repeats",
-                                        value: frequency.label,
-                                        isPlaceholder: false
-                                    ) {
-                                        ForEach(RecurrenceFrequency.allCases, id: \.self) { option in
-                                            Button(option.label) { frequency = option }
+                                    SignalFormRow(label: "Repeats") {
+                                        Menu {
+                                            ForEach(RecurrenceFrequency.allCases, id: \.self) { option in
+                                                Button(option.label) { frequency = option }
+                                            }
+                                        } label: {
+                                            HStack(spacing: 8) {
+                                                Text(frequency.label)
+                                                    .font(.system(size: 15, weight: .medium))
+                                                    .foregroundStyle(Theme.ink)
+                                                Image(systemName: "chevron.up.chevron.down")
+                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .foregroundStyle(Theme.faint)
+                                            }
                                         }
                                     }
                                 }
@@ -122,32 +132,37 @@ struct IncomeFormSheet: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
         .onAppear { if !isEditing { amountFocused = true } }
     }
 
     // MARK: - Rows
 
     private var dateRow: some View {
-        HStack(spacing: 12) {
-            Text("Date")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Theme.muted)
-            Spacer()
+        SignalFormRow(label: "Date") {
             DatePicker("", selection: $selectedDate, displayedComponents: .date)
                 .labelsHidden()
                 .datePickerStyle(.compact)
                 .tint(Theme.accent)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 9)
     }
 
     private var categoryRow: some View {
-        FormMenuRow(label: "Category", value: categoryValueLabel, isPlaceholder: selectedCategoryId == nil) {
-            Button("No category") { selectedCategoryId = nil }
-            ForEach(incomeCategories) { cat in
-                Button(cat.name) { selectedCategoryId = cat.id }
+        SignalFormRow(label: "Category") {
+            Menu {
+                Button("No category") { selectedCategoryId = nil }
+                ForEach(incomeCategories) { cat in
+                    Button(cat.name) { selectedCategoryId = cat.id }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Text(categoryValueLabel)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(selectedCategoryId == nil ? Theme.faint : Theme.ink)
+                        .lineLimit(1)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.faint)
+                }
             }
         }
     }

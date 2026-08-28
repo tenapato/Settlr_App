@@ -116,7 +116,7 @@ struct CardPaymentsView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(hex: "#0e0f11").ignoresSafeArea()
+                Theme.bg.ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     MonthSelectorBar(selectedMonth: $vm.month) {
@@ -140,7 +140,6 @@ struct CardPaymentsView: View {
             .navigationTitle("Payments")
             .navigationBarTitleDisplayMode(.large)
         }
-        .preferredColorScheme(.dark)
         .task { await vm.load(workspaceId: workspaceId) }
     }
 
@@ -156,7 +155,7 @@ struct CardPaymentsView: View {
     private var content: some View {
         if vm.isLoading {
             ProgressView()
-                .tint(Color(hex: "#c8ff5a"))
+                .tint(Theme.accent)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let err = vm.errorMessage, vm.visibleCards.isEmpty {
             PaymentsErrorView(message: err) {
@@ -182,7 +181,7 @@ struct CardPaymentsView: View {
                 if let err = vm.errorMessage {
                     Text(err)
                         .font(.system(size: 13))
-                        .foregroundStyle(Color(hex: "#ff6b6b"))
+                        .foregroundStyle(Theme.expense)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 20)
                 }
@@ -195,7 +194,7 @@ struct CardPaymentsView: View {
                 if let window = vm.activeWindow {
                     Text("Payment dates \(window.startDay)–\(window.endDay) · \(monthLabel(window.monthKey)). Cards without a cutoff or payment day are hidden.")
                         .font(.system(size: 11))
-                        .foregroundStyle(Color(hex: "#5a5d63"))
+                        .foregroundStyle(Theme.faint)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 20)
                 }
@@ -260,15 +259,15 @@ private struct FortnightFilterBar: View {
                     Image(systemName: "chevron.down")
                         .font(.system(size: 9, weight: .bold))
                 }
-                .foregroundStyle(selected == .all ? Color(hex: "#8e9197") : Color(hex: "#c8ff5a"))
+                .foregroundStyle(selected == .all ? Theme.muted : Theme.accent)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(
                     Capsule()
-                        .fill(Color(hex: "#15171a"))
+                        .fill(Theme.surface)
                         .overlay(
                             Capsule().strokeBorder(
-                                selected == .all ? Color(hex: "#2a2d32") : Color(hex: "#c8ff5a").opacity(0.4),
+                                selected == .all ? Theme.line : Theme.accent.opacity(0.4),
                                 lineWidth: 1
                             )
                         )
@@ -293,7 +292,7 @@ private struct MonthSelectorBar: View {
         HStack {
             Button { change(by: -1) } label: {
                 Image(systemName: "chevron.left")
-                    .foregroundStyle(Color(hex: "#8e9197"))
+                    .foregroundStyle(Theme.muted)
             }
             Spacer()
             Button {
@@ -303,7 +302,7 @@ private struct MonthSelectorBar: View {
             } label: {
                 Text(displayLabel)
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#ecedee"))
+                    .foregroundStyle(Theme.ink)
                     .contentTransition(.numericText())
                     .animation(.snappy(duration: 0.2), value: selectedMonth)
             }
@@ -311,7 +310,7 @@ private struct MonthSelectorBar: View {
             Spacer()
             Button { change(by: 1) } label: {
                 Image(systemName: "chevron.right")
-                    .foregroundStyle(Color(hex: "#8e9197"))
+                    .foregroundStyle(Theme.muted)
             }
         }
         .padding(.vertical, 12)
@@ -344,23 +343,23 @@ private struct TotalsStrip: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            totalCell(label: "To pay", cents: totals.totalPaymentDueCents, color: Color(hex: "#ff6b6b"))
+            totalCell(label: "To pay", cents: totals.totalPaymentDueCents, color: Theme.expense)
             divider
-            totalCell(label: "Recorded", cents: totals.totalPaymentsRecordedCents, color: Color(hex: "#ecedee"))
+            totalCell(label: "Recorded", cents: totals.totalPaymentsRecordedCents, color: Theme.ink)
             divider
-            totalCell(label: "Still owed", cents: totals.remainingDueCents, color: Color(hex: "#ffb547"))
+            totalCell(label: "Still owed", cents: totals.remainingDueCents, color: Theme.warning)
         }
         .padding(.vertical, 14)
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(Color(hex: "#15171a"))
-                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1))
+                .fill(Theme.surface)
+                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Theme.line, lineWidth: 1))
         )
     }
 
     private var divider: some View {
         Rectangle()
-            .fill(Color(hex: "#2a2d32"))
+            .fill(Theme.line)
             .frame(width: 1, height: 32)
     }
 
@@ -368,7 +367,7 @@ private struct TotalsStrip: View {
         VStack(spacing: 4) {
             Text(label)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Color(hex: "#8e9197"))
+                .foregroundStyle(Theme.muted)
                 .tracking(0.5).textCase(.uppercase)
             AmountLabel(cents: cents, font: .system(size: 14, weight: .semibold))
                 .foregroundStyle(color)
@@ -392,10 +391,10 @@ private struct CardPaymentTile: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(row.label)
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Color(hex: "#ecedee"))
+                        .foregroundStyle(Theme.ink)
                     Text(maskedNumber)
                         .font(.system(size: 12, design: .monospaced))
-                        .foregroundStyle(Color(hex: "#5a5d63"))
+                        .foregroundStyle(Theme.faint)
                 }
                 Spacer()
                 statusTag
@@ -405,14 +404,14 @@ private struct CardPaymentTile: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("To pay")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color(hex: "#8e9197"))
+                        .foregroundStyle(Theme.muted)
                         .tracking(0.5).textCase(.uppercase)
                     AmountLabel(cents: row.paymentDueCents, font: .system(size: 22, weight: .bold))
-                        .foregroundStyle(Color(hex: "#ecedee"))
+                        .foregroundStyle(Theme.ink)
                     if row.dueSource == "override" {
                         Text("Statement override · spend \(moneyString(row.spentCents))")
                             .font(.system(size: 11))
-                            .foregroundStyle(Color(hex: "#5a5d63"))
+                            .foregroundStyle(Theme.faint)
                     }
                 }
                 Spacer()
@@ -420,11 +419,11 @@ private struct CardPaymentTile: View {
                     VStack(alignment: .trailing, spacing: 3) {
                         Text("Due")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#8e9197"))
+                            .foregroundStyle(Theme.muted)
                             .tracking(0.5).textCase(.uppercase)
                         Text(due)
                             .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(Color(hex: "#c8ff5a"))
+                            .foregroundStyle(Theme.accent)
                     }
                 }
             }
@@ -436,7 +435,7 @@ private struct CardPaymentTile: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Usage")
                             .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#8e9197"))
+                            .foregroundStyle(Theme.muted)
                             .tracking(0.5).textCase(.uppercase)
                         Text(String(format: pct.truncatingRemainder(dividingBy: 1) == 0 ? "%.0f%%" : "%.1f%%", pct))
                             .font(.system(size: 13, weight: .semibold, design: .monospaced))
@@ -452,18 +451,18 @@ private struct CardPaymentTile: View {
                 Group {
                     if busy {
                         ProgressView()
-                            .tint(row.paidInFull ? Color(hex: "#ecedee") : Color(hex: "#0e0f11"))
+                            .tint(row.paidInFull ? Theme.ink : Theme.buttonInk)
                     } else {
                         Text(row.paidInFull ? "Undo — mark open" : "Mark as paid")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(row.paidInFull ? Color(hex: "#8e9197") : Color(hex: "#0e0f11"))
+                            .foregroundStyle(row.paidInFull ? Theme.muted : Theme.buttonInk)
                     }
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
                 .background(
                     RoundedRectangle(cornerRadius: 11)
-                        .fill(row.paidInFull ? Color(hex: "#1c1f23") : Color(hex: "#c8ff5a"))
+                        .fill(row.paidInFull ? Theme.surface2 : Theme.accent)
                 )
             }
             .buttonStyle(.plain)
@@ -473,11 +472,11 @@ private struct CardPaymentTile: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color(hex: "#15171a"))
+                .fill(Theme.surface)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
                         .strokeBorder(
-                            row.paidInFull ? Color(hex: "#5ddf8a").opacity(0.35) : Color(hex: "#2a2d32"),
+                            row.paidInFull ? Theme.income.opacity(0.35) : Theme.line,
                             lineWidth: 1
                         )
                 )
@@ -493,22 +492,22 @@ private struct CardPaymentTile: View {
         Text(row.paidInFull ? "PAID" : "OPEN")
             .font(.system(size: 10, weight: .bold))
             .tracking(1)
-            .foregroundStyle(row.paidInFull ? Color(hex: "#5ddf8a") : Color(hex: "#ffb547"))
+            .foregroundStyle(row.paidInFull ? Theme.income : Theme.warning)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .background(
                 Capsule().fill(
-                    (row.paidInFull ? Color(hex: "#5ddf8a") : Color(hex: "#ffb547")).opacity(0.14)
+                    (row.paidInFull ? Theme.income : Theme.warning).opacity(0.14)
                 )
             )
     }
 
     private var utilizationColor: Color {
         switch row.utilizationStatus {
-        case "over_limit": return Color(hex: "#ff6b6b")
-        case "warning": return Color(hex: "#ffb547")
-        case "ok": return Color(hex: "#5ddf8a")
-        default: return Color(hex: "#8e9197")
+        case "over_limit": return Theme.expense
+        case "warning": return Theme.warning
+        case "ok": return Theme.income
+        default: return Theme.muted
         }
     }
 
@@ -537,15 +536,15 @@ private struct CardPaymentTile: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(Color(hex: "#8e9197"))
+                .foregroundStyle(Theme.muted)
                 .tracking(0.5).textCase(.uppercase)
             if let cents {
                 AmountLabel(cents: cents, font: .system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#ecedee"))
+                    .foregroundStyle(Theme.ink)
             } else {
                 Text("—")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#5a5d63"))
+                    .foregroundStyle(Theme.faint)
             }
         }
     }
@@ -567,14 +566,14 @@ private struct PaymentsEmptyView: View {
         VStack(spacing: 20) {
             Image(systemName: "creditcard")
                 .font(.system(size: 48))
-                .foregroundStyle(Color(hex: "#5a5d63"))
+                .foregroundStyle(Theme.faint)
             VStack(spacing: 8) {
                 Text("No cards to pay")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#ecedee"))
+                    .foregroundStyle(Theme.ink)
                 Text("Add credit cards in the Cards tab to track payments here")
                     .font(.system(size: 14))
-                    .foregroundStyle(Color(hex: "#8e9197"))
+                    .foregroundStyle(Theme.muted)
                     .multilineTextAlignment(.center)
             }
         }
@@ -591,22 +590,22 @@ private struct FortnightEmptyView: View {
         VStack(spacing: 20) {
             Image(systemName: "calendar.badge.exclamationmark")
                 .font(.system(size: 48))
-                .foregroundStyle(Color(hex: "#5a5d63"))
+                .foregroundStyle(Theme.faint)
             VStack(spacing: 8) {
                 Text("No cards in this fortnight")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#ecedee"))
+                    .foregroundStyle(Theme.ink)
                 Text("No card has a payment date in \(windowLabel.lowercased()). Cards without a cutoff or payment day are hidden.")
                     .font(.system(size: 14))
-                    .foregroundStyle(Color(hex: "#8e9197"))
+                    .foregroundStyle(Theme.muted)
                     .multilineTextAlignment(.center)
             }
             Button(action: onShowAll) {
                 Text("Show all cards")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#0e0f11"))
+                    .foregroundStyle(Theme.buttonInk)
                     .padding(.horizontal, 28).padding(.vertical, 12)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: "#c8ff5a")))
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Theme.accent))
             }
         }
         .padding(.horizontal, 32)
@@ -621,13 +620,13 @@ private struct PaymentsErrorView: View {
         VStack(spacing: 14) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 32))
-                .foregroundStyle(Color(hex: "#ffb547"))
+                .foregroundStyle(Theme.warning)
             Text(message)
                 .font(.system(size: 14))
-                .foregroundStyle(Color(hex: "#8e9197"))
+                .foregroundStyle(Theme.muted)
                 .multilineTextAlignment(.center)
             Button("Retry", action: onRetry)
-                .foregroundStyle(Color(hex: "#c8ff5a"))
+                .foregroundStyle(Theme.accent)
                 .font(.system(size: 15, weight: .semibold))
         }
         .padding(.horizontal, 32)

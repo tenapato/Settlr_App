@@ -7,36 +7,111 @@ struct HeroAmountField: View {
     @Binding var amountText: String
     var tint: Color
     var focus: FocusState<Bool>.Binding
+    var errorMessage: String? = nil
+    var currencyCode: String = "MXN"
 
     var body: some View {
-        VStack(spacing: 10) {
-            SectionEyebrow("MXN", color: Theme.faint)
+        VStack(spacing: 8) {
+            SectionEyebrow(currencyCode, color: Theme.faint)
 
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text("$")
                     .font(.system(size: 30, weight: .semibold, design: .rounded))
-                    .foregroundStyle(tint.opacity(0.55))
+                    .foregroundStyle(tint)
 
-                TextField("0.00", text: $amountText)
+                TextField(text: $amountText, prompt: Text("0.00").foregroundStyle(Theme.faint))
                     .focused(focus)
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.center)
                     .font(.system(size: 46, weight: .bold, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(tint)
-                    .tint(tint)
+                    .foregroundStyle(amountText.isEmpty ? Theme.faint : Theme.ink)
+                    .tint(Theme.accent)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.45)
                     .fixedSize(horizontal: true, vertical: false)
             }
 
             Rectangle()
-                .fill(Theme.line)
-                .frame(width: 130, height: 1)
+                .fill(focus.wrappedValue ? Theme.accent : Theme.line)
+                .frame(maxWidth: 180, minHeight: 1, maxHeight: 1)
+
+            if let errorMessage, !errorMessage.isEmpty {
+                Text(errorMessage)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Theme.expense)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .multilineTextAlignment(.center)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
+        .frame(minHeight: 100)
         .contentShape(Rectangle())
         .onTapGesture { focus.wrappedValue = true }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Amount in Mexican pesos")
+        .accessibilityValue(amountText.isEmpty ? "No amount entered" : currencyCode + " " + amountText)
+    }
+}
+
+// MARK: - Signal form rows
+
+/// Border-light, full-width form row used beneath a hero amount field.
+/// The row keeps the trailing native control intact while making the complete
+/// row tappable when a caller supplies an action.
+struct SignalFormRow<Trailing: View>: View {
+    let label: String
+    let action: (() -> Void)?
+    private let trailing: Trailing
+
+    init(
+        label: String,
+        action: (() -> Void)? = nil,
+        @ViewBuilder trailing: () -> Trailing
+    ) {
+        self.label = label
+        self.action = action
+        self.trailing = trailing()
+    }
+
+    var body: some View {
+        Group {
+            if let action {
+                Button(action: action) { rowContent }
+                    .buttonStyle(.plain)
+            } else {
+                rowContent
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Theme.line)
+                .frame(height: 1)
+        }
+    }
+
+    private var rowContent: some View {
+        HStack(spacing: 12) {
+            Text(label)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Theme.muted)
+                .layoutPriority(1)
+
+            Spacer(minLength: 16)
+            trailing
+
+            if action != nil {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.faint)
+                    .accessibilityHidden(true)
+            }
+        }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
     }
 }
 

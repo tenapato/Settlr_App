@@ -87,7 +87,6 @@ struct SavingsRecurringSheet: View {
             }
             .animation(.easeOut(duration: 0.2), value: ruleToDelete != nil)
         }
-        .preferredColorScheme(.dark)
     }
 
     private var emptyState: some View {
@@ -269,21 +268,25 @@ struct SavingsRecurringFormSheet: View {
                     VStack(spacing: 20) {
                         HeroAmountField(amountText: $amountText, tint: Theme.income, focus: $amountFocused)
 
-                        FormCard {
-                            FormTextRow(
-                                label: "Description",
-                                placeholder: "CETES, payday save…",
-                                text: $description,
-                                focus: $descriptionFocused
-                            )
-                            FormRowDivider()
+                        VStack(spacing: 0) {
+                            SignalFormRow(label: "Description") {
+                                TextField("CETES, payday save…", text: $description)
+                                    .focused($descriptionFocused)
+                                    .autocorrectionDisabled()
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(Theme.ink)
+                                    .multilineTextAlignment(.trailing)
+                            }
                             accountRow
-                            FormRowDivider()
                             frequencyRow
-                            FormRowDivider()
                             startDateRow
-                            FormRowDivider()
-                            FormTextRow(label: "Notes", placeholder: "Optional", text: $notes)
+                            SignalFormRow(label: "Notes") {
+                                TextField("Optional", text: $notes)
+                                    .autocorrectionDisabled()
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(Theme.ink)
+                                    .multilineTextAlignment(.trailing)
+                            }
                         }
 
                         Text("Deposits are created automatically from the start date onward, including occurrences already due.")
@@ -326,45 +329,56 @@ struct SavingsRecurringFormSheet: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
         .onAppear { if !isEditing { amountFocused = true } }
     }
 
     // MARK: - Sections
 
     private var accountRow: some View {
-        FormMenuRow(
-            label: "Account",
-            value: accounts.first(where: { $0.id == accountId })?.name ?? "Select",
-            isPlaceholder: accountId.isEmpty
-        ) {
-            ForEach(accounts) { account in
-                Button(account.name) { accountId = account.id }
+        SignalFormRow(label: "Account") {
+            Menu {
+                ForEach(accounts) { account in
+                    Button(account.name) { accountId = account.id }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Text(accounts.first(where: { $0.id == accountId })?.name ?? "Select")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(accountId.isEmpty ? Theme.faint : Theme.ink)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.faint)
+                }
             }
         }
     }
 
     private var frequencyRow: some View {
-        FormMenuRow(label: "Repeats", value: frequency.label, isPlaceholder: false) {
-            ForEach(SavingsFrequency.allCases, id: \.self) { option in
-                Button(option.label) { frequency = option }
+        SignalFormRow(label: "Repeats") {
+            Menu {
+                ForEach(SavingsFrequency.allCases, id: \.self) { option in
+                    Button(option.label) { frequency = option }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Text(frequency.label)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Theme.ink)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.faint)
+                }
             }
         }
     }
 
     private var startDateRow: some View {
-        HStack(spacing: 12) {
-            Text("Starts")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Theme.muted)
-            Spacer()
+        SignalFormRow(label: "Starts") {
             DatePicker("", selection: $startDate, displayedComponents: .date)
                 .labelsHidden()
                 .datePickerStyle(.compact)
                 .tint(Theme.accent)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 9)
     }
 
     // MARK: - Derived
