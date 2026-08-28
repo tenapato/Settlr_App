@@ -64,7 +64,12 @@ struct SavingsEntryFormSheet: View {
                     VStack(spacing: 20) {
                         directionToggle
 
-                        HeroAmountField(amountText: $amountText, tint: tint, focus: $amountFocused)
+                        HeroAmountField(
+                            amountText: $amountText,
+                            tint: tint,
+                            focus: $amountFocused,
+                            errorMessage: errorMessage
+                        )
 
                         VStack(spacing: 0) {
                             SignalFormRow(label: "Description") {
@@ -87,13 +92,6 @@ struct SavingsEntryFormSheet: View {
                                     .foregroundStyle(Theme.ink)
                                     .multilineTextAlignment(.trailing)
                             }
-                        }
-
-                        if let error = errorMessage {
-                            Text(error)
-                                .font(.system(size: 13))
-                                .foregroundStyle(Theme.expense)
-                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
                         Button(isEditing ? "Save Changes" : (direction == "deposit" ? "Add Deposit" : "Add Withdrawal")) {
@@ -119,7 +117,7 @@ struct SavingsEntryFormSheet: View {
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button("Done") { amountFocused = false; descriptionFocused = false }
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.accentText)
                         .fontWeight(.semibold)
                 }
             }
@@ -140,13 +138,17 @@ struct SavingsEntryFormSheet: View {
     }
 
     private var accountRow: some View {
-        SignalFormRow(label: "Account") {
+        SignalNativeFormRow {
             Menu {
                 ForEach(accounts) { account in
                     Button(account.name) { accountId = account.id }
                 }
             } label: {
                 HStack(spacing: 8) {
+                    Text("Account")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Theme.muted)
+                    Spacer(minLength: 16)
                     Text(accountValueLabel)
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(accountId.isEmpty ? Theme.faint : Theme.ink)
@@ -159,9 +161,8 @@ struct SavingsEntryFormSheet: View {
     }
 
     private var dateRow: some View {
-        SignalFormRow(label: "Date") {
-            DatePicker("", selection: $selectedDate, displayedComponents: .date)
-                .labelsHidden()
+        SignalNativeFormRow {
+            DatePicker("Date", selection: $selectedDate, displayedComponents: .date)
                 .datePickerStyle(.compact)
                 .tint(Theme.accent)
         }

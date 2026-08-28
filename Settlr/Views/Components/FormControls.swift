@@ -29,8 +29,9 @@ struct HeroAmountField: View {
                     .tint(Theme.accent)
                     .lineLimit(1)
                     .minimumScaleFactor(0.45)
-                    .fixedSize(horizontal: true, vertical: false)
+                    .frame(maxWidth: .infinity)
             }
+            .frame(maxWidth: 320)
 
             Rectangle()
                 .fill(focus.wrappedValue ? Theme.accent : Theme.line)
@@ -112,6 +113,29 @@ struct SignalFormRow<Trailing: View>: View {
         .padding(.horizontal, 4)
         .padding(.vertical, 8)
         .contentShape(Rectangle())
+    }
+}
+
+/// A row whose native picker/menu owns the complete hit region. Use this for
+/// controls that must remain native rather than wrapping them in an inert row
+/// action (which would steal focus from the control).
+struct SignalNativeFormRow<Control: View>: View {
+    private let control: Control
+
+    init(@ViewBuilder control: () -> Control) {
+        self.control = control()
+    }
+
+    var body: some View {
+        control
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+            .accessibilityElement(children: .contain)
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(Theme.line)
+                    .frame(height: 1)
+            }
     }
 }
 

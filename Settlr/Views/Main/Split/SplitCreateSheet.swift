@@ -49,6 +49,7 @@ struct SplitCreateSheet: View {
     /// Every numeric field on the sheet. The decimal pad has no return key, so
     /// tracking focus is the only way to give the user a way out of it.
     @FocusState private var focusedField: Field?
+    @FocusState private var totalAmountFocused: Bool
 
     /// Item rows come and go, so they key off the row's identity, not an index.
     private enum Field: Hashable {
@@ -70,6 +71,7 @@ struct SplitCreateSheet: View {
     private var isEvenSplit: Bool { draft.splitMode == "even" }
     private var isEditing: Bool { editingSplit != nil }
     private var headcount: Int { draft.participants.count }
+    private var canUseCreditCards: Bool { appState.currentUser?.has(.creditCards) == true }
 
     private var submissionDraft: SplitDraft {
         var result = draft
@@ -162,13 +164,13 @@ struct SplitCreateSheet: View {
                     // "Create" would be a promise this can't keep at a table.
                     Button(saveButtonTitle) { save() }
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(canSave ? Theme.accent : Theme.faint)
+                        .foregroundStyle(canSave ? Theme.accentText : Theme.faint)
                         .disabled(!canSave || isSubmitting)
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button("Done") { dismissKeyboard() }
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.accentText)
                         .fontWeight(.semibold)
                 }
             }
@@ -216,7 +218,9 @@ struct SplitCreateSheet: View {
                 Text(claimChangeMessage)
             }
         }
-        .task { await loadCards() }
+        .task {
+            if canUseCreditCards { await loadCards() }
+        }
         .onAppear { applyInitialDraftOnce() }
         .onDisappear { photoRecovery.clear() }
     }
@@ -272,7 +276,7 @@ struct SplitCreateSheet: View {
                     showReceiptSettings = true
                 }
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Theme.accent)
+                .foregroundStyle(Theme.accentText)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
@@ -424,7 +428,7 @@ struct SplitCreateSheet: View {
                     Spacer()
                     Text("\(headcount)")
                         .font(.system(size: 17, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.accentText)
                         .frame(minWidth: 32, alignment: .trailing)
                     Stepper("", value: headcountBinding, in: 1...50)
                         .labelsHidden()
@@ -441,7 +445,7 @@ struct SplitCreateSheet: View {
                         Spacer()
                         Text(formatSplitMoney(evenShareCents))
                             .font(.system(size: 20, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(Theme.accent)
+                            .foregroundStyle(Theme.accentText)
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 12)
@@ -581,7 +585,7 @@ struct SplitCreateSheet: View {
             } label: {
                 Label("Add item", systemImage: "plus")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(Theme.accentText)
             }
             .padding(.leading, 4)
         }
@@ -684,6 +688,13 @@ struct SplitCreateSheet: View {
     private var extrasSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionEyebrow("Tax, tip & total")
+            if isEvenSplit || totalEdited {
+                HeroAmountField(
+                    amountText: totalAmountBinding,
+                    tint: Theme.accentText,
+                    focus: $totalAmountFocused
+                )
+            }
             FormCard {
                 moneyRow(label: "Tax", text: moneyBinding(\.taxCents), field: .tax)
                 FormRowDivider()
@@ -693,37 +704,20 @@ struct SplitCreateSheet: View {
                 }
                 FormRowDivider()
                 moneyRow(label: "Fee", text: moneyBinding(\.feeCents), field: .fee)
-                FormRowDivider()
-                HStack {
-                    Text("Total")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Theme.ink)
-                    Spacer()
-                    TextField(
-                        "",
-                        text: Binding(
-                            get: {
-                                totalEdited
-                                    ? textFromCents(draft.selectedTotalCents)
-                                    : textFromCents(derivedTotalCents)
-                            },
-                            set: {
-                                draft.selectedTotalCents = centsFromText($0)
-                                draft.mismatchAcknowledged = false
-                                totalEdited = true
-                            }
-                        ),
-                        prompt: Text("0.00").foregroundStyle(Theme.faint)
-                    )
-                    .font(.system(size: 17, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Theme.accent)
-                    .keyboardType(.decimalPad)
-                    .focused($focusedField, equals: .total)
-                    .multilineTextAlignment(.trailing)
-                    .frame(width: 120)
+                if !isEvenSplit && !totalEdited {
+                    FormRowDivider()
+                    HStack {
+                        Text("Total")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
+                        Spacer()
+                        Text(textFromCents(derivedTotalCents))
+                            .font(.system(size: 17, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(Theme.ink)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
             }
 
             if totalEdited, effectiveTotalCents != derivedTotalCents {
@@ -923,26 +917,38 @@ struct SplitCreateSheet: View {
         )
     }
 
+    private var totalAmountBinding: Binding<String> {
+        Binding(
+            get: {
+                let cents = totalEdited ? draft.selectedTotalCents : derivedTotalCents
+                return cents > 0 ? textFromCents(cents) : ""
+            },
+            set: {
+                draft.selectedTotalCents = centsFromText($0)
+                draft.mismatchAcknowledged = false
+                totalEdited = true
+            }
+        )
+    }
+
     // MARK: - Payment
 
     private var paymentSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionEyebrow("You paid with")
-            SegmentedToggle(
-                selection: $draft.paymentChannel,
-                options: [
-                    ToggleOption(value: "cash", label: "Cash / debit", icon: "banknote"),
-                    ToggleOption(value: "credit_card", label: "Credit card", icon: "creditcard"),
-                ]
-            )
-            if draft.paymentChannel == "credit_card" {
-                SignalFormRow(label: "Card") {
+            SegmentedToggle(selection: $draft.paymentChannel, options: paymentOptions)
+            if draft.paymentChannel == "credit_card", canUseCreditCards {
+                SignalNativeFormRow {
                     Menu {
                         ForEach(creditCards) { card in
                             Button(card.label) { draft.creditCardId = card.id }
                         }
                     } label: {
                         HStack(spacing: 8) {
+                            Text("Card")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(Theme.muted)
+                            Spacer(minLength: 16)
                             Text(creditCards.first { $0.id == draft.creditCardId }?.label ?? "Select")
                                 .font(.system(size: 15, weight: .medium))
                                 .foregroundStyle(draft.creditCardId == nil ? Theme.faint : Theme.ink)
@@ -957,16 +963,17 @@ struct SplitCreateSheet: View {
     }
 
     private var dateRow: some View {
-        HStack {
-            Text("Date")
-                .font(.system(size: 15))
-                .foregroundStyle(Theme.ink)
-            Spacer()
-            DatePicker("", selection: $draft.occurredAt, displayedComponents: .date)
-                .labelsHidden()
+        SignalNativeFormRow {
+            DatePicker("Date", selection: $draft.occurredAt, displayedComponents: .date)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+    }
+
+    private var paymentOptions: [ToggleOption] {
+        var options = [ToggleOption(value: "cash", label: "Cash / debit", icon: "banknote")]
+        if canUseCreditCards {
+            options.append(ToggleOption(value: "credit_card", label: "Credit card", icon: "creditcard"))
+        }
+        return options
     }
 
     // MARK: - Actions
@@ -974,6 +981,7 @@ struct SplitCreateSheet: View {
     private func dismissKeyboard() {
         merchantFocused = false
         focusedField = nil
+        totalAmountFocused = false
     }
 
     /// Cache first, network second.
@@ -983,6 +991,7 @@ struct SplitCreateSheet: View {
     /// is a wrong ledger row, not a cosmetic gap: `paymentChannel` and
     /// `creditCardId` decide what the expense the server writes looks like.
     private func loadCards() async {
+        guard canUseCreditCards else { return }
         creditCards = OfflineSessionCache.creditCards(workspaceId: workspaceId)
             .filter { !$0.isArchived }
         guard let resp: CreditCardsResponse = try? await APIClient.shared.fetch(

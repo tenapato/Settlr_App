@@ -30,3 +30,24 @@ grep -Fq 'accessibilityLabel("Amount in Mexican pesos")' Settlr/Views/Components
 grep -Fq 'SignalFormRow' Settlr/Views/Main/Expenses/ExpenseFormSheet.swift
 grep -Fq 'SignalFormRow' Settlr/Views/Main/Income/IncomeFormSheet.swift
 grep -Fq 'SignalFormRow' Settlr/Views/Main/Savings/SavingsEntryFormSheet.swift
+
+# Task 3 fix round 1: validation, bounded hero layout, native row ownership,
+# feature-gated card controls, and the remaining split form migration.
+grep -Fq 'errorMessage: errorMessage' Settlr/Views/Main/Expenses/ExpenseFormSheet.swift
+grep -Fq 'errorMessage: errorMessage' Settlr/Views/Main/Income/IncomeFormSheet.swift
+grep -Fq 'errorMessage: errorMessage' Settlr/Views/Main/Savings/SavingsEntryFormSheet.swift
+grep -Fq 'errorMessage: errorMessage' Settlr/Views/Main/Income/IncomeRecurringSheet.swift
+grep -Fq 'errorMessage: errorMessage' Settlr/Views/Main/Savings/SavingsRecurringSheet.swift
+grep -Fq '.frame(maxWidth: .infinity)' Settlr/Views/Components/FormControls.swift
+grep -Fq 'struct SignalNativeFormRow' Settlr/Views/Components/FormControls.swift
+grep -Fq 'SignalNativeFormRow' Settlr/Views/Main/Expenses/ExpenseFormSheet.swift
+grep -Fq 'SignalNativeFormRow' Settlr/Views/Main/Income/IncomeFormSheet.swift
+grep -Fq 'SignalNativeFormRow' Settlr/Views/Main/Savings/SavingsEntryFormSheet.swift
+grep -Fq 'SignalNativeFormRow' Settlr/Views/Main/Income/IncomeRecurringSheet.swift
+grep -Fq 'SignalNativeFormRow' Settlr/Views/Main/Savings/SavingsRecurringSheet.swift
+grep -Fq 'canUseCreditCards' Settlr/Views/Main/Expenses/ExpenseFormSheet.swift
+grep -Fq 'canUseCreditCards' Settlr/Views/Main/Split/SplitCreateSheet.swift
+grep -Fq 'SignalNativeFormRow' Settlr/Views/Main/Split/SplitCreateSheet.swift
+grep -Fq 'DatePicker("Date"' Settlr/Views/Main/Split/SplitCreateSheet.swift
+grep -Fq 'HeroAmountField' Settlr/Views/Main/Split/SplitCreateSheet.swift
+grep -Fq 'Theme.accentText' Settlr/Views/Main/CardPaymentsView.swift

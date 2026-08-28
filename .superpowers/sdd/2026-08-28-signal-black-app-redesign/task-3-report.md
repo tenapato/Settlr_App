@@ -46,3 +46,23 @@ Per task instructions, `xcodebuild` and XCTest were not run.
 ## Scope notes
 
 The pre-existing `.superpowers/brainstorm/` directory remains untracked and was not staged. No Server files were touched.
+
+## Fix Round 1 — reviewer Important findings
+
+Addressed all six Important findings without changing endpoint paths, request bodies, save callbacks, queue behavior, or dismissal semantics:
+
+- Passed each form's existing `errorMessage` into `HeroAmountField` and removed the duplicate error copy below the row group.
+- Made the hero editor width-bounded (`maxWidth: 320`) while keeping the centered editable amount composition and the large focus region, so `minimumScaleFactor(0.45)` can actually participate for long values.
+- Added `SignalNativeFormRow`, which gives native `Menu` and `DatePicker` controls the complete row hit region and preserves their own accessibility labels. Migrated all corresponding named form call sites, including SplitCreateSheet's date/card rows.
+- Added `credit_cards` feature checks to `ExpenseFormSheet` and `SplitCreateSheet`. Card options and card rows are hidden, and card loading is skipped, when unavailable. Existing edit state/request semantics remain intact.
+- Replaced touched accent text/icon uses with `Theme.accentText` while retaining `Theme.accent` for fills and control tint where appropriate; toolbar `Done` labels now use the readable token.
+- Completed SplitCreateSheet's remaining form migration: date is a native Signal row, and manual/even-split totals use the shared `HeroAmountField` binding while preserving derived totals, reconciliation, and draft calculation behavior.
+
+Fix Round 1 verification:
+
+```text
+bash scripts/check-signal-redesign.sh        PASS
+swiftc -parse (all 8 changed Swift files)    PASS
+```
+
+Per task instructions, `xcodebuild` and XCTest were not run.

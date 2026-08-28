@@ -57,7 +57,12 @@ struct IncomeFormSheet: View {
 
                 ScrollView {
                     VStack(spacing: 20) {
-                        HeroAmountField(amountText: $amountText, tint: Theme.income, focus: $amountFocused)
+                        HeroAmountField(
+                            amountText: $amountText,
+                            tint: Theme.income,
+                            focus: $amountFocused,
+                            errorMessage: errorMessage
+                        )
 
                         VStack(spacing: 0) {
                             SignalFormRow(label: "Description") {
@@ -79,13 +84,17 @@ struct IncomeFormSheet: View {
                                     isOn: $repeats
                                 )
                                 if repeats {
-                                    SignalFormRow(label: "Repeats") {
+                                    SignalNativeFormRow {
                                         Menu {
                                             ForEach(RecurrenceFrequency.allCases, id: \.self) { option in
                                                 Button(option.label) { frequency = option }
                                             }
                                         } label: {
                                             HStack(spacing: 8) {
+                                                Text("Repeats")
+                                                    .font(.system(size: 15, weight: .medium))
+                                                    .foregroundStyle(Theme.muted)
+                                                Spacer(minLength: 16)
                                                 Text(frequency.label)
                                                     .font(.system(size: 15, weight: .medium))
                                                     .foregroundStyle(Theme.ink)
@@ -97,13 +106,6 @@ struct IncomeFormSheet: View {
                                     }
                                 }
                             }
-                        }
-
-                        if let error = errorMessage {
-                            Text(error)
-                                .font(.system(size: 13))
-                                .foregroundStyle(Theme.expense)
-                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
                         Button(isEditing ? "Save Changes" : (repeats ? "Create Recurring Income" : "Add Income")) { save() }
@@ -127,7 +129,7 @@ struct IncomeFormSheet: View {
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button("Done") { amountFocused = false; descriptionFocused = false }
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.accentText)
                         .fontWeight(.semibold)
                 }
             }
@@ -138,16 +140,15 @@ struct IncomeFormSheet: View {
     // MARK: - Rows
 
     private var dateRow: some View {
-        SignalFormRow(label: "Date") {
-            DatePicker("", selection: $selectedDate, displayedComponents: .date)
-                .labelsHidden()
+        SignalNativeFormRow {
+            DatePicker("Date", selection: $selectedDate, displayedComponents: .date)
                 .datePickerStyle(.compact)
                 .tint(Theme.accent)
         }
     }
 
     private var categoryRow: some View {
-        SignalFormRow(label: "Category") {
+        SignalNativeFormRow {
             Menu {
                 Button("No category") { selectedCategoryId = nil }
                 ForEach(incomeCategories) { cat in
@@ -155,6 +156,10 @@ struct IncomeFormSheet: View {
                 }
             } label: {
                 HStack(spacing: 8) {
+                    Text("Category")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Theme.muted)
+                    Spacer(minLength: 16)
                     Text(categoryValueLabel)
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(selectedCategoryId == nil ? Theme.faint : Theme.ink)

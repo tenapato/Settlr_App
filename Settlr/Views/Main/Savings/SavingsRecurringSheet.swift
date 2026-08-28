@@ -34,7 +34,7 @@ struct SavingsRecurringSheet: View {
                     } label: {
                         Image(systemName: "plus")
                             .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(Theme.accent)
+                            .foregroundStyle(Theme.accentText)
                     }
                     .disabled(vm.accounts.isEmpty)
                 }
@@ -170,7 +170,7 @@ struct SavingsRecurringSheet: View {
                             }
                         }
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.accentText)
                         .buttonStyle(.plain)
 
                         Button {
@@ -266,7 +266,12 @@ struct SavingsRecurringFormSheet: View {
 
                 ScrollView {
                     VStack(spacing: 20) {
-                        HeroAmountField(amountText: $amountText, tint: Theme.income, focus: $amountFocused)
+                        HeroAmountField(
+                            amountText: $amountText,
+                            tint: Theme.income,
+                            focus: $amountFocused,
+                            errorMessage: errorMessage
+                        )
 
                         VStack(spacing: 0) {
                             SignalFormRow(label: "Description") {
@@ -294,13 +299,6 @@ struct SavingsRecurringFormSheet: View {
                             .foregroundStyle(Theme.faint)
                             .frame(maxWidth: .infinity, alignment: .leading)
 
-                        if let error = errorMessage {
-                            Text(error)
-                                .font(.system(size: 13))
-                                .foregroundStyle(Theme.expense)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-
                         Button(isEditing ? "Save Changes" : "Schedule Deposits") {
                             save()
                         }
@@ -324,7 +322,7 @@ struct SavingsRecurringFormSheet: View {
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button("Done") { amountFocused = false; descriptionFocused = false }
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.accentText)
                         .fontWeight(.semibold)
                 }
             }
@@ -335,13 +333,17 @@ struct SavingsRecurringFormSheet: View {
     // MARK: - Sections
 
     private var accountRow: some View {
-        SignalFormRow(label: "Account") {
+        SignalNativeFormRow {
             Menu {
                 ForEach(accounts) { account in
                     Button(account.name) { accountId = account.id }
                 }
             } label: {
                 HStack(spacing: 8) {
+                    Text("Account")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Theme.muted)
+                    Spacer(minLength: 16)
                     Text(accounts.first(where: { $0.id == accountId })?.name ?? "Select")
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(accountId.isEmpty ? Theme.faint : Theme.ink)
@@ -354,13 +356,17 @@ struct SavingsRecurringFormSheet: View {
     }
 
     private var frequencyRow: some View {
-        SignalFormRow(label: "Repeats") {
+        SignalNativeFormRow {
             Menu {
                 ForEach(SavingsFrequency.allCases, id: \.self) { option in
                     Button(option.label) { frequency = option }
                 }
             } label: {
                 HStack(spacing: 8) {
+                    Text("Repeats")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Theme.muted)
+                    Spacer(minLength: 16)
                     Text(frequency.label)
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(Theme.ink)
@@ -373,9 +379,8 @@ struct SavingsRecurringFormSheet: View {
     }
 
     private var startDateRow: some View {
-        SignalFormRow(label: "Starts") {
-            DatePicker("", selection: $startDate, displayedComponents: .date)
-                .labelsHidden()
+        SignalNativeFormRow {
+            DatePicker("Starts", selection: $startDate, displayedComponents: .date)
                 .datePickerStyle(.compact)
                 .tint(Theme.accent)
         }

@@ -7,6 +7,7 @@ struct ExpenseFormSheet: View {
     let onSave: (CreateExpenseBody) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppState.self) private var appState
 
     @State private var description: String
     @State private var amountText: String
@@ -20,6 +21,7 @@ struct ExpenseFormSheet: View {
     @FocusState private var descriptionFocused: Bool
 
     private var isEditing: Bool { expense != nil }
+    private var canUseCreditCards: Bool { appState.currentUser?.has(.creditCards) == true }
 
     init(
         workspaceId: String,
@@ -60,7 +62,12 @@ struct ExpenseFormSheet: View {
 
                 ScrollView {
                     VStack(spacing: 20) {
-                        HeroAmountField(amountText: $amountText, tint: Theme.expense, focus: $amountFocused)
+                        HeroAmountField(
+                            amountText: $amountText,
+                            tint: Theme.expense,
+                            focus: $amountFocused,
+                            errorMessage: errorMessage
+                        )
 
                         VStack(spacing: 0) {
                             SignalFormRow(label: "Description") {
@@ -79,13 +86,6 @@ struct ExpenseFormSheet: View {
 
                         paymentSection
                         cardSection
-
-                        if let error = errorMessage {
-                            Text(error)
-                                .font(.system(size: 13))
-                                .foregroundStyle(Theme.expense)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
 
                         Button(isEditing ? "Save Changes" : "Add Expense") { save() }
                             .buttonStyle(PrimaryButtonStyle())
@@ -108,12 +108,14 @@ struct ExpenseFormSheet: View {
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button("Done") { amountFocused = false; descriptionFocused = false }
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.accentText)
                         .fontWeight(.semibold)
                 }
             }
         }
-        .task { await loadCreditCards() }
+        .task {
+            if canUseCreditCards { await loadCreditCards() }
+        }
         .onAppear { if !isEditing { amountFocused = true } }
         .onChange(of: paymentChannel) { _, newValue in
             if newValue == "credit_card" {
@@ -127,16 +129,15 @@ struct ExpenseFormSheet: View {
     // MARK: - Rows
 
     private var dateRow: some View {
-        SignalFormRow(label: "Date") {
-            DatePicker("", selection: $selectedDate, displayedComponents: .date)
-                .labelsHidden()
+        SignalNativeFormRow {
+            DatePicker("Date", selection: $selectedDate, displayedComponents: .date)
                 .datePickerStyle(.compact)
                 .tint(Theme.accent)
         }
     }
 
     private var categoryRow: some View {
-        SignalFormRow(label: "Category") {
+        SignalNativeFormRow {
             Menu {
                 Button("No category") { selectedCategoryId = nil }
                 ForEach(expenseCategories) { cat in
@@ -144,6 +145,10 @@ struct ExpenseFormSheet: View {
                 }
             } label: {
                 HStack(spacing: 8) {
+                    Text("Category")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Theme.muted)
+                    Spacer(minLength: 16)
                     Text(categoryValueLabel)
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(selectedCategoryId == nil ? Theme.faint : Theme.ink)
@@ -162,17 +167,14 @@ struct ExpenseFormSheet: View {
                 .padding(.leading, 4)
             SegmentedToggle(
                 selection: $paymentChannel,
-                options: [
-                    ToggleOption(value: "cash", label: "Cash", icon: "banknote.fill"),
-                    ToggleOption(value: "credit_card", label: "Credit Card", icon: "creditcard.fill")
-                ]
+                options: paymentOptions
             )
         }
     }
 
     @ViewBuilder
     private var cardSection: some View {
-        if paymentChannel == "credit_card" {
+        if paymentChannel == "credit_card", canUseCreditCards {
             if creditCards.isEmpty {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -184,13 +186,17 @@ struct ExpenseFormSheet: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 4)
             } else {
-                SignalFormRow(label: "Card") {
-                    Menu {
+        SignalNativeFormRow {
+            Menu {
                         ForEach(creditCards) { card in
                             Button(cardOptionLabel(card)) { selectedCreditCardId = card.id }
                         }
                     } label: {
                         HStack(spacing: 8) {
+                            Text("Card")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(Theme.muted)
+                            Spacer(minLength: 16)
                             Text(cardValueLabel)
                                 .font(.system(size: 15, weight: .medium))
                                 .foregroundStyle(selectedCreditCardId == nil ? Theme.faint : Theme.ink)
@@ -213,6 +219,14 @@ struct ExpenseFormSheet: View {
         let hasAmount = (Double(normalized) ?? 0) > 0
         let cardOK = paymentChannel != "credit_card" || selectedCreditCardId != nil
         return hasDescription && hasAmount && cardOK
+    }
+
+    private var paymentOptions: [ToggleOption] {
+        var options = [ToggleOption(value: "cash", label: "Cash", icon: "banknote.fill")]
+        if canUseCreditCards {
+            options.append(ToggleOption(value: "credit_card", label: "Credit Card", icon: "creditcard.fill"))
+        }
+        return options
     }
 
     private var categoryValueLabel: String {
@@ -240,6 +254,7 @@ struct ExpenseFormSheet: View {
 
     @MainActor
     private func loadCreditCards() async {
+        guard canUseCreditCards else { return }
         do {
             let resp: CreditCardsResponse = try await APIClient.shared.fetch(Endpoints.creditCards(workspaceId))
             creditCards = resp.creditCards

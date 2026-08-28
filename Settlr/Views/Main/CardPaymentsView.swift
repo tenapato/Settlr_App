@@ -259,7 +259,7 @@ private struct FortnightFilterBar: View {
                     Image(systemName: "chevron.down")
                         .font(.system(size: 9, weight: .bold))
                 }
-                .foregroundStyle(selected == .all ? Theme.muted : Theme.accent)
+                .foregroundStyle(selected == .all ? Theme.muted : Theme.accentText)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(
@@ -423,7 +423,7 @@ private struct CardPaymentTile: View {
                             .tracking(0.5).textCase(.uppercase)
                         Text(due)
                             .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(Theme.accent)
+                            .foregroundStyle(Theme.accentText)
                     }
                 }
             }
@@ -626,7 +626,7 @@ private struct PaymentsErrorView: View {
                 .foregroundStyle(Theme.muted)
                 .multilineTextAlignment(.center)
             Button("Retry", action: onRetry)
-                .foregroundStyle(Theme.accent)
+                .foregroundStyle(Theme.accentText)
                 .font(.system(size: 15, weight: .semibold))
         }
         .padding(.horizontal, 32)
