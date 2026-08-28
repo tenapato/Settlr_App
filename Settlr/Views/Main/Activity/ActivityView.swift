@@ -82,8 +82,10 @@ struct ActivityView: View {
             get: {
                 showSavingsForm
                     && user?.has(.savings) == true
+                    && savingsVM.loadedWorkspaceID == workspaceId
                     && savingsVM.hasLoadedAccounts
                     && !savingsVM.accounts.isEmpty
+                    && savingsVM.errorMessage == nil
             },
             set: { showSavingsForm = $0 }
         )
@@ -259,12 +261,18 @@ struct ActivityView: View {
             guard appState.currentUser?.has(.savings) == true else { showSavingsForm = false; return }
             Task {
                 await savingsVM.load(workspaceId: workspaceId)
-                guard appState.activeWorkspace?.id == workspaceId else { return }
-                guard appState.currentUser?.has(.savings) == true else { showSavingsForm = false; return }
-                if savingsVM.hasLoadedAccounts, savingsVM.accounts.isEmpty {
+                guard appState.activeWorkspace?.id == workspaceId else {
                     showSavingsForm = false
-                    showSavingsAccounts = true
-                } else if savingsVM.errorMessage != nil {
+                    return
+                }
+                guard appState.currentUser?.has(.savings) == true else { showSavingsForm = false; return }
+                guard savingsVM.loadedWorkspaceID == workspaceId else {
+                    showSavingsForm = false
+                    return
+                }
+                if savingsVM.hasLoadedAccounts, !savingsVM.accounts.isEmpty, savingsVM.errorMessage == nil {
+                    return
+                } else {
                     showSavingsForm = false
                     showSavingsAccounts = true
                 }

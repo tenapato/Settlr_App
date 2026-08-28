@@ -124,3 +124,8 @@ grep -Fq 'onDeleted:' Settlr/Views/Main/Activity/ActivityView.swift
 grep -Fq 'isWorkspaceCurrent:' Settlr/Views/Main/Activity/ActivityView.swift
 grep -Fq 'guard isWorkspaceCurrent() else { return nil }' Settlr/Views/Components/TransactionDetailSheet.swift
 grep -Fq '.interactiveDismissDisabled(isSaving)' Settlr/Views/Main/Savings/SavingsAccountsSheet.swift
+
+# Task 5 fix round 5: Activity's Savings entry presenter must use the same
+# current-workspace, successful-account guards as the root presenter.
+grep -Fq 'savingsVM.loadedWorkspaceID == workspaceId' Settlr/Views/Main/Activity/ActivityView.swift
+grep -Fq 'savingsVM.errorMessage == nil' Settlr/Views/Main/Activity/ActivityView.swift

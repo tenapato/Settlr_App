@@ -191,3 +191,22 @@ bash scripts/check-app-source-regressions.sh        PASS
 ruby scripts/test-testflight-workflow.rb            PASS
 git diff --check                                    PASS
 ```
+
+## Fix Round 5
+
+- Activity's Savings entry presenter now mirrors the root presenter's current
+  workspace, successful-account, and clean-error guards. A stale or incomplete
+  handoff cannot present an entry form with prior-workspace accounts.
+- The Activity handoff dismisses stale/unfinished entry presentation and routes
+  current empty or failed account loads through `SavingsAccountsSheet`, while
+  preserving the Savings feature gate and single Activity-owned presenter.
+
+Fix Round 5 checks:
+
+```text
+swiftc -parse (ActivityView.swift)                 PASS
+bash scripts/check-signal-redesign.sh               PASS
+bash scripts/check-app-source-regressions.sh        PASS
+ruby scripts/test-testflight-workflow.rb            PASS
+git diff --check                                    PASS
+```
