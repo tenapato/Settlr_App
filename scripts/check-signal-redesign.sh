@@ -101,3 +101,18 @@ grep -Fq '.task(id: workspaceId)' Settlr/Views/Main/Activity/ActivityView.swift
 grep -Fq 'reloadActivityIfCurrentWorkspace' Settlr/Views/Main/Activity/ActivityView.swift
 grep -Fq 'SavingsAccountsSheet(workspaceId: workspaceId, vm: savingsVM)' Settlr/Views/Main/Activity/ActivityView.swift
 grep -Fq 'reload: false' Settlr/Views/Main/Activity/ActivityView.swift
+
+# Task 5 fix round 3: workspace-safe Activity mutations, account-gated global
+# Savings quick actions, independent account loading, and duplicate-submit
+# protection in the account-management form.
+grep -Fq 'workspaceMutationGeneration(for workspaceId: String)' Settlr/ViewModels/ExpensesVM.swift
+grep -Fq 'workspaceMutationGeneration(for workspaceId: String)' Settlr/ViewModels/IncomeVM.swift
+grep -Fq 'expectedGeneration: Int? = nil' Settlr/ViewModels/ExpensesVM.swift
+grep -Fq 'expectedGeneration: Int? = nil' Settlr/ViewModels/IncomeVM.swift
+grep -Fq 'expectedGeneration: Int? = nil' Settlr/Views/Main/Savings/SavingsVM.swift
+grep -Fq 'guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }' Settlr/Views/Main/Savings/SavingsVM.swift
+grep -Fq 'showRootSavingsAccounts' Settlr/Views/Main/MainTabView.swift
+grep -Fq 'prepareGlobalSavingsForm()' Settlr/Views/Main/MainTabView.swift
+grep -Fq 'savingsVM.hasLoadedAccounts' Settlr/Views/Main/MainTabView.swift
+grep -Fq '@State private var isSavingAccount = false' Settlr/Views/Main/Savings/SavingsAccountsSheet.swift
+grep -Fq 'isSaving: isSavingAccount' Settlr/Views/Main/Savings/SavingsAccountsSheet.swift

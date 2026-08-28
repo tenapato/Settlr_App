@@ -118,7 +118,7 @@ git diff --check                                    PASS
   existing mutation completes, with workspace guards preventing stale saves from
   repopulating a switched workspace.
 
-## Fix Round 2
+### Additional Fix Round 2 hardening
 
 - Suppressed MainTabView's root Savings presenter on Activity. Savings actions
   wait for account state and divert empty/error workspaces to the existing
@@ -137,3 +137,33 @@ git diff --check                                    PASS
 - Activity-owned mutations disable the shared VM's follow-up reload where
   applicable, then perform one guarded Activity reload so the new event appears
   without a duplicate mutation or tab switch.
+
+## Fix Round 3
+
+- Activity-owned expense, income, recurring-income, savings-entry, and
+  savings-account mutations now accept an optional workspace-generation token.
+  Responses and errors from an old workspace are ignored, while existing
+  callers retain the unguarded default behavior.
+- The MainTab global Savings quick action loads the current workspace's
+  accounts before presenting anything. A confirmed empty or failed load routes
+  to `SavingsAccountsSheet`; the entry form is only presented for a current,
+  successful, non-empty account response, and root presentation is suppressed
+  on Savings and Activity tabs.
+- Savings account loading is independent from entries loading, so a successful
+  accounts response sets `hasLoadedAccounts` even if entries fail. Overlapping
+  generations cannot clear a newer load's `isLoading` state or apply stale
+  recurring results.
+- Savings account create/edit/delete forms use in-flight state to prevent
+  duplicate submissions, disable cancellation during the request, preserve VM
+  errors, and pass workspace-generation guards through account mutations.
+
+Fix Round 3 checks:
+
+```text
+swiftc -parse (changed Task 5 Swift files)          PASS
+Foundation Activity composer harness                PASS
+bash scripts/check-signal-redesign.sh               PASS
+bash scripts/check-app-source-regressions.sh        PASS
+ruby scripts/test-testflight-workflow.rb            PASS
+git diff --check                                    PASS
+```

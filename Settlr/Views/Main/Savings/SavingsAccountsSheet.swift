@@ -9,6 +9,7 @@ struct SavingsAccountsSheet: View {
     @State private var showAccountForm = false
     @State private var editingAccount: SavingsAccount?
     @State private var accountToDelete: SavingsAccount?
+    @State private var isSavingAccount = false
 
     var body: some View {
         NavigationStack {
@@ -42,23 +43,30 @@ struct SavingsAccountsSheet: View {
             .sheet(isPresented: $showAccountForm) {
                 SavingsAccountFormSheet(
                     account: editingAccount,
+                    isSaving: isSavingAccount,
                     onSave: { name, color in
-                        Task {
+                        guard !isSavingAccount else { return }
+                        isSavingAccount = true
+                        let generation = vm.workspaceMutationGeneration(for: workspaceId)
+                        Task { @MainActor in
                             let ok: Bool
                             if let editingAccount {
                                 ok = await vm.updateAccount(
                                     workspaceId: workspaceId,
                                     accountId: editingAccount.id,
                                     name: name,
-                                    color: color
+                                    color: color,
+                                    expectedGeneration: generation
                                 )
                             } else {
                                 ok = await vm.createAccount(
                                     workspaceId: workspaceId,
                                     name: name,
-                                    color: color
+                                    color: color,
+                                    expectedGeneration: generation
                                 )
                             }
+                            isSavingAccount = false
                             if ok {
                                 showAccountForm = false
                                 editingAccount = nil
@@ -73,7 +81,14 @@ struct SavingsAccountsSheet: View {
                         title: "Delete Account?",
                         itemName: "\(account.name) — all entries will be deleted",
                         onConfirm: {
-                            Task { await vm.deleteAccount(workspaceId: workspaceId, accountId: account.id) }
+                            let generation = vm.workspaceMutationGeneration(for: workspaceId)
+                            Task { @MainActor in
+                                await vm.deleteAccount(
+                                    workspaceId: workspaceId,
+                                    accountId: account.id,
+                                    expectedGeneration: generation
+                                )
+                            }
                             accountToDelete = nil
                         },
                         onCancel: { accountToDelete = nil }
@@ -168,6 +183,7 @@ struct SavingsAccountsSheet: View {
 
 struct SavingsAccountFormSheet: View {
     var account: SavingsAccount?
+    let isSaving: Bool
     let onSave: (_ name: String, _ color: String) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -183,8 +199,13 @@ struct SavingsAccountFormSheet: View {
         "#ef4444", "#14b8a6", "#ec4899", "#c8ff5a",
     ]
 
-    init(account: SavingsAccount?, onSave: @escaping (_ name: String, _ color: String) -> Void) {
+    init(
+        account: SavingsAccount?,
+        isSaving: Bool = false,
+        onSave: @escaping (_ name: String, _ color: String) -> Void
+    ) {
         self.account = account
+        self.isSaving = isSaving
         self.onSave = onSave
         let hex = account?.color ?? "#22c55e"
         _name = State(initialValue: account?.name ?? "")
@@ -249,13 +270,19 @@ struct SavingsAccountFormSheet: View {
                             .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.line, lineWidth: 1))
                     )
 
-                    Button(isEditing ? "Save Changes" : "Create Account") {
+                    Button {
                         let trimmed = name.trimmingCharacters(in: .whitespaces)
-                        guard !trimmed.isEmpty else { return }
+                        guard !trimmed.isEmpty, !isSaving else { return }
                         onSave(trimmed, colorHex)
+                    } label: {
+                        if isSaving {
+                            ProgressView().tint(Theme.bg)
+                        } else {
+                            Text(isEditing ? "Save Changes" : "Create Account")
+                        }
                     }
                     .buttonStyle(PrimaryButtonStyle())
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
 
                     Spacer()
                 }
@@ -268,6 +295,7 @@ struct SavingsAccountFormSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                         .foregroundStyle(Theme.muted)
+                        .disabled(isSaving)
                 }
             }
             .onAppear { nameFocused = true }

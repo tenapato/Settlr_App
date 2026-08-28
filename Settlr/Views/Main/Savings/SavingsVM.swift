@@ -37,6 +37,21 @@ final class SavingsVM {
         accounts.first { $0.id == id }
     }
 
+    /// True only when the accounts response belongs to the requested workspace.
+    /// This keeps global quick actions from presenting a form with stale data.
+    var loadedWorkspaceID: String? { activeWorkspaceID }
+
+    @MainActor
+    func workspaceMutationGeneration(for workspaceId: String) -> Int {
+        guard activeWorkspaceID == workspaceId else { return -1 }
+        return loadGeneration
+    }
+
+    private func acceptsMutation(workspaceId: String, expectedGeneration: Int?) -> Bool {
+        guard let expectedGeneration else { return true }
+        return activeWorkspaceID == workspaceId && loadGeneration == expectedGeneration
+    }
+
     var activeRecurringCount: Int {
         recurring.filter(\.active).count
     }
@@ -49,6 +64,8 @@ final class SavingsVM {
         }
         loadGeneration += 1
         let generation = loadGeneration
+        isLoading = true
+        errorMessage = nil
         let task = Task { @MainActor in await self.performLoad(workspaceId: workspaceId, generation: generation) }
         inFlightLoad = task
         await task.value
@@ -60,6 +77,7 @@ final class SavingsVM {
         activeWorkspaceID = nil
         inFlightLoad?.cancel()
         inFlightLoad = nil
+        isLoading = false
         accounts = []
         entries = []
         recurring = []
@@ -78,9 +96,11 @@ final class SavingsVM {
 
     @MainActor
     private func performLoad(workspaceId: String, generation: Int) async {
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
+        guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }
+        defer {
+            guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }
+            isLoading = false
+        }
 
         // Recurring rules are supplementary: the endpoint may be absent on a given
         // deployment, and losing them must not blank out accounts and entries.
@@ -88,16 +108,16 @@ final class SavingsVM {
             Endpoints.recurringSavings(workspaceId)
         )
 
+        async let accountsTask: SavingsAccountsResponse = api.fetch(Endpoints.savingsAccounts(workspaceId))
+        async let entriesTask: SavingsEntriesResponse = api.fetch(
+            Endpoints.savingsEntries(workspaceId, accountId: selectedAccountId)
+        )
+
         do {
-            async let accountsTask: SavingsAccountsResponse = api.fetch(Endpoints.savingsAccounts(workspaceId))
-            async let entriesTask: SavingsEntriesResponse = api.fetch(
-                Endpoints.savingsEntries(workspaceId, accountId: selectedAccountId)
-            )
-            let (accountsResp, entriesResp) = try await (accountsTask, entriesTask)
+            let accountsResp = try await accountsTask
             guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }
             accounts = accountsResp.accounts.sorted { $0.sortOrder < $1.sortOrder }
             totalBalanceCents = accountsResp.totalBalanceCents
-            entries = entriesResp.entries
             hasLoadedAccounts = true
             if let id = selectedAccountId, !accounts.contains(where: { $0.id == id }) {
                 selectedAccountId = nil
@@ -107,54 +127,86 @@ final class SavingsVM {
             errorMessage = error.localizedDescription
         }
 
+        do {
+            let entriesResp = try await entriesTask
+            guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }
+            entries = entriesResp.entries
+        } catch {
+            guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }
+            errorMessage = error.localizedDescription
+        }
+
         guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }
-        recurring = await recurringTask?.recurringSavings ?? []
+        let recurringItems = await recurringTask?.recurringSavings ?? []
+        guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }
+        recurring = recurringItems
     }
 
     @MainActor
-    func createAccount(workspaceId: String, name: String, color: String) async -> Bool {
+    func createAccount(
+        workspaceId: String,
+        name: String,
+        color: String,
+        expectedGeneration: Int? = nil
+    ) async -> Bool {
         do {
             let resp: SavingsAccountResponse = try await api.fetch(
                 Endpoints.savingsAccounts(workspaceId),
                 method: "POST",
                 body: CreateSavingsAccountBody(name: name, color: color, currency: "MXN")
             )
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return false }
             accounts.append(resp.account)
             accounts.sort { $0.sortOrder < $1.sortOrder }
             return true
         } catch {
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return false }
             errorMessage = error.localizedDescription
             return false
         }
     }
 
     @MainActor
-    func updateAccount(workspaceId: String, accountId: String, name: String, color: String) async -> Bool {
+    func updateAccount(
+        workspaceId: String,
+        accountId: String,
+        name: String,
+        color: String,
+        expectedGeneration: Int? = nil
+    ) async -> Bool {
         do {
             let resp: SavingsAccountResponse = try await api.fetch(
                 Endpoints.savingsAccount(workspaceId, accountId),
                 method: "PATCH",
                 body: UpdateSavingsAccountBody(name: name, color: color)
             )
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return false }
             if let idx = accounts.firstIndex(where: { $0.id == accountId }) {
                 accounts[idx] = resp.account
             }
             return true
         } catch {
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return false }
             errorMessage = error.localizedDescription
             return false
         }
     }
 
     @MainActor
-    func deleteAccount(workspaceId: String, accountId: String) async {
+    func deleteAccount(
+        workspaceId: String,
+        accountId: String,
+        expectedGeneration: Int? = nil
+    ) async {
         do {
             try await api.send(Endpoints.savingsAccount(workspaceId, accountId), method: "DELETE")
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return }
             accounts.removeAll { $0.id == accountId }
             entries.removeAll { $0.accountId == accountId }
             if selectedAccountId == accountId { selectedAccountId = nil }
             totalBalanceCents = accounts.reduce(0) { $0 + $1.balanceCents }
         } catch {
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -163,7 +215,8 @@ final class SavingsVM {
     func createEntry(
         workspaceId: String,
         body: CreateSavingsEntryBody,
-        reload: Bool = true
+        reload: Bool = true,
+        expectedGeneration: Int? = nil
     ) async {
         do {
             let _: SavingsEntryResponse = try await api.fetch(
@@ -171,8 +224,10 @@ final class SavingsVM {
                 method: "POST",
                 body: body
             )
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return }
             if reload { await load(workspaceId: workspaceId) }
         } catch {
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return }
             errorMessage = error.localizedDescription
         }
     }

@@ -12,6 +12,7 @@ struct MainTabView: View {
     @State private var showExpenseForm = false
     @State private var showIncomeForm = false
     @State private var showSavingsForm = false
+    @State private var showRootSavingsAccounts = false
     @State private var showCategories = false
     @State private var showSplitList = false
     @State private var showSplitScan = false
@@ -89,16 +90,23 @@ struct MainTabView: View {
         }
         .sheet(isPresented: rootSavingsFormPresentation) {
             SavingsEntryFormSheet(
-                workspaceId: appState.activeWorkspace?.id ?? "",
+                workspaceId: rootWorkspaceID,
                 accounts: savingsVM.accounts,
                 defaultAccountId: savingsVM.selectedAccountId,
                 onSave: { body in
                     Task {
-                        await savingsVM.createEntry(workspaceId: appState.activeWorkspace?.id ?? "", body: body)
+                        let generation = savingsVM.workspaceMutationGeneration(for: rootWorkspaceID)
+                        await savingsVM.createEntry(
+                            workspaceId: rootWorkspaceID,
+                            body: body,
+                            expectedGeneration: generation
+                        )
                     }
                 }
             )
-            .task { await savingsVM.load(workspaceId: appState.activeWorkspace?.id ?? "") }
+        }
+        .sheet(isPresented: rootSavingsAccountsPresentation) {
+            SavingsAccountsSheet(workspaceId: rootWorkspaceID, vm: savingsVM)
         }
         .sheet(isPresented: $showCategories) {
             CategoriesView(workspaceId: appState.activeWorkspace?.id ?? "")
@@ -118,7 +126,48 @@ struct MainTabView: View {
     }
 
     private var rootSavingsFormPresentation: Binding<Bool> {
-        Binding(get: { showSavingsForm && selectedTab != .savings && selectedTab != .activity }, set: { showSavingsForm = $0 })
+        Binding(
+            get: {
+                showSavingsForm
+                    && selectedTab != .savings
+                    && selectedTab != .activity
+                    && savingsVM.loadedWorkspaceID == rootWorkspaceID
+                    && savingsVM.hasLoadedAccounts
+                    && !savingsVM.accounts.isEmpty
+                    && savingsVM.errorMessage == nil
+            },
+            set: { showSavingsForm = $0 }
+        )
+    }
+
+    private var rootWorkspaceID: String { appState.activeWorkspace?.id ?? "" }
+
+    private var rootSavingsAccountsPresentation: Binding<Bool> {
+        Binding(
+            get: {
+                showRootSavingsAccounts && selectedTab != .savings && selectedTab != .activity
+            },
+            set: { showRootSavingsAccounts = $0 }
+        )
+    }
+
+    private func prepareGlobalSavingsForm() {
+        guard selectedTab != .savings, selectedTab != .activity else { return }
+        guard appState.currentUser?.has(.savings) == true, !rootWorkspaceID.isEmpty else { return }
+        let workspaceId = rootWorkspaceID
+        Task { @MainActor in
+            await savingsVM.load(workspaceId: workspaceId)
+            guard appState.activeWorkspace?.id == workspaceId,
+                  selectedTab != .savings,
+                  selectedTab != .activity,
+                  appState.currentUser?.has(.savings) == true else { return }
+            showSavingsForm = false
+            if savingsVM.hasLoadedAccounts, !savingsVM.accounts.isEmpty, savingsVM.errorMessage == nil {
+                showSavingsForm = true
+            } else {
+                showRootSavingsAccounts = true
+            }
+        }
     }
 
     // MARK: - Feature availability
@@ -126,6 +175,10 @@ struct MainTabView: View {
     private var availableTabs: [Tab] { Tab.available(for: appState.currentUser) }
 
     private func reconcileSelectedTab() {
+        if appState.currentUser?.has(.savings) != true {
+            showSavingsForm = false
+            showRootSavingsAccounts = false
+        }
         guard !availableTabs.contains(selectedTab) else { return }
         selectedTab = .home
         // An open palette may have been showing actions that just went away.
@@ -193,7 +246,7 @@ struct MainTabView: View {
         if ActivitySegment.savings.isAvailable(for: user) {
             actions.append(
                 QuickActionItem(id: "savings", title: "Savings", subtitle: "Add savings", systemImage: "banknote", role: .standard) {
-                    openLedgerForm(.savings) { showSavingsForm = true }
+                    openLedgerForm(.savings) { prepareGlobalSavingsForm() }
                 }
             )
         }

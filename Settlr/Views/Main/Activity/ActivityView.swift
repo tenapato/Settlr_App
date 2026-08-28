@@ -141,7 +141,12 @@ struct ActivityView: View {
                         categories: vm.categories.isEmpty ? expensesVM.categories : vm.categories
                     ) { body in
                         Task {
-                            await expensesVM.create(workspaceId: workspaceId, body: body)
+                            let generation = await expensesVM.workspaceMutationGeneration(for: workspaceId)
+                            await expensesVM.create(
+                                workspaceId: workspaceId,
+                                body: body,
+                                expectedGeneration: generation
+                            )
                             await reloadActivityIfCurrentWorkspace()
                         }
                     }
@@ -152,6 +157,7 @@ struct ActivityView: View {
                         categories: vm.categories.isEmpty ? incomeVM.categories : vm.categories
                     ) { body, repeatEvery in
                         Task {
+                            let generation = await incomeVM.workspaceMutationGeneration(for: workspaceId)
                             if let repeatEvery {
                                 _ = await incomeVM.createRecurring(
                                     workspaceId: workspaceId,
@@ -161,11 +167,16 @@ struct ActivityView: View {
                                         frequency: repeatEvery.rawValue,
                                         startDate: body.occurredAt,
                                         categoryId: body.categoryId,
-                                        reload: false
+                                        reload: false,
+                                        expectedGeneration: generation
                                     )
                                 )
                             } else {
-                                await incomeVM.create(workspaceId: workspaceId, body: body)
+                                await incomeVM.create(
+                                    workspaceId: workspaceId,
+                                    body: body,
+                                    expectedGeneration: generation
+                                )
                             }
                             await reloadActivityIfCurrentWorkspace()
                         }
@@ -178,7 +189,13 @@ struct ActivityView: View {
                         defaultAccountId: savingsVM.selectedAccountId,
                         onSave: { body in
                             Task {
-                                await savingsVM.createEntry(workspaceId: workspaceId, body: body, reload: false)
+                                let generation = await savingsVM.workspaceMutationGeneration(for: workspaceId)
+                                await savingsVM.createEntry(
+                                    workspaceId: workspaceId,
+                                    body: body,
+                                    reload: false,
+                                    expectedGeneration: generation
+                                )
                                 await reloadActivityIfCurrentWorkspace()
                             }
                         }

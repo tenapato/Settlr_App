@@ -58,6 +58,22 @@ final class IncomeVM {
         categories = []
     }
 
+    /// Returns a token Activity can use to reject a save response that crosses
+    /// a workspace switch. Existing callers do not need to participate.
+    @MainActor
+    func workspaceMutationGeneration(for workspaceId: String) -> Int {
+        guard categoryWorkspaceID == workspaceId else { return -1 }
+        return categoryLoadGeneration
+    }
+
+    private func acceptsMutation(
+        workspaceId: String,
+        expectedGeneration: Int?
+    ) -> Bool {
+        guard let expectedGeneration else { return true }
+        return categoryWorkspaceID == workspaceId && categoryLoadGeneration == expectedGeneration
+    }
+
     @MainActor
     func loadCategories(workspaceId: String) async {
         if categoryWorkspaceID != workspaceId {
@@ -102,44 +118,63 @@ final class IncomeVM {
     }
 
     @MainActor
-    func create(workspaceId: String, body: CreateIncomeBody) async {
+    func create(
+        workspaceId: String,
+        body: CreateIncomeBody,
+        expectedGeneration: Int? = nil
+    ) async {
         do {
             let response: CreateIncomeResponse = try await api.fetch(
                 Endpoints.income(workspaceId),
                 method: "POST",
                 body: body
             )
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return }
             incomes.insert(response.income, at: 0)
         } catch {
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return }
             errorMessage = error.localizedDescription
         }
     }
 
     @MainActor
     @discardableResult
-    func update(workspaceId: String, incomeId: String, body: CreateIncomeBody) async -> Income? {
+    func update(
+        workspaceId: String,
+        incomeId: String,
+        body: CreateIncomeBody,
+        expectedGeneration: Int? = nil
+    ) async -> Income? {
         do {
             let response: CreateIncomeResponse = try await api.fetch(
                 Endpoints.incomeItem(workspaceId, incomeId),
                 method: "PATCH",
                 body: body
             )
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return nil }
             if let idx = incomes.firstIndex(where: { $0.id == incomeId }) {
                 incomes[idx] = response.income
             }
             return response.income
         } catch {
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return nil }
             errorMessage = error.localizedDescription
             return nil
         }
     }
 
     @MainActor
-    func delete(workspaceId: String, incomeId: String) async {
+    func delete(
+        workspaceId: String,
+        incomeId: String,
+        expectedGeneration: Int? = nil
+    ) async {
         do {
             try await api.send(Endpoints.incomeItem(workspaceId, incomeId), method: "DELETE")
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return }
             incomes.removeAll { $0.id == incomeId }
         } catch {
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -150,7 +185,8 @@ final class IncomeVM {
     func createRecurring(
         workspaceId: String,
         body: CreateRecurringIncomeBody,
-        reload: Bool = true
+        reload: Bool = true,
+        expectedGeneration: Int? = nil
     ) async -> Bool {
         do {
             let _: RecurringIncomeResponse = try await api.fetch(
@@ -158,9 +194,11 @@ final class IncomeVM {
                 method: "POST",
                 body: body
             )
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return false }
             if reload { await load(workspaceId: workspaceId) }
             return true
         } catch {
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return false }
             errorMessage = error.localizedDescription
             return false
         }
