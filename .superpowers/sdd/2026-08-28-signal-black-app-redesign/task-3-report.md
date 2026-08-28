@@ -43,6 +43,24 @@ swiftc -parse (all 8 changed Swift files)    PASS
 
 Per task instructions, `xcodebuild` and XCTest were not run.
 
+## Fix Round 3 — feature revocation timing
+
+- Added `ExpenseFormSheet` reaction to `canUseCreditCards` changes so a feature revocation while the sheet is visible immediately clears stale cards and normalizes the payment channel to cash.
+- Added the same normalization immediately before `SplitCreateSheet.submitEdit` constructs its submission draft, closing the confirmation-dialog timing window while preserving non-card paths.
+- Added structural checks for the Expense change observer and the exact Split submit-time ordering.
+
+Fix Round 3 verification:
+
+```text
+bash scripts/check-signal-redesign.sh        PASS
+bash scripts/check-app-source-regressions.sh PASS
+ruby scripts/test-testflight-workflow.rb     PASS
+git diff --check                             PASS
+swiftc -parse (changed Swift files)           PASS
+```
+
+Per task instructions, `xcodebuild` and XCTest were not run.
+
 ## Fix Round 2 — remaining Important findings
 
 - Added gated card-state normalization to Expense and Split. When `credit_cards` is unavailable, stale edit state is converted to cash with a nil card identifier before presentation and again immediately before request construction; card controls and card loading remain hidden/skipped.

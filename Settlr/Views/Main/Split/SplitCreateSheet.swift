@@ -1073,6 +1073,7 @@ struct SplitCreateSheet: View {
 
     private func submitEdit(clearClaimsFor: Set<String>) {
         guard let editingSplit else { return }
+        normalizeCardPaymentState()
         let bodyDraft = submissionDraft
         guard network.isOnline else {
             errorMessage = "Editing needs an internet connection."

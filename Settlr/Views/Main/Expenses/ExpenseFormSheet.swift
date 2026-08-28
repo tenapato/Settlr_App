@@ -131,6 +131,7 @@ struct ExpenseFormSheet: View {
                 selectedCreditCardId = nil
             }
         }
+        .onChange(of: canUseCreditCards) { _, _ in normalizeCardPaymentState() }
     }
 
     // MARK: - Rows
