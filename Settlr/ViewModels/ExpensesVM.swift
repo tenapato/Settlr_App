@@ -58,6 +58,18 @@ final class ExpensesVM {
     }
 
     @MainActor
+    func loadCategories(workspaceId: String) async {
+        do {
+            let response: CategoriesResponse = try await api.fetch(
+                Endpoints.categories(workspaceId) + "?scope=expense"
+            )
+            categories = response.categories
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
     func load(workspaceId: String) async {
         isLoading = true
         defer { isLoading = false }

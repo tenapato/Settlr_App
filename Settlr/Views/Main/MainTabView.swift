@@ -12,6 +12,7 @@ struct MainTabView: View {
     @State private var showExpenseForm = false
     @State private var showIncomeForm = false
     @State private var showSavingsForm = false
+    @State private var showCategories = false
     @State private var showSplitList = false
     @State private var showSplitScan = false
     @State private var createdSplitId: String?
@@ -36,7 +37,7 @@ struct MainTabView: View {
                     .padding(.bottom, 16)
             }
         }
-        .background(Color(hex: "#0e0f11"))
+        .background(Theme.bg)
         // A tab can disappear under the user: an admin turns a feature off and
         // the next `/api/me` drops it. Landing on Home beats rendering a tab
         // whose content no longer exists.
@@ -98,6 +99,9 @@ struct MainTabView: View {
                 }
             )
             .task { await savingsVM.load(workspaceId: appState.activeWorkspace?.id ?? "") }
+        }
+        .sheet(isPresented: $showCategories) {
+            CategoriesView(workspaceId: appState.activeWorkspace?.id ?? "")
         }
     }
 
@@ -165,14 +169,24 @@ struct MainTabView: View {
         if ActivitySegment.expenses.isAvailable(for: user) {
             actions.append(
                 QuickActionItem(id: "expense", title: "Expense", subtitle: "Add an expense", systemImage: "arrow.up", role: .standard) {
-                    openLedgerForm(.expenses) { showExpenseForm = true }
+                    openLedgerForm(.expenses) {
+                        Task {
+                            await expensesVM.loadCategories(workspaceId: appState.activeWorkspace?.id ?? "")
+                            showExpenseForm = true
+                        }
+                    }
                 }
             )
         }
         if ActivitySegment.income.isAvailable(for: user) {
             actions.append(
                 QuickActionItem(id: "income", title: "Income", subtitle: "Add income", systemImage: "arrow.down", role: .standard) {
-                    openLedgerForm(.income) { showIncomeForm = true }
+                    openLedgerForm(.income) {
+                        Task {
+                            await incomeVM.loadCategories(workspaceId: appState.activeWorkspace?.id ?? "")
+                            showIncomeForm = true
+                        }
+                    }
                 }
             )
         }
@@ -225,7 +239,7 @@ struct MainTabView: View {
                 .frame(maxWidth: .infinity)
                 .background(
                     Capsule()
-                        .fill(Color(hex: "#1c1f23"))
+                    .fill(Theme.surface2)
                         .shadow(color: .black.opacity(0.4), radius: 20, y: 8)
                 )
 
@@ -243,7 +257,9 @@ struct MainTabView: View {
                 // The insights ticker still makes sense without the Categories
                 // screen behind it, so it stays — only the jump goes away.
                 guard CardsCategoriesSegment.categories.isAvailable(for: appState.currentUser) else { return }
-                selectedTab = .cards
+                // Categories will live under Activity in the unified ledger.
+                // Until then, keep this route independent of credit-card access.
+                showCategories = true
             })
         case .activity:
             activityTabContent(workspaceId: wsId)

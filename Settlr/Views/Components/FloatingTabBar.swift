@@ -60,7 +60,7 @@ struct FloatingTabBar: View {
                         .transition(.opacity)
                 }
             }
-            .foregroundStyle(isSelected ? Color(hex: "#c8ff5a") : Color(hex: "#8e9197"))
+            .foregroundStyle(isSelected ? Theme.accentText : Theme.muted)
             .padding(.horizontal, isSelected ? 14 : 0)
             .padding(.vertical, 13)
             // Selected item claims its intrinsic width so the label can't clip;
@@ -71,7 +71,7 @@ struct FloatingTabBar: View {
             .background {
                 if isSelected {
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(hex: "#c8ff5a").opacity(0.14))
+                        .fill(Theme.accent.opacity(0.14))
                         .matchedGeometryEffect(id: "indicator", in: indicatorNS)
                 }
             }

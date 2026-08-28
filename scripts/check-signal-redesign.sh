@@ -15,3 +15,10 @@ grep -Fq 'presentation.isSelected ? Theme.accentText' Settlr/Views/Components/De
 grep -Fq 'case home, activity, savings, cards' Settlr/Views/Components/FloatingTabBar.swift
 grep -Fq 'struct QuickActionLauncher' Settlr/Views/Components/QuickActionLauncher.swift
 grep -Fq 'Scan and split' Settlr/Views/Components/QuickActionLauncher.swift
+grep -Fq '@State private var showCategories = false' Settlr/Views/Main/MainTabView.swift
+grep -Fq '.sheet(isPresented: $showCategories)' Settlr/Views/Main/MainTabView.swift
+grep -Fq 'CategoriesView(workspaceId: appState.activeWorkspace?.id ?? "")' Settlr/Views/Main/MainTabView.swift
+grep -Fq 'await expensesVM.loadCategories' Settlr/Views/Main/MainTabView.swift
+grep -Fq 'await incomeVM.loadCategories' Settlr/Views/Main/MainTabView.swift
+grep -Fq '.background(Theme.bg)' Settlr/Views/Main/MainTabView.swift
+grep -Fq 'Theme.accentText : Theme.muted' Settlr/Views/Components/FloatingTabBar.swift
