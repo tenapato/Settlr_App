@@ -222,6 +222,7 @@ struct SplitCreateSheet: View {
             if canUseCreditCards { await loadCards() }
         }
         .onAppear { applyInitialDraftOnce() }
+        .onChange(of: canUseCreditCards) { _, _ in normalizeCardPaymentState() }
         .onDisappear { photoRecovery.clear() }
     }
 
@@ -355,6 +356,7 @@ struct SplitCreateSheet: View {
             // UI preference into the reusable draft model.
             draft.participants.append(.init(id: nil, name: "", isOrganizer: false))
         }
+        normalizeCardPaymentState()
     }
 
     private func applyScan(_ parsed: ScannedReceipt) {
@@ -611,7 +613,7 @@ struct SplitCreateSheet: View {
                 } label: {
                     Text("\(item.wrappedValue.quantity)×")
                         .font(.system(size: 13, design: .monospaced))
-                        .foregroundStyle(item.wrappedValue.quantity > 1 ? Theme.accent : Theme.faint)
+                        .foregroundStyle(item.wrappedValue.quantity > 1 ? Theme.accentText : Theme.faint)
                         .frame(width: 34)
                 }
 
@@ -688,7 +690,7 @@ struct SplitCreateSheet: View {
     private var extrasSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionEyebrow("Tax, tip & total")
-            if isEvenSplit || totalEdited {
+            if !isEditing && !hasScanned || isEvenSplit || totalEdited {
                 HeroAmountField(
                     amountText: totalAmountBinding,
                     tint: Theme.accentText,
@@ -1001,7 +1003,17 @@ struct SplitCreateSheet: View {
         creditCards = resp.creditCards.filter { !$0.isArchived }
     }
 
+    /// A feature can be revoked while this sheet is open. Normalize stale
+    /// card state before it can reach either a create or edit request.
+    private func normalizeCardPaymentState() {
+        guard !canUseCreditCards else { return }
+        draft.paymentChannel = "cash"
+        draft.creditCardId = nil
+        creditCards = []
+    }
+
     private func save() {
+        normalizeCardPaymentState()
         let bodyDraft = submissionDraft
         if bodyDraft.reconciliation.requiresDecision {
             errorMessage = "Choose whether to keep the receipt total or use the calculated total."

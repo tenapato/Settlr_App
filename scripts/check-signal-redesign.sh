@@ -51,3 +51,12 @@ grep -Fq 'SignalNativeFormRow' Settlr/Views/Main/Split/SplitCreateSheet.swift
 grep -Fq 'DatePicker("Date"' Settlr/Views/Main/Split/SplitCreateSheet.swift
 grep -Fq 'HeroAmountField' Settlr/Views/Main/Split/SplitCreateSheet.swift
 grep -Fq 'Theme.accentText' Settlr/Views/Main/CardPaymentsView.swift
+
+# Task 3 fix round 2: normalize gated state before presenting/saving and keep
+# manual by-item totals editable.
+grep -Fq 'normalizeCardPaymentState()' Settlr/Views/Main/Expenses/ExpenseFormSheet.swift
+grep -Fq 'normalizeCardPaymentState()' Settlr/Views/Main/Split/SplitCreateSheet.swift
+grep -Fq 'paymentChannel: effectivePaymentChannel' Settlr/Views/Main/Expenses/ExpenseFormSheet.swift
+grep -Fq 'creditCardId: effectiveCreditCardId' Settlr/Views/Main/Expenses/ExpenseFormSheet.swift
+grep -Fq 'if !isEditing && !hasScanned' Settlr/Views/Main/Split/SplitCreateSheet.swift
+grep -Fq 'quantity > 1 ? Theme.accentText' Settlr/Views/Main/Split/SplitCreateSheet.swift

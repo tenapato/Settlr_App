@@ -43,6 +43,25 @@ swiftc -parse (all 8 changed Swift files)    PASS
 
 Per task instructions, `xcodebuild` and XCTest were not run.
 
+## Fix Round 2 — remaining Important findings
+
+- Added gated card-state normalization to Expense and Split. When `credit_cards` is unavailable, stale edit state is converted to cash with a nil card identifier before presentation and again immediately before request construction; card controls and card loading remain hidden/skipped.
+- Restored the Hero total for a new, non-scanned by-item/manual split (`!isEditing && !hasScanned`) while retaining scanned receipt reconciliation and the existing even/by-item derived-total rules.
+- Updated the Split item quantity badge to use `Theme.accentText` for light-mode readability.
+- Added structural checks for normalization, effective request fields, manual-total eligibility, and the quantity token.
+
+Fix Round 2 verification:
+
+```text
+bash scripts/check-signal-redesign.sh        PASS
+bash scripts/check-app-source-regressions.sh PASS
+ruby scripts/test-testflight-workflow.rb     PASS
+git diff --check                             PASS
+swiftc -parse (changed Swift files)           PASS
+```
+
+Per task instructions, `xcodebuild` and XCTest were not run.
+
 ## Scope notes
 
 The pre-existing `.superpowers/brainstorm/` directory remains untracked and was not staged. No Server files were touched.

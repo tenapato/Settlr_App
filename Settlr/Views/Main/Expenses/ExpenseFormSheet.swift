@@ -22,6 +22,10 @@ struct ExpenseFormSheet: View {
 
     private var isEditing: Bool { expense != nil }
     private var canUseCreditCards: Bool { appState.currentUser?.has(.creditCards) == true }
+    private var effectivePaymentChannel: String { canUseCreditCards ? paymentChannel : "cash" }
+    private var effectiveCreditCardId: String? {
+        effectivePaymentChannel == "credit_card" ? selectedCreditCardId : nil
+    }
 
     init(
         workspaceId: String,
@@ -116,7 +120,10 @@ struct ExpenseFormSheet: View {
         .task {
             if canUseCreditCards { await loadCreditCards() }
         }
-        .onAppear { if !isEditing { amountFocused = true } }
+        .onAppear {
+            normalizeCardPaymentState()
+            if !isEditing { amountFocused = true }
+        }
         .onChange(of: paymentChannel) { _, newValue in
             if newValue == "credit_card" {
                 ensureDefaultCreditCard()
@@ -217,7 +224,7 @@ struct ExpenseFormSheet: View {
         let hasDescription = !description.trimmingCharacters(in: .whitespaces).isEmpty
         let normalized = amountText.replacingOccurrences(of: ",", with: ".")
         let hasAmount = (Double(normalized) ?? 0) > 0
-        let cardOK = paymentChannel != "credit_card" || selectedCreditCardId != nil
+        let cardOK = effectivePaymentChannel != "credit_card" || effectiveCreditCardId != nil
         return hasDescription && hasAmount && cardOK
     }
 
@@ -250,6 +257,15 @@ struct ExpenseFormSheet: View {
         return card.label
     }
 
+    /// A stale session can revoke card access while an edit sheet is open. Do
+    /// not let that old UI state leak a gated payment channel into a request.
+    private func normalizeCardPaymentState() {
+        guard !canUseCreditCards else { return }
+        paymentChannel = "cash"
+        selectedCreditCardId = nil
+        creditCards = []
+    }
+
     // MARK: - Data + save
 
     @MainActor
@@ -272,6 +288,7 @@ struct ExpenseFormSheet: View {
     }
 
     private func save() {
+        normalizeCardPaymentState()
         guard !description.trimmingCharacters(in: .whitespaces).isEmpty else {
             errorMessage = "Description is required."
             return
@@ -282,8 +299,8 @@ struct ExpenseFormSheet: View {
             return
         }
         let cents = Int((amount * 100).rounded())
-        if paymentChannel == "credit_card" {
-            guard selectedCreditCardId != nil else {
+        if effectivePaymentChannel == "credit_card" {
+            guard effectiveCreditCardId != nil else {
                 errorMessage = creditCards.isEmpty ? "Add a credit card first." : "Select a credit card."
                 return
             }
@@ -296,8 +313,8 @@ struct ExpenseFormSheet: View {
             amountCents: cents,
             occurredAt: dateStr,
             categoryId: selectedCategoryId,
-            paymentChannel: paymentChannel,
-            creditCardId: paymentChannel == "credit_card" ? selectedCreditCardId : nil
+            paymentChannel: effectivePaymentChannel,
+            creditCardId: effectiveCreditCardId
         ))
         dismiss()
     }
