@@ -208,10 +208,10 @@ struct ActivityView: View {
                                     description: body.description,
                                     frequency: repeatEvery.rawValue,
                                     startDate: body.occurredAt,
-                                    categoryId: body.categoryId,
-                                    reload: false,
-                                    expectedGeneration: generation
-                                )
+                                    categoryId: body.categoryId
+                                ),
+                                reload: false,
+                                expectedGeneration: generation
                             )
                         } else {
                             await incomeVM.create(

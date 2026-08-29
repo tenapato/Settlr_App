@@ -105,6 +105,10 @@ grep -Fq '.task(id: workspaceId)' Settlr/Views/Main/Activity/ActivityView.swift
 grep -Fq 'reloadActivityIfCurrentWorkspace' Settlr/Views/Main/Activity/ActivityView.swift
 grep -Fq 'SavingsAccountsSheet(workspaceId: workspaceId, vm: savingsVM)' Settlr/Views/Main/Activity/ActivityView.swift
 grep -Fq 'reload: false' Settlr/Views/Main/Activity/ActivityView.swift
+if ! rg -U -q 'body: CreateRecurringIncomeBody\(\n[[:space:]]+amountCents: body\.amountCents,\n[[:space:]]+description: body\.description,\n[[:space:]]+frequency: repeatEvery\.rawValue,\n[[:space:]]+startDate: body\.occurredAt,\n[[:space:]]+categoryId: body\.categoryId\n[[:space:]]+\),\n[[:space:]]+reload: false,\n[[:space:]]+expectedGeneration: generation' Settlr/Views/Main/Activity/ActivityView.swift; then
+    echo "Activity recurring income must close its body at categoryId and pass reload/generation to createRecurring." >&2
+    exit 1
+fi
 
 # Task 5 fix round 3: workspace-safe Activity mutations, account-gated global
 # Savings quick actions, independent account loading, and duplicate-submit
