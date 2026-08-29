@@ -224,6 +224,7 @@ grep -Fq 'flowOrigin = .manual' Settlr/Views/Main/Split/SplitScanFlow.swift
 grep -Fq 'initialTotalEdited' Settlr/Views/Main/Split/SplitCreateSheet.swift
 grep -Fq 'testManualFlowOriginDoesNotOfferReviewBack' SettlrTests/SplitDraftTests.swift
 grep -Fq 'testDerivedTotalRestorationKeepsTrackingItemTotals' SettlrTests/SplitDraftTests.swift
+grep -Fq 'enum SplitScanFlowOrigin: Equatable' Settlr/Views/Main/Split/SplitDraft.swift
 
 # Task 7 fix round 1: shared CardsVM ownership, gated overflow, and retained
 # data recovery after refresh failures.

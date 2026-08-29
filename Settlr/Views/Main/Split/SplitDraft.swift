@@ -1,6 +1,6 @@
 import Foundation
 
-enum SplitScanFlowOrigin {
+enum SplitScanFlowOrigin: Equatable {
     case capturedReceipt
     case manual
 }
