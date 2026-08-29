@@ -14,6 +14,10 @@ struct SplitCreateSheet: View {
     var notice: String?
     /// Non-nil uses this same form as the complete, versioned split editor.
     var editingSplit: BillSplit? = nil
+    /// Restores a scanner draft when the user backs up to Review.
+    var initialDraft: SplitDraft? = nil
+    var onBackToReview: ((SplitDraft) -> Void)? = nil
+    var onCancelFlow: (() -> Void)? = nil
     /// Scanner owns the full-screen stack. Standalone editor presentations keep
     /// the historical dismiss-on-save behavior.
     var dismissOnSave: Bool = true
@@ -155,12 +159,26 @@ struct SplitCreateSheet: View {
             .navigationTitle(isEditing ? "Edit Bill Split" : "Split a Bill")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        photoRecovery.clear()
-                        dismiss()
+                if onBackToReview != nil {
+                    ToolbarItemGroup(placement: .navigationBarLeading) {
+                        Button("Back") {
+                            onBackToReview?(draft)
+                        }
+                        .foregroundStyle(Theme.muted)
+                        Button("Cancel") {
+                            photoRecovery.clear()
+                            if let onCancelFlow { onCancelFlow() } else { dismiss() }
+                        }
+                        .foregroundStyle(Theme.muted)
                     }
-                    .foregroundStyle(Theme.muted)
+                } else {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            photoRecovery.clear()
+                            if let onCancelFlow { onCancelFlow() } else { dismiss() }
+                        }
+                        .foregroundStyle(Theme.muted)
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     // Says what will actually happen. Offline the split is saved
@@ -348,7 +366,11 @@ struct SplitCreateSheet: View {
         guard !hasInitialized else { return }
         hasInitialized = true
         if scanNotice == nil, let notice { scanNotice = notice }
-        if let editingSplit {
+        if let initialDraft {
+            draft = initialDraft
+            totalEdited = true
+            hasScanned = true
+        } else if let editingSplit {
             draft = SplitDraft(split: editingSplit)
             openedEditVersion = editingSplit.version
             totalEdited = true

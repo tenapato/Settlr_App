@@ -31,9 +31,12 @@ struct SplitScanFlow: View {
     @State private var notice: String?
     @State private var resultSplit: BillSplit?
     @State private var queuedResult = false
+    @State private var flowDraft: SplitDraft?
 
     var body: some View {
-        stageView
+        NavigationStack {
+            stageView
+        }
             .confirmationDialog(
                 "Photo parsing failed",
                 isPresented: $showPhotoRecovery,
@@ -67,10 +70,11 @@ struct SplitScanFlow: View {
             )
         case .review:
             if let prefill {
-                ReceiptReviewView(
-                    receipt: prefill,
-                    onRetake: resetCapture,
-                    onContinue: { stage = .split }
+                    ReceiptReviewView(
+                        receipt: prefill,
+                        onBack: { stage = .capture },
+                        onRetake: resetCapture,
+                        onContinue: { stage = .split }
                 )
             } else {
                 splitEditor
@@ -88,6 +92,12 @@ struct SplitScanFlow: View {
             vm: vm,
             prefill: prefill,
             notice: notice,
+            initialDraft: flowDraft,
+            onBackToReview: { draft in
+                flowDraft = draft
+                stage = .review
+            },
+            onCancelFlow: { dismiss() },
             dismissOnSave: false
         ) { outcome in
             switch outcome {
@@ -112,8 +122,18 @@ struct SplitScanFlow: View {
     private var resultView: some View {
         if let resultSplit {
             SplitResultView(split: resultSplit, onFinish: { dismiss() })
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") { dismiss() }
+                    }
+                }
         } else if queuedResult {
             queuedResultView
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") { dismiss() }
+                    }
+                }
         } else {
             splitEditor
         }
@@ -146,6 +166,7 @@ struct SplitScanFlow: View {
     private func handleCapture(_ image: UIImage) {
         vm.beginReceiptScan()
         errorMessage = nil
+        flowDraft = nil
         photoRecovery.clear()
         busyImage = image
         withAnimation(.easeOut(duration: 0.2)) { busyMessage = "Reading the receipt…" }
@@ -230,6 +251,7 @@ struct SplitScanFlow: View {
 
     private func resetCapture() {
         prefill = nil
+        flowDraft = nil
         notice = nil
         errorMessage = nil
         busyMessage = nil
@@ -242,6 +264,7 @@ struct SplitScanFlow: View {
 /// uncertainty visible without making the user re-read the whole form.
 private struct ReceiptReviewView: View {
     let receipt: ScannedReceipt
+    let onBack: () -> Void
     let onRetake: () -> Void
     let onContinue: () -> Void
 
@@ -289,7 +312,10 @@ private struct ReceiptReviewView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("Back", action: onBack)
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
                 Button("Close") { dismiss() }
             }
         }

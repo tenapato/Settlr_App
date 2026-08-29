@@ -26,6 +26,7 @@ struct ReceiptCaptureView: View {
     @State private var pickedPhoto: PhotosPickerItem?
     @State private var isLoadingPhoto = false
     @State private var pickerError: String?
+    @State private var flashEnabled = false
     @AppStorage(AppPreferenceKey.saveCapturedReceiptsToPhotos)
     private var saveCapturedReceiptsToPhotos = true
 
@@ -65,7 +66,10 @@ struct ReceiptCaptureView: View {
         }
         .preferredColorScheme(.dark)
         .task { await camera.start() }
-        .onDisappear { camera.stop() }
+        .onDisappear {
+            camera.setTorch(enabled: false)
+            camera.stop()
+        }
     }
 
     // MARK: - Chrome
@@ -74,6 +78,7 @@ struct ReceiptCaptureView: View {
         HStack {
             circleButton("xmark") { dismiss() }
             Spacer()
+            flashButton
             if onOpenSplits != nil {
                 circleButton("list.bullet") { onOpenSplits?() }
             }
@@ -92,6 +97,24 @@ struct ReceiptCaptureView: View {
         }
         .contentShape(Circle())
         .accessibilityLabel(systemName == "xmark" ? "Close" : "Open saved splits")
+    }
+
+    private var flashButton: some View {
+        Button {
+            guard camera.flashAvailable else { return }
+            flashEnabled.toggle()
+            camera.setTorch(enabled: flashEnabled)
+        } label: {
+            Image(systemName: flashEnabled ? "bolt.fill" : "bolt.slash")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(flashEnabled ? Theme.accentText : Theme.ink)
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(.ultraThinMaterial))
+        }
+        .contentShape(Circle())
+        .accessibilityLabel("Flash")
+        .accessibilityValue(flashEnabled ? "On" : "Off")
+        .accessibilityHint(camera.flashAvailable ? "Toggles the camera flash" : "Flash is unavailable on this device")
     }
 
     /// A receipt-shaped cut-out — tall and narrow — so people frame the whole
@@ -223,7 +246,7 @@ struct ReceiptCaptureView: View {
     /// same treatment as the `+` button it was launched from.
     private var shutter: some View {
         Button {
-            camera.capture { image in
+            camera.capture(flashEnabled: flashEnabled) { image in
                 guard let image else { return }
                 if saveCapturedReceiptsToPhotos {
                     ReceiptPhotoLibrary.save(image)
@@ -301,12 +324,14 @@ final class CameraController: NSObject, @unchecked Sendable {
     enum State: Equatable { case starting, running, denied, unavailable }
 
     @MainActor private(set) var state: State = .starting
+    @MainActor private(set) var flashAvailable = false
 
     let session = AVCaptureSession()
     private let output = AVCapturePhotoOutput()
     private let queue = DispatchQueue(label: "cash.settlr.camera")
     @MainActor private var captureHandler: (@MainActor (UIImage?) -> Void)?
     private var isConfigured = false
+    private var captureDevice: AVCaptureDevice?
 
     @MainActor
     func start() async {
@@ -343,6 +368,18 @@ final class CameraController: NSObject, @unchecked Sendable {
         }
     }
 
+    @MainActor
+    func setTorch(enabled: Bool) {
+        guard flashAvailable else { return }
+        queue.async { [self] in
+            guard let device = captureDevice, device.hasTorch else { return }
+            guard (try? device.lockForConfiguration()) != nil else { return }
+            defer { device.unlockForConfiguration() }
+            guard device.isTorchModeSupported(enabled ? .on : .off) else { return }
+            device.torchMode = enabled ? .on : .off
+        }
+    }
+
     private func configure() -> Bool {
         session.beginConfiguration()
         defer { session.commitConfiguration() }
@@ -357,6 +394,8 @@ final class CameraController: NSObject, @unchecked Sendable {
 
         session.addInput(input)
         session.addOutput(output)
+        captureDevice = device
+        DispatchQueue.main.async { self.flashAvailable = device.hasFlash }
 
         // Receipts are printed close up; without this the text lands soft.
         if (try? device.lockForConfiguration()) != nil {
@@ -369,12 +408,17 @@ final class CameraController: NSObject, @unchecked Sendable {
     }
 
     @MainActor
-    func capture(completion: @escaping @MainActor (UIImage?) -> Void) {
+    func capture(
+        flashEnabled: Bool = false,
+        completion: @escaping @MainActor (UIImage?) -> Void
+    ) {
         guard state == .running else { return completion(nil) }
         captureHandler = completion
+        let flashMode: AVCaptureDevice.FlashMode =
+            flashAvailable && flashEnabled && output.supportedFlashModes.contains(.on) ? .on : .off
         queue.async { [self] in
             let settings = AVCapturePhotoSettings()
-            settings.flashMode = .auto
+            settings.flashMode = flashMode
             output.capturePhoto(with: settings, delegate: self)
         }
     }

@@ -209,6 +209,15 @@ grep -Fq 'Parser confidence' Settlr/Views/Main/Split/SplitCreateSheet.swift
 grep -Fq 'Unverified rows' Settlr/Views/Main/Split/SplitCreateSheet.swift
 grep -Fq 'SplitDraftTests.swift' Settlr.xcodeproj/project.pbxproj
 
+# Task 8 fix round 1: safe flash, navigable scanner stages, and privacy-safe
+# acceptance of meaningful on-device rows.
+grep -Fq 'flashEnabled' Settlr/Views/Main/Split/ReceiptCaptureView.swift
+grep -Fq 'func setTorch(enabled:' Settlr/Views/Main/Split/ReceiptCaptureView.swift
+grep -Fq 'NavigationStack' Settlr/Views/Main/Split/SplitScanFlow.swift
+grep -Fq 'testAutomaticUsesMeaningfulUnverifiedOnDeviceRowsWithoutCallingServer' SettlrTests/ParserPreferenceTests.swift
+grep -Fq 'testExplicitOnDeviceUsesMeaningfulUnverifiedRowsWithoutCallingServer' SettlrTests/ParserPreferenceTests.swift
+grep -Fq 'hasUsableRows(result)' Settlr/Views/Main/Split/ReceiptReconciler.swift
+
 # Task 7 fix round 1: shared CardsVM ownership, gated overflow, and retained
 # data recovery after refresh failures.
 grep -Fq 'CardsView(workspaceId: workspaceId, vm: cardsVM)' Settlr/Views/Main/CardsRootView.swift
