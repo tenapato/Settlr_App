@@ -7,6 +7,7 @@ struct CardsRootView: View {
     let workspaceId: String
     let canUsePayments: Bool
 
+    @Environment(AppState.self) private var appState
     @State private var cardsVM = CardsVM()
     @State private var paymentVM: CardPaymentsVM?
     @State private var navigatorMode: FortnightNavigatorMode = .current
@@ -39,11 +40,13 @@ struct CardsRootView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        Button("All cards") {
-                            select(.all)
-                        }
+                        if canUsePayments {
+                            Button("All cards") {
+                                select(.all)
+                            }
 
-                        Divider()
+                            Divider()
+                        }
 
                         Button {
                             showCardManagement = true
@@ -71,11 +74,17 @@ struct CardsRootView: View {
             Task { await loadPayments() }
         }
         .sheet(isPresented: $showCardManagement) {
-            CardsView(workspaceId: workspaceId)
+            CardsView(workspaceId: workspaceId, vm: cardsVM) {
+                await refreshAfterCardMutation()
+            }
         }
         .sheet(item: $selectedCard) { card in
             CardDetailSheet(workspaceId: workspaceId, card: card) { body in
-                try await cardsVM.updateCard(workspaceId: workspaceId, cardId: card.id, body: body)
+                guard isCurrentWorkspace else { throw CancellationError() }
+                let updated = try await cardsVM.updateCard(workspaceId: workspaceId, cardId: card.id, body: body)
+                guard isCurrentWorkspace else { return updated }
+                await refreshAfterCardMutation()
+                return updated
             }
         }
     }
@@ -108,6 +117,13 @@ struct CardsRootView: View {
                 .padding(.horizontal, 20)
         } else {
             cardCarousel
+            if let error = cardsVM.errorMessage {
+                SignalRefreshWarning(message: "Showing saved card data. Refresh failed.") {
+                    Task { await cardsVM.load(workspaceId: workspaceId) }
+                }
+                .padding(.horizontal, 20)
+                .accessibilityValue(error)
+            }
         }
     }
 
@@ -165,6 +181,13 @@ struct CardsRootView: View {
                         SignalTraceLoadingView(lastUpdated: nil)
                             .padding(.horizontal, 20)
                     }
+                    if let error = paymentVM.errorMessage {
+                        SignalRefreshWarning(message: "Showing saved payment status. Refresh failed.") {
+                            Task { await paymentVM.load(workspaceId: workspaceId) }
+                        }
+                        .padding(.horizontal, 20)
+                        .accessibilityValue(error)
+                    }
                     ForEach(paymentVM.visibleCards) { card in
                         CardPaymentTile(
                             row: card.row,
@@ -191,6 +214,22 @@ struct CardsRootView: View {
         await cardsVM.load(workspaceId: workspaceId)
         guard canUsePayments else { return }
         await loadPayments()
+    }
+
+    private var isCurrentWorkspace: Bool {
+        appState.activeWorkspace?.id == workspaceId
+    }
+
+    private func refreshAfterCardMutation() async {
+        guard isCurrentWorkspace else { return }
+        await cardsVM.load(workspaceId: workspaceId)
+        guard isCurrentWorkspace, canUsePayments else { return }
+        if paymentVM == nil {
+            await loadPayments()
+        } else if let paymentVM {
+            paymentVM.fortnight = serverFilter(for: navigatorMode)
+            await paymentVM.load(workspaceId: workspaceId)
+        }
     }
 
     private func loadPayments() async {
@@ -331,5 +370,29 @@ private struct DueSummary: View {
         )
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Card payments due")
+    }
+}
+
+struct SignalRefreshWarning: View {
+    let message: String
+    let onRetry: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle")
+                .foregroundStyle(Theme.warning)
+            Text(message)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Theme.muted)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button("Retry", action: onRetry)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.accentText)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Theme.surface2, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(message)
     }
 }

@@ -180,12 +180,11 @@ struct CardPaymentsView: View {
     private var loadedList: some View {
         ScrollView {
             LazyVStack(spacing: 14) {
-                if let err = vm.errorMessage {
-                    Text(err)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Theme.expense)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 20)
+                if vm.errorMessage != nil {
+                    SignalRefreshWarning(message: "Showing saved payment status. Refresh failed.") {
+                        Task { await vm.load(workspaceId: workspaceId) }
+                    }
+                    .padding(.horizontal, 20)
                 }
 
                 if vm.isLoading {

@@ -194,3 +194,15 @@ if rg -q '\.preferredColorScheme\(\.dark\)' Settlr/Views/Main/CardsView.swift Se
     echo "Cards views must follow the app appearance preference." >&2
     exit 1
 fi
+
+# Task 7 fix round 1: shared CardsVM ownership, gated overflow, and retained
+# data recovery after refresh failures.
+grep -Fq 'CardsView(workspaceId: workspaceId, vm: cardsVM)' Settlr/Views/Main/CardsRootView.swift
+grep -Fq 'onCardMutated' Settlr/Views/Main/CardsView.swift
+grep -Fq 'if canUsePayments {' Settlr/Views/Main/CardsRootView.swift
+grep -Fq 'Showing saved card data. Refresh failed.' Settlr/Views/Main/CardsRootView.swift
+grep -Fq 'Showing saved payment status. Refresh failed.' Settlr/Views/Main/CardsRootView.swift
+grep -Fq 'SignalRefreshWarning' Settlr/Views/Main/CardsView.swift
+grep -Fq 'SignalRefreshWarning' Settlr/Views/Main/CardPaymentsView.swift
+grep -Fq 'refreshAfterCardMutation()' Settlr/Views/Main/CardsRootView.swift
+grep -Fq 'guard isCurrentWorkspace else { throw CancellationError() }' Settlr/Views/Main/CardsRootView.swift

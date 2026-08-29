@@ -33,9 +33,10 @@ final class CardsVM {
     }
 
     @MainActor
-    func createCard(workspaceId: String) async {
+    @discardableResult
+    func createCard(workspaceId: String) async -> Bool {
         let label = newLabel.trimmingCharacters(in: .whitespaces)
-        guard !label.isEmpty else { return }
+        guard !label.isEmpty else { return false }
         isCreating = true
         errorMessage = nil
         defer { isCreating = false }
@@ -51,8 +52,10 @@ final class CardsVM {
             cards.append(resp.creditCard)
             resetForm()
             showCreateSheet = false
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
@@ -70,12 +73,15 @@ final class CardsVM {
     }
 
     @MainActor
-    func deleteCard(workspaceId: String, cardId: String) async {
+    @discardableResult
+    func deleteCard(workspaceId: String, cardId: String) async -> Bool {
         do {
             try await api.send(Endpoints.creditCard(workspaceId, cardId), method: "DELETE")
             cards.removeAll { $0.id == cardId }
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
@@ -89,9 +95,22 @@ final class CardsVM {
 struct CardsView: View {
     let workspaceId: String
     var embedded: Bool = false
+    var onCardMutated: (() async -> Void)? = nil
     @State private var vm = CardsVM()
     @State private var searchText = ""
     @State private var selectedCard: CreditCard?
+
+    init(
+        workspaceId: String,
+        embedded: Bool = false,
+        vm: CardsVM? = nil,
+        onCardMutated: (() async -> Void)? = nil
+    ) {
+        self.workspaceId = workspaceId
+        self.embedded = embedded
+        self.onCardMutated = onCardMutated
+        _vm = State(initialValue: vm ?? CardsVM())
+    }
 
     private var filteredCards: [CreditCard] {
         guard !searchText.isEmpty else { return vm.cards }
@@ -122,7 +141,7 @@ struct CardsView: View {
             Theme.bg.ignoresSafeArea()
 
             ZStack {
-                if vm.isLoading {
+                if vm.isLoading && vm.cards.isEmpty {
                     ProgressView()
                         .tint(Theme.accent)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -151,11 +170,15 @@ struct CardsView: View {
             }
         }
         .sheet(isPresented: $vm.showCreateSheet) {
-            CreateCardSheet(vm: vm, workspaceId: workspaceId)
+            CreateCardSheet(vm: vm, workspaceId: workspaceId) {
+                await onCardMutated?()
+            }
         }
         .sheet(item: $selectedCard) { card in
             CardDetailSheet(workspaceId: workspaceId, card: card) { body in
-                try await vm.updateCard(workspaceId: workspaceId, cardId: card.id, body: body)
+                let updated = try await vm.updateCard(workspaceId: workspaceId, cardId: card.id, body: body)
+                await onCardMutated?()
+                return updated
             }
         }
     }
@@ -163,6 +186,13 @@ struct CardsView: View {
     private var cardList: some View {
         ScrollView {
             LazyVStack(spacing: 14) {
+                if vm.errorMessage != nil, !vm.cards.isEmpty {
+                    SignalRefreshWarning(message: "Showing saved card data. Refresh failed.") {
+                        Task { await vm.load(workspaceId: workspaceId) }
+                    }
+                    .padding(.horizontal, 20)
+                }
+
                 // Search bar pinned at top
                 HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass")
@@ -213,7 +243,11 @@ struct CardsView: View {
                         .padding(.horizontal, 20)
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
-                                Task { await vm.deleteCard(workspaceId: workspaceId, cardId: card.id) }
+                                Task {
+                                    if await vm.deleteCard(workspaceId: workspaceId, cardId: card.id) {
+                                        await onCardMutated?()
+                                    }
+                                }
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
@@ -254,6 +288,7 @@ private struct CardTile: View {
 private struct CreateCardSheet: View {
     let vm: CardsVM
     let workspaceId: String
+    let onCreated: () async -> Void
     @FocusState private var focusedField: Field?
 
     private enum Field: Hashable {
@@ -320,7 +355,11 @@ private struct CreateCardSheet: View {
                         }
 
                         Button {
-                            Task { await vm.createCard(workspaceId: workspaceId) }
+                            Task {
+                                if await vm.createCard(workspaceId: workspaceId) {
+                                    await onCreated()
+                                }
+                            }
                         } label: {
                             Group {
                                 if vm.isCreating {
