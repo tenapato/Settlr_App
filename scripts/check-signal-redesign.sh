@@ -159,3 +159,14 @@ if ! grep -Fq 'private func savingsDestinationView' "$activity_view"; then
   echo "Activity savings destination content must be isolated in a helper view function." >&2
   exit 1
 fi
+
+# Task 6: additive server-backed Savings goals and settled account presenters.
+for field in targetAmountCents targetDate goalStatus progressPct remainingCents; do
+  grep -Fq "$field" Settlr/Models/Savings.swift
+done
+grep -Fq 'struct SavingsGoalCard' Settlr/Views/Main/Savings/SavingsView.swift
+grep -Fq 'SavingsGoalCard(account: account)' Settlr/Views/Main/Savings/SavingsView.swift
+grep -Fq 'accountsRequestIsSettled' Settlr/Views/Main/Savings/SavingsVM.swift
+grep -Fq 'accountsRequestIsSettled(for: workspaceId)' Settlr/Views/Main/Activity/ActivityView.swift
+grep -Fq 'accountsRequestIsSettled(for: rootWorkspaceID)' Settlr/Views/Main/MainTabView.swift
+grep -Fq 'SavingsGoalTests.swift' Settlr.xcodeproj/project.pbxproj

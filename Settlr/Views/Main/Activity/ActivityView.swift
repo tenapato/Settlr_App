@@ -83,6 +83,7 @@ struct ActivityView: View {
                 showSavingsForm
                     && user?.has(.savings) == true
                     && savingsVM.loadedWorkspaceID == workspaceId
+                    && savingsVM.accountsRequestIsSettled(for: workspaceId)
                     && savingsVM.hasLoadedAccounts
                     && !savingsVM.accounts.isEmpty
                     && savingsVM.errorMessage == nil
@@ -286,7 +287,10 @@ struct ActivityView: View {
                     showSavingsForm = false
                     return
                 }
-                if savingsVM.hasLoadedAccounts, !savingsVM.accounts.isEmpty, savingsVM.errorMessage == nil {
+                if savingsVM.accountsRequestIsSettled(for: workspaceId),
+                   savingsVM.hasLoadedAccounts,
+                   !savingsVM.accounts.isEmpty,
+                   savingsVM.errorMessage == nil {
                     return
                 } else {
                     showSavingsForm = false

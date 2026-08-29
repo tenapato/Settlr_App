@@ -44,7 +44,7 @@ struct SavingsAccountsSheet: View {
                 SavingsAccountFormSheet(
                     account: editingAccount,
                     isSaving: isSavingAccount,
-                    onSave: { name, color in
+                    onSave: { name, color, targetAmountCents, targetDate in
                         guard !isSavingAccount else { return }
                         isSavingAccount = true
                         let generation = vm.workspaceMutationGeneration(for: workspaceId)
@@ -56,6 +56,8 @@ struct SavingsAccountsSheet: View {
                                     accountId: editingAccount.id,
                                     name: name,
                                     color: color,
+                                    targetAmountCents: targetAmountCents,
+                                    targetDate: targetDate,
                                     expectedGeneration: generation
                                 )
                             } else {
@@ -63,6 +65,8 @@ struct SavingsAccountsSheet: View {
                                     workspaceId: workspaceId,
                                     name: name,
                                     color: color,
+                                    targetAmountCents: targetAmountCents,
+                                    targetDate: targetDate,
                                     expectedGeneration: generation
                                 )
                             }
@@ -140,6 +144,18 @@ struct SavingsAccountsSheet: View {
                             .foregroundStyle(Theme.ink)
                         AmountLabel(cents: account.balanceCents, font: .system(size: 13, weight: .medium))
                             .foregroundStyle(Theme.muted)
+                        if let target = account.targetAmountCents {
+                            HStack(spacing: 4) {
+                                Text(account.goalStatus == "funded" ? "Funded" : "Goal")
+                                AmountLabel(cents: target, font: .system(size: 11, weight: .medium))
+                            }
+                            .font(.system(size: 11))
+                            .foregroundStyle(account.goalStatus == "funded" ? Theme.income : Theme.faint)
+                        } else {
+                            Text("Flexible")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Theme.faint)
+                        }
                     }
 
                     Spacer()
@@ -184,12 +200,15 @@ struct SavingsAccountsSheet: View {
 struct SavingsAccountFormSheet: View {
     var account: SavingsAccount?
     let isSaving: Bool
-    let onSave: (_ name: String, _ color: String) -> Void
+    let onSave: (_ name: String, _ color: String, _ targetAmountCents: Int?, _ targetDate: String?) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
     @State private var colorHex: String
     @State private var pickedColor: Color
+    @State private var targetAmountText: String
+    @State private var targetDate: Date
+    @State private var hasTargetDate: Bool
     @FocusState private var nameFocused: Bool
 
     private var isEditing: Bool { account != nil }
@@ -202,7 +221,7 @@ struct SavingsAccountFormSheet: View {
     init(
         account: SavingsAccount?,
         isSaving: Bool = false,
-        onSave: @escaping (_ name: String, _ color: String) -> Void
+        onSave: @escaping (_ name: String, _ color: String, _ targetAmountCents: Int?, _ targetDate: String?) -> Void
     ) {
         self.account = account
         self.isSaving = isSaving
@@ -211,6 +230,9 @@ struct SavingsAccountFormSheet: View {
         _name = State(initialValue: account?.name ?? "")
         _colorHex = State(initialValue: hex)
         _pickedColor = State(initialValue: Color(hex: hex))
+        _targetAmountText = State(initialValue: account.map { String(format: "%.2f", Double($0.targetAmountCents ?? 0) / 100.0) } ?? "")
+        _targetDate = State(initialValue: Self.parseDate(account?.targetDate))
+        _hasTargetDate = State(initialValue: account?.targetDate != nil)
     }
 
     var body: some View {
@@ -218,6 +240,7 @@ struct SavingsAccountFormSheet: View {
             ZStack {
                 Theme.bg.ignoresSafeArea()
 
+                ScrollView {
                 VStack(spacing: 20) {
                     FormCard {
                         FormTextRow(
@@ -270,10 +293,16 @@ struct SavingsAccountFormSheet: View {
                             .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.line, lineWidth: 1))
                     )
 
+                    goalSection
+
                     Button {
                         let trimmed = name.trimmingCharacters(in: .whitespaces)
                         guard !trimmed.isEmpty, !isSaving else { return }
-                        onSave(trimmed, colorHex)
+                        let normalized = targetAmountText.replacingOccurrences(of: ",", with: ".")
+                        let targetCents = Int(((Double(normalized) ?? 0) * 100).rounded())
+                        let target = targetCents > 0 ? targetCents : nil
+                        let date = target == nil || !hasTargetDate ? nil : Self.formatDate(targetDate)
+                        onSave(trimmed, colorHex, target, date)
                     } label: {
                         if isSaving {
                             ProgressView().tint(Theme.bg)
@@ -288,6 +317,9 @@ struct SavingsAccountFormSheet: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
+                .padding(.bottom, 40)
+                }
+                .scrollDismissesKeyboard(.interactively)
             }
             .navigationTitle(isEditing ? "Edit Account" : "New Account")
             .navigationBarTitleDisplayMode(.inline)
@@ -302,6 +334,70 @@ struct SavingsAccountFormSheet: View {
         }
         .preferredColorScheme(.dark)
         .interactiveDismissDisabled(isSaving)
+    }
+
+    private var goalSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                SectionEyebrow("GOAL", color: Theme.muted)
+                Spacer()
+                Text("Optional")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.faint)
+            }
+            HStack(spacing: 8) {
+                Text("Target amount")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Theme.muted)
+                Spacer()
+                Text("$").foregroundStyle(Theme.accentText)
+                TextField("0.00", text: $targetAmountText)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Theme.ink)
+                    .frame(width: 120)
+            }
+            .frame(minHeight: 44)
+            .overlay(alignment: .bottom) { Rectangle().fill(Theme.line).frame(height: 1) }
+
+            Toggle(isOn: $hasTargetDate) {
+                Text("Target date")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Theme.muted)
+            }
+            .tint(Theme.accent)
+            .frame(minHeight: 44)
+
+            if hasTargetDate {
+                DatePicker("Date", selection: $targetDate, displayedComponents: .date)
+                    .datePickerStyle(.compact)
+                    .tint(Theme.accent)
+            }
+
+            Text("Leave the target amount blank for a flexible account.")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.faint)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Theme.surface)
+                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.line, lineWidth: 1))
+        )
+    }
+
+    private static func parseDate(_ raw: String?) -> Date {
+        guard let raw else { return Date() }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: raw) ?? Date()
+    }
+
+    private static func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
     }
 }
 

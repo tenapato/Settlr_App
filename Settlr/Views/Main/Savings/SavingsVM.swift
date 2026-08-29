@@ -16,6 +16,12 @@ final class SavingsVM {
     /// hasn't finished, and callers must not treat it as a confirmed empty state.
     var hasLoadedAccounts = false
 
+    /// Account responses are allowed to refresh independently from entries.
+    /// Presenters use this marker to distinguish retained accounts from the
+    /// current request's settled result (including a settled failure).
+    private(set) var accountsRequestGeneration: Int = 0
+    private(set) var settledAccountsRequestGeneration: Int?
+
     private let api = APIClient.shared
     private var inFlightLoad: Task<Void, Never>?
     private var loadGeneration = 0
@@ -42,6 +48,17 @@ final class SavingsVM {
     /// This keeps global quick actions from presenting a form with stale data.
     var loadedWorkspaceID: String? { activeWorkspaceID }
 
+    var hasSettledCurrentAccountsRequest: Bool {
+        guard activeWorkspaceID != nil else { return false }
+        return settledAccountsRequestGeneration == loadGeneration
+            && accountsRequestGeneration == loadGeneration
+    }
+
+    @MainActor
+    func accountsRequestIsSettled(for workspaceId: String) -> Bool {
+        activeWorkspaceID == workspaceId && hasSettledCurrentAccountsRequest
+    }
+
     @MainActor
     func workspaceMutationGeneration(for workspaceId: String) -> Int {
         guard activeWorkspaceID == workspaceId else { return -1 }
@@ -65,6 +82,8 @@ final class SavingsVM {
         }
         loadGeneration += 1
         let generation = loadGeneration
+        accountsRequestGeneration = generation
+        settledAccountsRequestGeneration = nil
         isLoading = true
         errorMessage = nil
         let task = Task { @MainActor in await self.performLoad(workspaceId: workspaceId, generation: generation) }
@@ -85,6 +104,8 @@ final class SavingsVM {
         totalBalanceCents = 0
         selectedAccountId = nil
         hasLoadedAccounts = false
+        accountsRequestGeneration = 0
+        settledAccountsRequestGeneration = nil
         errorMessage = nil
     }
 
@@ -121,11 +142,13 @@ final class SavingsVM {
             accounts = accountsResp.accounts.sorted { $0.sortOrder < $1.sortOrder }
             totalBalanceCents = accountsResp.totalBalanceCents
             hasLoadedAccounts = true
+            settledAccountsRequestGeneration = generation
             if let id = selectedAccountId, !accounts.contains(where: { $0.id == id }) {
                 selectedAccountId = nil
             }
         } catch {
             guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }
+            settledAccountsRequestGeneration = generation
             errorMessage = error.localizedDescription
         }
 
@@ -149,13 +172,21 @@ final class SavingsVM {
         workspaceId: String,
         name: String,
         color: String,
+        targetAmountCents: Int? = nil,
+        targetDate: String? = nil,
         expectedGeneration: Int? = nil
     ) async -> Bool {
         do {
             let resp: SavingsAccountResponse = try await api.fetch(
                 Endpoints.savingsAccounts(workspaceId),
                 method: "POST",
-                body: CreateSavingsAccountBody(name: name, color: color, currency: "MXN")
+                body: CreateSavingsAccountBody(
+                    name: name,
+                    color: color,
+                    currency: "MXN",
+                    targetAmountCents: targetAmountCents,
+                    targetDate: targetDate
+                )
             )
             guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return false }
             accounts.append(resp.account)
@@ -174,13 +205,20 @@ final class SavingsVM {
         accountId: String,
         name: String,
         color: String,
+        targetAmountCents: Int? = nil,
+        targetDate: String? = nil,
         expectedGeneration: Int? = nil
     ) async -> Bool {
         do {
             let resp: SavingsAccountResponse = try await api.fetch(
                 Endpoints.savingsAccount(workspaceId, accountId),
                 method: "PATCH",
-                body: UpdateSavingsAccountBody(name: name, color: color)
+                body: UpdateSavingsAccountBody(
+                    name: name,
+                    color: color,
+                    targetAmountCents: targetAmountCents,
+                    targetDate: targetDate
+                )
             )
             guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return false }
             if let idx = accounts.firstIndex(where: { $0.id == accountId }) {

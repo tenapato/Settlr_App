@@ -33,7 +33,8 @@ struct SavingsView: View {
             // accounts. Checking mid-load sent every "Add savings" tap to Manage Accounts.
             Task {
                 await vm.awaitCurrentLoad()
-                if vm.hasLoadedAccounts && vm.accounts.isEmpty {
+                guard vm.accountsRequestIsSettled(for: workspaceId) else { return }
+                if vm.hasLoadedAccounts && (vm.accounts.isEmpty || vm.errorMessage != nil) {
                     showForm = false
                     showManageAccounts = true
                 }
@@ -45,27 +46,25 @@ struct SavingsView: View {
         ZStack {
             Theme.bg.ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                balanceHeader
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 12)
-
-                if !vm.accounts.isEmpty {
-                    accountChips
-                        .padding(.bottom, 12)
+            if vm.isLoading && vm.accounts.isEmpty && !vm.hasLoadedAccounts {
+                SettlrPulseLoadingView(message: "Getting your savings")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if vm.accounts.isEmpty && (vm.hasLoadedAccounts || vm.errorMessage != nil) {
+                noAccountsState
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        balanceHeader
+                        if vm.isLoading || vm.errorMessage != nil { recoveryBanner }
+                        if !vm.accounts.isEmpty { accountChips }
+                        accountObjects
+                        recentEntries
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 120)
                 }
-
-                if vm.isLoading {
-                    Spacer()
-                    ProgressView().tint(Theme.accent)
-                    Spacer()
-                } else if vm.accounts.isEmpty {
-                    noAccountsState
-                } else if vm.filteredEntries.isEmpty {
-                    noEntriesState
-                } else {
-                    entriesList
-                }
+                .refreshable { await vm.load(workspaceId: workspaceId) }
             }
         }
         .toolbar {
@@ -141,7 +140,7 @@ struct SavingsView: View {
     // MARK: - Balance header
 
     private var balanceHeader: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(vm.selectedAccountId == nil ? "Total balance" : "Account balance")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Theme.faint)
@@ -156,12 +155,39 @@ struct SavingsView: View {
             .contentTransition(.numericText())
             .animation(.snappy(duration: 0.25), value: vm.displayBalanceCents)
 
-            Text("Transfers do not affect Net")
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.faint)
+            HStack(spacing: 20) {
+                metric(label: "This month", cents: monthMovementCents, tint: monthMovementCents >= 0 ? Theme.income : Theme.expense)
+                metric(label: "Accounts", text: "\(vm.accounts.count)", tint: Theme.muted)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 4)
+    }
+
+    private func metric(label: String, cents: Int? = nil, text: String? = nil, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            SectionEyebrow(label, color: Theme.faint)
+            if let cents {
+                AmountLabel(cents: cents, font: .system(size: 16, weight: .semibold))
+                    .foregroundStyle(tint)
+            } else {
+                Text(text ?? "—")
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .foregroundStyle(tint)
+            }
+        }
+    }
+
+    private var monthMovementCents: Int {
+        let calendar = Calendar.current
+        let now = Date()
+        let source = vm.selectedAccountId == nil ? vm.entries : vm.filteredEntries
+        return source.reduce(into: 0) { result, entry in
+            guard let date = Self.date(from: entry.occurredAt),
+                  calendar.component(.year, from: date) == calendar.component(.year, from: now),
+                  calendar.component(.month, from: date) == calendar.component(.month, from: now) else { return }
+            result += entry.isDeposit ? entry.amountCents : -entry.amountCents
+        }
     }
 
     // MARK: - Account chips
@@ -191,6 +217,66 @@ struct SavingsView: View {
             }
             .padding(.horizontal, 24)
         }
+    }
+
+    private var accountObjects: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionEyebrow("ACCOUNTS", color: Theme.faint)
+            ForEach(vm.accounts) { account in
+                Button { vm.selectedAccountId = account.id } label: {
+                    SavingsAccountObject(account: account, isSelected: vm.selectedAccountId == account.id)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var recentEntries: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                SectionEyebrow("RECENT ENTRIES", color: Theme.faint)
+                Spacer()
+                if vm.selectedAccountId != nil {
+                    Button("All") { vm.selectedAccountId = nil }
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.accentText)
+                }
+            }
+            if vm.filteredEntries.isEmpty {
+                noEntriesState
+                    .frame(minHeight: 170)
+            } else {
+                ForEach(Array(vm.filteredEntries.prefix(12))) { entry in
+                    LedgerSwipeRow(
+                        onTap: { entryToEdit = entry },
+                        onEdit: { entryToEdit = entry },
+                        onDelete: { entryToDelete = entry }
+                    ) {
+                        SavingsEntryRow(entry: entry, account: vm.account(for: entry.accountId), showAccount: vm.selectedAccountId == nil)
+                    }
+                    .background(Theme.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+            }
+        }
+    }
+
+    private var recoveryBanner: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SignalTraceLoadingView(lastUpdated: nil)
+            if let errorMessage = vm.errorMessage {
+                Text("Couldn’t refresh savings. Showing your last saved data.")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.warning)
+                Text(errorMessage)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.faint)
+                    .lineLimit(2)
+            }
+        }
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Savings refresh unavailable. Showing your last saved data.")
     }
 
     private func accountChip(
@@ -231,53 +317,6 @@ struct SavingsView: View {
     }
 
     // MARK: - Entries list
-
-    private var entriesList: some View {
-        List {
-            ForEach(groupByDay(vm.filteredEntries, date: { $0.occurredAt }, cents: { $0.amountCents })) { section in
-                Section {
-                    ForEach(section.items) { entry in
-                        LedgerSwipeRow(
-                            onTap: { entryToEdit = entry },
-                            onEdit: { entryToEdit = entry },
-                            onDelete: { entryToDelete = entry }
-                        ) {
-                            SavingsEntryRow(
-                                entry: entry,
-                                account: vm.account(for: entry.accountId),
-                                showAccount: vm.selectedAccountId == nil
-                            )
-                        }
-                        .listRowBackground(Theme.surface)
-                        .listRowSeparatorTint(Theme.line)
-                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-                    }
-                } header: {
-                    DaySectionHeader(title: section.title, subtotalCents: section.subtotalCents)
-                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-                }
-            }
-
-            HStack {
-                let count = vm.filteredEntries.count
-                Text("\(count) entr\(count == 1 ? "y" : "ies")")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Theme.faint)
-                Spacer()
-            }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 10)
-            .listRowBackground(Color.clear)
-            .listRowSeparator(.hidden)
-
-            Spacer().frame(height: 100)
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-        }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .refreshable { await vm.load(workspaceId: workspaceId) }
-    }
 
     // MARK: - Empty states
 
@@ -330,6 +369,140 @@ struct SavingsView: View {
         }
         .padding(.horizontal, 32)
     }
+
+    private static func date(from raw: String) -> Date? {
+        for format in ["yyyy-MM-dd'T'HH:mm:ss.SSSZ", "yyyy-MM-dd'T'HH:mm:ssZ", "yyyy-MM-dd"] {
+            let formatter = DateFormatter()
+            formatter.dateFormat = format
+            if let date = formatter.date(from: raw) { return date }
+        }
+        return nil
+    }
+}
+
+private struct SavingsAccountObject: View {
+    let account: SavingsAccount
+    let isSelected: Bool
+
+    var body: some View {
+        SectionCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    Circle()
+                        .fill(Color(hex: account.color ?? "#c8ff5a"))
+                        .frame(width: 10, height: 10)
+                    Text(account.name)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                    Spacer()
+                    if account.goalStatus == "funded" {
+                        Text("FUNDED")
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(0.7)
+                            .foregroundStyle(Theme.accentText)
+                    }
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "chevron.right")
+                        .foregroundStyle(isSelected ? Theme.accentText : Theme.faint)
+                }
+                HStack(alignment: .firstTextBaseline) {
+                    AmountLabel(cents: account.balanceCents, font: .system(size: 25, weight: .bold, design: .rounded))
+                        .foregroundStyle(Theme.ink)
+                    Spacer()
+                    if let target = account.targetAmountCents {
+                        Text("of ")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.faint)
+                        AmountLabel(cents: target, font: .system(size: 12, weight: .medium))
+                            .foregroundStyle(Theme.muted)
+                    } else {
+                        Text("Flexible")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Theme.muted)
+                    }
+                }
+                if account.targetAmountCents != nil {
+                    SavingsGoalCard(account: account)
+                }
+            }
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(isSelected ? Theme.accent.opacity(0.65) : Color.clear, lineWidth: 1)
+        )
+    }
+}
+
+/// Presents server-owned goal progress. Flexible accounts never render a
+/// progress track, and funded status is read from goalStatus rather than
+/// inferred from balances on the device.
+struct SavingsGoalCard: View {
+    let account: SavingsAccount
+
+    private var progress: Double {
+        min(max((account.progressPct ?? 0) / 100.0, 0), 1)
+    }
+
+    private var statusLabel: String {
+        switch account.goalStatus {
+        case "funded": return "Funded"
+        case "past_due": return "Past due"
+        case "in_progress": return "In progress"
+        default: return "Goal"
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(statusLabel)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(account.goalStatus == "funded" ? Theme.income : Theme.accentText)
+                Spacer()
+                if let progressPct = account.progressPct {
+                    Text("\(progressPct.formatted(.number.precision(.fractionLength(0...1))))%")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .foregroundStyle(Theme.ink)
+                }
+            }
+            GeometryReader { proxy in
+                Capsule()
+                    .fill(Theme.line)
+                    .overlay(alignment: .leading) {
+                        Capsule()
+                            .fill(account.goalStatus == "funded" ? Theme.income : Theme.accent)
+                            .frame(width: proxy.size.width * progress)
+                    }
+            }
+            .frame(height: 5)
+            HStack(spacing: 14) {
+                if let remaining = account.remainingCents, remaining > 0 {
+                    Text("\(AmountLabelText(cents: remaining)) remaining")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.muted)
+                } else if account.goalStatus == "funded" {
+                    Text("Target reached")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.income)
+                }
+                if let targetDate = account.targetDate {
+                    Text("by \(targetDate.prefix(10))")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.faint)
+                }
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Savings goal for \(account.name)")
+        .accessibilityValue("\(account.progressPct ?? 0) percent, \(statusLabel)")
+    }
+}
+
+private func AmountLabelText(cents: Int) -> String {
+    let formatter = NumberFormatter()
+    formatter.numberStyle = .currency
+    formatter.currencyCode = "MXN"
+    formatter.maximumFractionDigits = 2
+    return formatter.string(from: NSNumber(value: Double(cents) / 100.0)) ?? "$0.00"
 }
 
 // MARK: - Entry row

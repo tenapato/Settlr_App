@@ -132,6 +132,7 @@ struct MainTabView: View {
                     && selectedTab != .savings
                     && selectedTab != .activity
                     && savingsVM.loadedWorkspaceID == rootWorkspaceID
+                    && savingsVM.accountsRequestIsSettled(for: rootWorkspaceID)
                     && savingsVM.hasLoadedAccounts
                     && !savingsVM.accounts.isEmpty
                     && savingsVM.errorMessage == nil
@@ -168,7 +169,10 @@ struct MainTabView: View {
                   selectedTab != .activity,
                   appState.currentUser?.has(.savings) == true else { return }
             showSavingsForm = false
-            if savingsVM.hasLoadedAccounts, !savingsVM.accounts.isEmpty, savingsVM.errorMessage == nil {
+            if savingsVM.accountsRequestIsSettled(for: workspaceId),
+               savingsVM.hasLoadedAccounts,
+               !savingsVM.accounts.isEmpty,
+               savingsVM.errorMessage == nil {
                 showSavingsForm = true
             } else {
                 showRootSavingsAccounts = true
