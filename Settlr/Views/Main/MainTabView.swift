@@ -135,7 +135,7 @@ struct MainTabView: View {
                     && savingsVM.accountsRequestIsSettled(for: rootWorkspaceID)
                     && savingsVM.hasLoadedAccounts
                     && !savingsVM.accounts.isEmpty
-                    && savingsVM.errorMessage == nil
+                    && savingsVM.accountsErrorMessage == nil
             },
             set: { showSavingsForm = $0 }
         )
@@ -172,7 +172,7 @@ struct MainTabView: View {
             if savingsVM.accountsRequestIsSettled(for: workspaceId),
                savingsVM.hasLoadedAccounts,
                !savingsVM.accounts.isEmpty,
-               savingsVM.errorMessage == nil {
+               savingsVM.accountsErrorMessage == nil {
                 showSavingsForm = true
             } else {
                 showRootSavingsAccounts = true

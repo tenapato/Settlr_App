@@ -1,5 +1,24 @@
 import Foundation
 
+enum SavingsTargetAmountError: Error, Equatable {
+    case invalid
+}
+
+/// Parses the optional account goal amount without allowing malformed or
+/// overflowing values to reach an Int conversion.
+func parseSavingsTargetAmount(_ raw: String) throws -> Int? {
+    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+    guard let amount = Double(trimmed), amount.isFinite, amount > 0 else {
+        throw SavingsTargetAmountError.invalid
+    }
+    let cents = amount * 100
+    guard cents.isFinite, cents.rounded() > 0, cents.rounded() < Double(Int.max) else {
+        throw SavingsTargetAmountError.invalid
+    }
+    return Int(cents.rounded())
+}
+
 struct SavingsAccount: Codable, Identifiable, Hashable {
     let id: String
     let name: String

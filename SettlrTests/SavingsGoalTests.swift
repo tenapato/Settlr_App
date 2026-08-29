@@ -42,6 +42,21 @@ final class SavingsGoalTests: XCTestCase {
         XCTAssertTrue(json?["targetDate"] is NSNull)
     }
 
+    func testBlankTargetAmountClearsGoal() {
+        XCTAssertNil(try? parseSavingsTargetAmount(""))
+        XCTAssertNil(try? parseSavingsTargetAmount("   "))
+    }
+
+    func testInvalidTargetAmountsDoNotBecomeCents() {
+        for raw in ["0", "-1", "nan", "infinity", "1e309", "999999999999999999999999999"] {
+            XCTAssertThrowsError(try parseSavingsTargetAmount(raw))
+        }
+    }
+
+    func testTargetAmountParsesToCents() throws {
+        XCTAssertEqual(try parseSavingsTargetAmount("100.25"), 10_025)
+    }
+
     private func decodeAccount(_ json: String) throws -> SavingsAccount {
         try JSONDecoder().decode(SavingsAccount.self, from: Data(json.utf8))
     }

@@ -16,7 +16,9 @@ struct SavingsAccountsSheet: View {
             ZStack {
                 Theme.bg.ignoresSafeArea()
 
-                if vm.accounts.isEmpty {
+                if vm.accounts.isEmpty && vm.accountsErrorMessage != nil && !vm.hasLoadedAccounts {
+                    accountsErrorState
+                } else if vm.accounts.isEmpty {
                     emptyState
                 } else {
                     accountList
@@ -130,8 +132,40 @@ struct SavingsAccountsSheet: View {
         }
     }
 
+    private var accountsErrorState: some View {
+        VStack(spacing: 14) {
+            Spacer()
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 32))
+                .foregroundStyle(Theme.warning)
+            Text("Accounts unavailable")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+            Text("We couldn’t load this workspace’s accounts. Try again before creating one.")
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.muted)
+                .multilineTextAlignment(.center)
+            Button("Retry") { Task { await vm.load(workspaceId: workspaceId) } }
+                .buttonStyle(PrimaryButtonStyle())
+                .padding(.horizontal, 32)
+            Spacer()
+        }
+        .padding(.horizontal, 28)
+    }
+
     private var accountList: some View {
         List {
+            if vm.accountsErrorMessage != nil {
+                VStack(alignment: .leading, spacing: 6) {
+                    SignalTraceLoadingView(lastUpdated: nil)
+                    Text("Couldn’t refresh accounts. Showing your last saved data.")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Theme.warning)
+                }
+                .padding(.vertical, 6)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            }
             ForEach(vm.accounts) { account in
                 HStack(spacing: 14) {
                     Circle()
@@ -209,6 +243,7 @@ struct SavingsAccountFormSheet: View {
     @State private var targetAmountText: String
     @State private var targetDate: Date
     @State private var hasTargetDate: Bool
+    @State private var errorMessage: String?
     @FocusState private var nameFocused: Bool
 
     private var isEditing: Bool { account != nil }
@@ -298,11 +333,14 @@ struct SavingsAccountFormSheet: View {
                     Button {
                         let trimmed = name.trimmingCharacters(in: .whitespaces)
                         guard !trimmed.isEmpty, !isSaving else { return }
-                        let normalized = targetAmountText.replacingOccurrences(of: ",", with: ".")
-                        let targetCents = Int(((Double(normalized) ?? 0) * 100).rounded())
-                        let target = targetCents > 0 ? targetCents : nil
-                        let date = target == nil || !hasTargetDate ? nil : Self.formatDate(targetDate)
-                        onSave(trimmed, colorHex, target, date)
+                        do {
+                            let target = try parseSavingsTargetAmount(targetAmountText.replacingOccurrences(of: ",", with: "."))
+                            let date = target == nil || !hasTargetDate ? nil : Self.formatDate(targetDate)
+                            errorMessage = nil
+                            onSave(trimmed, colorHex, target, date)
+                        } catch {
+                            errorMessage = "Enter a positive target amount within the supported range, or leave it blank."
+                        }
                     } label: {
                         if isSaving {
                             ProgressView().tint(Theme.bg)
@@ -312,6 +350,13 @@ struct SavingsAccountFormSheet: View {
                     }
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
+
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Theme.expense)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
 
                     Spacer()
                 }

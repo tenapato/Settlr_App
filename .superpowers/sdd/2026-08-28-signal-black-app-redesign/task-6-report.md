@@ -64,3 +64,35 @@ Full SwiftUI type-checking, XCTest execution, simulator verification, and
 manual appearance/accessibility checks remain deferred to the agreed manual
 build stage. The recurring and entry sheets already used Signal rows and were
 left endpoint-compatible.
+
+## Fix Round 1
+
+- Savings plus now settles an account request for the current workspace (or
+  starts one when no request is in flight) before presenting an entry form. Any
+  failed readiness guard closes the form; confirmed empty/error states route to
+  account management, while an initial account-load failure remains on its
+  retry state.
+- Split account-load status from entries and recurring errors. Valid settled
+  accounts remain usable when entries fail, while retained account data stays
+  visible with Signal recovery messaging during refresh failures.
+- Added specific first-load account error/retry states in both Savings and the
+  account-management sheet.
+- Added safe target amount parsing with blank-to-clear semantics and explicit
+  validation for zero, negative, non-finite, malformed, and overflowing input.
+  Invalid input never submits or clears an existing goal.
+- Reworked the root hierarchy into distinct `YOUR GOALS` and `FLEXIBLE
+  SAVINGS` groups. Goal cards now own their account identity and progress, with
+  no redundant generic account-card nesting.
+- Expanded the standalone harness and structural checks for parser safety,
+  readiness wiring, split errors, retry state, and hierarchy.
+
+Fix Round 1 checks:
+
+```text
+Savings goal harness passed
+swiftc -parse (changed Swift files)                     PASS
+bash scripts/check-signal-redesign.sh                   PASS
+bash scripts/check-app-source-regressions.sh           PASS
+ruby scripts/test-testflight-workflow.rb                PASS
+git diff --check                                         PASS
+```

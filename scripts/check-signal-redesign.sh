@@ -166,6 +166,15 @@ for field in targetAmountCents targetDate goalStatus progressPct remainingCents;
 done
 grep -Fq 'struct SavingsGoalCard' Settlr/Views/Main/Savings/SavingsView.swift
 grep -Fq 'SavingsGoalCard(account: account)' Settlr/Views/Main/Savings/SavingsView.swift
+grep -Fq 'YOUR GOALS' Settlr/Views/Main/Savings/SavingsView.swift
+grep -Fq 'FLEXIBLE SAVINGS' Settlr/Views/Main/Savings/SavingsView.swift
+grep -Fq 'accountsErrorMessage' Settlr/Views/Main/Savings/SavingsVM.swift
+grep -Fq 'entriesErrorMessage' Settlr/Views/Main/Savings/SavingsVM.swift
+grep -Fq 'parseSavingsTargetAmount' Settlr/Models/Savings.swift
+grep -Fq 'Savings accounts unavailable' Settlr/Views/Main/Savings/SavingsView.swift
+grep -Fq 'if vm.isLoading && vm.loadedWorkspaceID == workspaceId' Settlr/Views/Main/Savings/SavingsView.swift
+grep -Fq 'guard vm.accountsRequestIsSettled(for: workspaceId), vm.hasLoadedAccounts' Settlr/Views/Main/Savings/SavingsView.swift
+grep -Fq 'Target amount' Settlr/Views/Main/Savings/SavingsAccountsSheet.swift
 grep -Fq 'accountsRequestIsSettled' Settlr/Views/Main/Savings/SavingsVM.swift
 grep -Fq 'accountsRequestIsSettled(for: workspaceId)' Settlr/Views/Main/Activity/ActivityView.swift
 grep -Fq 'accountsRequestIsSettled(for: rootWorkspaceID)' Settlr/Views/Main/MainTabView.swift
