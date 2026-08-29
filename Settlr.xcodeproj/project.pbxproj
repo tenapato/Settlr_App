@@ -65,6 +65,7 @@
 		AA000000000000000000BB37 /* DeleteConfirmDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR38 /* DeleteConfirmDialog.swift */; };
 		AA000000000000000000BB38 /* VirtualCardFace.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR39 /* VirtualCardFace.swift */; };
 		AA000000000000000000BB39 /* CardDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR40 /* CardDetailSheet.swift */; };
+		AA000000000000000000BB94 /* CardsRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR94 /* CardsRootView.swift */; };
 		AA000000000000000000BB40 /* MonthRangeQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR41 /* MonthRangeQuery.swift */; };
 		AA000000000000000000BB41 /* LastWorkspaceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR42 /* LastWorkspaceStore.swift */; };
 		AA000000000000000000BB84 /* PendingSplitQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR84 /* PendingSplitQueue.swift */; };
@@ -114,6 +115,7 @@
 		AB0000000000000000000024 /* DashboardSummaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000025 /* DashboardSummaryTests.swift */; };
 		AB0000000000000000000026 /* ActivityEventTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000027 /* ActivityEventTests.swift */; };
 		AB0000000000000000000028 /* SavingsGoalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000029 /* SavingsGoalTests.swift */; };
+		AB0000000000000000000030 /* CardFortnightPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000031 /* CardFortnightPresentationTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -188,6 +190,7 @@
 		AA000000000000000000FR38 /* DeleteConfirmDialog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteConfirmDialog.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR39 /* VirtualCardFace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VirtualCardFace.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR40 /* CardDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardDetailSheet.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR94 /* CardsRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardsRootView.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR41 /* MonthRangeQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthRangeQuery.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR42 /* LastWorkspaceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LastWorkspaceStore.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR84 /* PendingSplitQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingSplitQueue.swift; sourceTree = "<group>"; };
@@ -236,6 +239,7 @@
 		AB0000000000000000000025 /* DashboardSummaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardSummaryTests.swift; sourceTree = "<group>"; };
 		AB0000000000000000000027 /* ActivityEventTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityEventTests.swift; sourceTree = "<group>"; };
 		AB0000000000000000000029 /* SavingsGoalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavingsGoalTests.swift; sourceTree = "<group>"; };
+		AB0000000000000000000031 /* CardFortnightPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardFortnightPresentationTests.swift; sourceTree = "<group>"; };
 		AA000000000000000000PROD /* Settlr.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Settlr.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -380,6 +384,7 @@
 				AA000000000000000000FR65 /* CardsAndCategoriesView.swift */,
 				AA000000000000000000FR57 /* CardPaymentsView.swift */,
 				AA000000000000000000FR40 /* CardDetailSheet.swift */,
+				AA000000000000000000FR94 /* CardsRootView.swift */,
 			);
 			path = Main;
 			sourceTree = "<group>";
@@ -511,6 +516,7 @@
 				AB0000000000000000000025 /* DashboardSummaryTests.swift */,
 				AB0000000000000000000027 /* ActivityEventTests.swift */,
 				AB0000000000000000000029 /* SavingsGoalTests.swift */,
+				AB0000000000000000000031 /* CardFortnightPresentationTests.swift */,
 				AB0000000000000000000023 /* FeatureAccessTests.swift */,
 				AB0000000000000000000003 /* ReceiptEvidenceTests.swift */,
 				AB0000000000000000000004 /* ParserPreferenceTests.swift */,
@@ -627,6 +633,7 @@
 				AB0000000000000000000024 /* DashboardSummaryTests.swift in Sources */,
 				AB0000000000000000000026 /* ActivityEventTests.swift in Sources */,
 				AB0000000000000000000028 /* SavingsGoalTests.swift in Sources */,
+				AB0000000000000000000030 /* CardFortnightPresentationTests.swift in Sources */,
 				AB0000000000000000000001 /* ReceiptEvidenceTests.swift in Sources */,
 				AB0000000000000000000002 /* ParserPreferenceTests.swift in Sources */,
 				AC0000000000000000000003 /* ReceiptPhotoUploadTests.swift in Sources */,
@@ -690,6 +697,7 @@
 				AA000000000000000000BB37 /* DeleteConfirmDialog.swift in Sources */,
 				AA000000000000000000BB38 /* VirtualCardFace.swift in Sources */,
 				AA000000000000000000BB39 /* CardDetailSheet.swift in Sources */,
+				AA000000000000000000BB94 /* CardsRootView.swift in Sources */,
 				AA000000000000000000BB40 /* MonthRangeQuery.swift in Sources */,
 				AA000000000000000000BB41 /* LastWorkspaceStore.swift in Sources */,
 				AA000000000000000000BB84 /* PendingSplitQueue.swift in Sources */,

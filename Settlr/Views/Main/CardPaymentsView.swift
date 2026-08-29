@@ -59,7 +59,9 @@ final class CardPaymentsVM {
 
     @MainActor
     func load(workspaceId: String) async {
-        isLoading = visibleCards.isEmpty
+        // Keep the existing rows visible while a refresh is in flight; roots
+        // render the inline Signal trace alongside that retained content.
+        isLoading = true
         errorMessage = nil
         defer { isLoading = false }
         do {
@@ -154,9 +156,8 @@ struct CardPaymentsView: View {
 
     @ViewBuilder
     private var content: some View {
-        if vm.isLoading {
-            ProgressView()
-                .tint(Theme.accent)
+        if vm.isLoading && vm.visibleCards.isEmpty {
+            SettlrPulseLoadingView(message: "Loading payment status")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let err = vm.errorMessage, vm.visibleCards.isEmpty {
             PaymentsErrorView(message: err) {
@@ -184,6 +185,11 @@ struct CardPaymentsView: View {
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.expense)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 20)
+                }
+
+                if vm.isLoading {
+                    SignalTraceLoadingView(lastUpdated: nil)
                         .padding(.horizontal, 20)
                 }
 
@@ -379,7 +385,7 @@ private struct TotalsStrip: View {
 
 // MARK: - Card tile
 
-private struct CardPaymentTile: View {
+struct CardPaymentTile: View {
     let row: CardPaymentRow
     let month: String
     let busy: Bool
@@ -454,7 +460,7 @@ private struct CardPaymentTile: View {
                         ProgressView()
                             .tint(row.paidInFull ? Theme.ink : Theme.buttonInk)
                     } else {
-                        Text(row.paidInFull ? "Undo — mark open" : "Mark as paid")
+                        Text(row.paidInFull ? "Undo paid status" : "Mark as paid")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(row.paidInFull ? Theme.muted : Theme.buttonInk)
                     }
@@ -583,7 +589,7 @@ private struct PaymentsEmptyView: View {
     }
 }
 
-private struct FortnightEmptyView: View {
+struct FortnightEmptyView: View {
     let windowLabel: String
     let onShowAll: () -> Void
 
@@ -614,7 +620,7 @@ private struct FortnightEmptyView: View {
     }
 }
 
-private struct PaymentsErrorView: View {
+struct PaymentsErrorView: View {
     let message: String
     let onRetry: () -> Void
     var body: some View {

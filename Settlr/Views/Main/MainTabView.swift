@@ -329,7 +329,11 @@ struct MainTabView: View {
         case .savings:
             SavingsView(workspaceId: wsId, showForm: $showSavingsForm, embedded: false)
         case .cards:
-            CardsTabAdapter(workspaceId: wsId)
+            CardsRootView(
+                workspaceId: wsId,
+                canUsePayments: appState.currentUser?.has(.creditCards) == true
+                    && appState.currentUser?.has(.cardPayments) == true
+            )
         }
     }
 
@@ -346,69 +350,5 @@ struct MainTabView: View {
             incomeVM: incomeVM,
             savingsVM: savingsVM
         )
-    }
-}
-
-private enum CardsTabSection: String, CaseIterable {
-    case cards
-    case payments
-
-    var title: String { self == .cards ? "Cards" : "Payments" }
-}
-
-/// Temporary private adapter. Task 7 will replace this with the public
-/// `CardsRootView` while keeping payment endpoints behind both feature gates.
-private struct CardsTabAdapter: View {
-    let workspaceId: String
-    @Environment(AppState.self) private var appState
-    @State private var section: CardsTabSection = .cards
-
-    private var availableSections: [CardsTabSection] {
-        var sections: [CardsTabSection] = [.cards]
-        if appState.currentUser?.has(.creditCards) == true,
-           appState.currentUser?.has(.cardPayments) == true {
-            sections.append(.payments)
-        }
-        return sections
-    }
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                if availableSections.count > 1 {
-                    Picker("", selection: $section) {
-                        ForEach(availableSections, id: \.self) { item in
-                            Text(item.title).tag(item)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 8)
-                }
-
-                Group {
-                    switch section {
-                    case .cards:
-                        CardsView(workspaceId: workspaceId, embedded: true)
-                    case .payments:
-                        if availableSections.contains(.payments) {
-                            CardPaymentsView(workspaceId: workspaceId)
-                        } else {
-                            CardsView(workspaceId: workspaceId, embedded: true)
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            .background(Theme.bg.ignoresSafeArea())
-            .navigationTitle(section.title)
-            .navigationBarTitleDisplayMode(.large)
-        }
-        .onAppear { reconcileSection() }
-        .onChange(of: availableSections) { _, _ in reconcileSection() }
-    }
-
-    private func reconcileSection() {
-        if !availableSections.contains(section) { section = .cards }
     }
 }

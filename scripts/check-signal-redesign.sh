@@ -179,3 +179,18 @@ grep -Fq 'accountsRequestIsSettled' Settlr/Views/Main/Savings/SavingsVM.swift
 grep -Fq 'accountsRequestIsSettled(for: workspaceId)' Settlr/Views/Main/Activity/ActivityView.swift
 grep -Fq 'accountsRequestIsSettled(for: rootWorkspaceID)' Settlr/Views/Main/MainTabView.swift
 grep -Fq 'SavingsGoalTests.swift' Settlr.xcodeproj/project.pbxproj
+
+# Task 7: Cards root and quiet fortnight navigator.
+grep -Fq 'struct CardsRootView' Settlr/Views/Main/CardsRootView.swift
+grep -Fq 'struct FortnightNavigator' Settlr/Views/Main/CardsRootView.swift
+grep -Fq 'Button("All cards")' Settlr/Views/Main/CardsRootView.swift
+grep -Fq 'FortnightNavigatorState' Settlr/Utils/CardPaymentFortnight.swift
+grep -Fq 'resolvedDueMonthKey' Settlr/Views/Main/CardPaymentsView.swift
+grep -Fq 'Undo paid status' Settlr/Views/Main/CardPaymentsView.swift
+grep -Fq 'SignalTraceLoadingView' Settlr/Views/Main/CardsRootView.swift
+grep -Fq 'CardsRootView(' Settlr/Views/Main/MainTabView.swift
+grep -Fq 'CardFortnightPresentationTests.swift' Settlr.xcodeproj/project.pbxproj
+if rg -q '\.preferredColorScheme\(\.dark\)' Settlr/Views/Main/CardsView.swift Settlr/Views/Main/CardDetailSheet.swift; then
+    echo "Cards views must follow the app appearance preference." >&2
+    exit 1
+fi

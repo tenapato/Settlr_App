@@ -11,6 +11,82 @@ struct FortnightWindow: Equatable {
     let label: String
 }
 
+/// The compact presentation state used by the Cards root. This is deliberately
+/// separate from the server-facing `FortnightFilter`: it owns the exact copy
+/// shown in the navigator while the existing filter remains the loading API.
+enum FortnightNavigatorMode: String, CaseIterable {
+    case previous
+    case current
+    case next
+    case all
+}
+
+struct FortnightNavigatorState: Equatable {
+    let mode: FortnightNavigatorMode
+    let label: String
+    let monthKeys: [String]
+    let window: FortnightWindow?
+
+    static func previous(reference: Date) -> Self { make(reference: reference, mode: .previous) }
+    static func current(reference: Date) -> Self { make(reference: reference, mode: .current) }
+    static func next(reference: Date) -> Self { make(reference: reference, mode: .next) }
+    static func all(reference: Date) -> Self { make(reference: reference, mode: .all) }
+
+    private static func make(reference: Date, mode: FortnightNavigatorMode) -> Self {
+        let calendar = Calendar(identifier: .gregorian)
+        let day = calendar.component(.day, from: reference)
+        let monthKey = monthKey(for: reference, calendar: calendar)
+        let current = CardPaymentFortnight.window(
+            reference: CardPaymentFortnight.referenceDay(forMonth: monthKey, todayDay: day),
+            which: .this
+        )!
+
+        let window: FortnightWindow?
+        switch mode {
+        case .all:
+            window = nil
+        case .current:
+            window = current
+        case .previous:
+            window = CardPaymentFortnight.window(
+                reference: CardPaymentFortnight.referenceDay(forMonth: monthKey, todayDay: day),
+                which: .last
+            )
+        case .next:
+            window = CardPaymentFortnight.window(
+                reference: CardPaymentFortnight.referenceDay(forMonth: monthKey, todayDay: day),
+                which: .next
+            )
+        }
+
+        guard let window else {
+            return Self(mode: mode, label: "All cards", monthKeys: [monthKey], window: nil)
+        }
+        return Self(
+            mode: mode,
+            label: exactLabel(for: window),
+            monthKeys: [window.monthKey],
+            window: window
+        )
+    }
+
+    private static func monthKey(for date: Date, calendar: Calendar) -> String {
+        let components = calendar.dateComponents([.year, .month], from: date)
+        guard let year = components.year, let month = components.month else { return "" }
+        return String(format: "%04d-%02d", year, month)
+    }
+
+    private static func exactLabel(for window: FortnightWindow) -> String {
+        let parts = window.monthKey.split(separator: "-")
+        guard parts.count == 2,
+              Int(parts[0]) != nil,
+              let month = Int(parts[1]) else { return window.label }
+        let monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        let monthName = monthNames.indices.contains(month - 1) ? monthNames[month - 1] : ""
+        return "\(window.startDay)–\(window.endDay) \(monthName)"
+    }
+}
+
 /// A card row resolved into a fortnight window, tagged with the statement
 /// month its payment date actually belongs to. Writes must target that month.
 struct FortnightCard: Identifiable {
