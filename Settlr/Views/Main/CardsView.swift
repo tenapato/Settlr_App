@@ -96,6 +96,7 @@ struct CardsView: View {
     let workspaceId: String
     var embedded: Bool = false
     var onCardMutated: (() async -> Void)? = nil
+    private let ownsViewModel: Bool
     @State private var vm = CardsVM()
     @State private var searchText = ""
     @State private var selectedCard: CreditCard?
@@ -109,6 +110,7 @@ struct CardsView: View {
         self.workspaceId = workspaceId
         self.embedded = embedded
         self.onCardMutated = onCardMutated
+        self.ownsViewModel = vm == nil
         _vm = State(initialValue: vm ?? CardsVM())
     }
 
@@ -133,7 +135,10 @@ struct CardsView: View {
                 }
             }
         }
-        .task { await vm.load(workspaceId: workspaceId) }
+        .task {
+            guard ownsViewModel else { return }
+            await vm.load(workspaceId: workspaceId)
+        }
     }
 
     private var cardsBody: some View {
@@ -146,7 +151,7 @@ struct CardsView: View {
                         .tint(Theme.accent)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .transition(.opacity)
-                } else if let err = vm.errorMessage {
+                } else if let err = vm.errorMessage, vm.cards.isEmpty {
                     CardsErrorView(message: err) {
                         Task { await vm.load(workspaceId: workspaceId) }
                     }

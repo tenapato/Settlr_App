@@ -206,3 +206,8 @@ grep -Fq 'SignalRefreshWarning' Settlr/Views/Main/CardsView.swift
 grep -Fq 'SignalRefreshWarning' Settlr/Views/Main/CardPaymentsView.swift
 grep -Fq 'refreshAfterCardMutation()' Settlr/Views/Main/CardsRootView.swift
 grep -Fq 'guard isCurrentWorkspace else { throw CancellationError() }' Settlr/Views/Main/CardsRootView.swift
+
+# Task 7 fix round 2: retained card content and injected VM ownership.
+grep -Fq 'else if let err = vm.errorMessage, vm.cards.isEmpty' Settlr/Views/Main/CardsView.swift
+grep -Fq 'private let ownsViewModel: Bool' Settlr/Views/Main/CardsView.swift
+grep -Fq 'guard ownsViewModel else { return }' Settlr/Views/Main/CardsView.swift
