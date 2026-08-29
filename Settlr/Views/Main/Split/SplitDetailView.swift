@@ -56,9 +56,14 @@ struct SplitDetailView: View {
         .sheet(isPresented: $showResult) {
             if let split {
                 NavigationStack {
-                    SplitResultView(split: split, onFinish: { showResult = false })
+                    SplitResultView(
+                        split: split,
+                        workspaceId: workspaceId,
+                        splitId: splitId,
+                        vm: vm,
+                        onFinish: { showResult = false }
+                    )
                 }
-                .preferredColorScheme(.dark)
             }
         }
         .sheet(isPresented: $showEditor) {
@@ -100,13 +105,13 @@ struct SplitDetailView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     if let split {
-                        if split.isOpen {
-                            Button { showEditor = true } label: {
-                                Label("Edit split", systemImage: "pencil")
-                            }
-                        } else if split.participants.contains(where: \.isSettled) {
+                        if split.participants.contains(where: \.isSettled) {
                             Button { showSettledEditExplanation = true } label: {
                                 Label("Editing unavailable", systemImage: "lock")
+                            }
+                        } else if split.isOpen {
+                            Button { showEditor = true } label: {
+                                Label("Edit split", systemImage: "pencil")
                             }
                         } else {
                             Button { reopenAndEdit() } label: {
@@ -212,11 +217,13 @@ struct SplitDetailView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 paymentMethodRow(split)
+                if split.accountingPresentation.summaryMode != .reviewRequired {
+                    shareCard(split)
+                }
                 if split.accountingPresentation.summaryMode == .reviewRequired {
                     unavailablePayerCard(split)
                     closedItemsSection(split)
                 } else if split.isOpen {
-                    shareCard(split)
                     itemsSection(split)
                     peopleSection(split)
                 } else if split.isEachOwn {
@@ -324,9 +331,9 @@ struct SplitDetailView: View {
                     ShareLink(item: link.absoluteString) {
                         HStack(spacing: 8) {
                             Image(systemName: "square.and.arrow.up").font(.system(size: 15, weight: .semibold))
-                            Text("Send link").font(.system(size: 15, weight: .semibold))
+                            Text("Share split").font(.system(size: 15, weight: .semibold))
                         }
-                        .foregroundStyle(Theme.bg)
+                        .foregroundStyle(Theme.buttonInk)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                         .background(Theme.accent)
@@ -350,13 +357,11 @@ struct SplitDetailView: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("Copy link")
 
-                    Button {
-                        showQR = true
-                    } label: {
-                        Image(systemName: "qrcode")
-                            .font(.system(size: 15, weight: .semibold))
+                    Button { showQR = true } label: {
+                        Label("Show QR", systemImage: "qrcode")
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Theme.ink)
-                            .frame(width: 46, height: 44)
+                            .frame(minWidth: 112, minHeight: 44)
                             .background(Theme.surface)
                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                             .overlay(
@@ -365,7 +370,7 @@ struct SplitDetailView: View {
                             )
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Show QR code")
+                    .accessibilityLabel("Show QR")
                 }
             }
 
@@ -373,7 +378,7 @@ struct SplitDetailView: View {
             // is the fallback that always works at a table — but only where there
             // is something to tap. An even split is decided by the headcount, so
             // walking the phone around asking "what did you have" changes nothing.
-            if !split.items.isEmpty, !split.isEvenSplit {
+            if split.isOpen, !split.items.isEmpty, !split.isEvenSplit {
                 Button {
                     showPassAround = true
                 } label: {
@@ -395,14 +400,14 @@ struct SplitDetailView: View {
                 .buttonStyle(.plain)
             }
 
-            if split.isEvenSplit {
+            if split.isEvenSplit || !split.isOpen {
                 Button {
                     showResult = true
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "list.number")
                             .font(.system(size: 15, weight: .semibold))
-                        Text("Show who pays what").font(.system(size: 15, weight: .semibold))
+                        Text("Show result").font(.system(size: 15, weight: .semibold))
                     }
                     .foregroundStyle(Theme.ink)
                     .frame(maxWidth: .infinity)
@@ -418,9 +423,11 @@ struct SplitDetailView: View {
             }
 
             Text(
-                split.isEvenSplit
-                    ? "The bill is divided equally — anyone with the link sees their share. No account, no install needed."
-                    : "Anyone with the link picks their own items — no account, no install needed. It opens in the app if they have it."
+                !split.isOpen
+                    ? "This split is closed. The link still shows the final shares."
+                    : (split.isEvenSplit
+                        ? "The bill is divided equally — anyone with the link sees their share. No account, no install needed."
+                        : "Anyone with the link picks their own items — no account, no install needed. It opens in the app if they have it.")
             )
             .font(.system(size: 12))
             .foregroundStyle(Theme.faint)
@@ -458,7 +465,7 @@ struct SplitDetailView: View {
                     if person.isOrganizer {
                         Text("you")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(Theme.bg)
+                            .foregroundStyle(Theme.buttonInk)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(Theme.accent)
@@ -613,8 +620,9 @@ struct SplitDetailView: View {
                     } label: {
                         Text("Mark paid")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Theme.bg)
+                            .foregroundStyle(Theme.buttonInk)
                             .frame(maxWidth: .infinity)
+                            .frame(minHeight: 44)
                             .padding(.vertical, 9)
                             .background(Theme.accent)
                             .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
@@ -845,8 +853,9 @@ struct SplitDetailView: View {
                 }
             }
             .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(Theme.bg)
+            .foregroundStyle(Theme.buttonInk)
             .frame(maxWidth: .infinity)
+            .frame(minHeight: 44)
             .padding(.vertical, 11)
             .background(Theme.accent)
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))

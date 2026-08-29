@@ -34,6 +34,22 @@ final class BillSplitVM {
 
     private let api = APIClient.shared
 
+    /// A conflict is server-authoritative: replace the local split before
+    /// presenting the retry message. Editor drafts remain sheet-local, so a
+    /// safe pending selection is retained while the fresh version is adopted.
+    @MainActor
+    private func adoptConflict(workspaceId: String, splitId: String) async {
+        let response: BillSplitResponse? = try? await api.fetch(
+            Endpoints.billSplit(workspaceId, splitId)
+        )
+        if let response {
+            detail = response.split
+            errorMessage = BillSplitPaymentConflictPresentation.message(didRefresh: true)
+        } else {
+            errorMessage = BillSplitPaymentConflictPresentation.message(didRefresh: false)
+        }
+    }
+
     // MARK: - List
 
     @MainActor
@@ -102,17 +118,7 @@ final class BillSplitVM {
         body: BillSplitPaymentMethodBody
     ) async -> Bool {
         await mutate(
-            onConflict: { _ in
-                let response: BillSplitResponse? = try? await self.api.fetch(
-                    Endpoints.billSplit(workspaceId, splitId)
-                )
-                if let response {
-                    self.detail = response.split
-                    self.errorMessage = BillSplitPaymentConflictPresentation.message(didRefresh: true)
-                } else {
-                    self.errorMessage = BillSplitPaymentConflictPresentation.message(didRefresh: false)
-                }
-            },
+            onConflict: { _ in await self.adoptConflict(workspaceId: workspaceId, splitId: splitId) },
             errorDescription: { error in
                 APIError.isOffline(error)
                     ? "Payment-method changes require an internet connection."
@@ -172,7 +178,9 @@ final class BillSplitVM {
 
     @MainActor
     func setStatus(workspaceId: String, splitId: String, status: String) async -> Bool {
-        await mutate {
+        await mutate(onConflict: { _ in
+            await self.adoptConflict(workspaceId: workspaceId, splitId: splitId)
+        }) {
             try await api.fetch(
                 Endpoints.billSplit(workspaceId, splitId),
                 method: "PATCH",
@@ -188,7 +196,9 @@ final class BillSplitVM {
         participantId: String,
         settled: Bool
     ) async {
-        _ = await mutate {
+        _ = await mutate(onConflict: { _ in
+            await self.adoptConflict(workspaceId: workspaceId, splitId: splitId)
+        }) {
             try await api.fetch(
                 Endpoints.billSplitSettle(workspaceId, splitId, participantId),
                 method: settled ? "POST" : "DELETE"
@@ -283,7 +293,9 @@ final class BillSplitVM {
         splitId: String,
         body: EditBillSplitBody
     ) async -> Bool {
-        await mutate {
+        await mutate(onConflict: { _ in
+            await self.adoptConflict(workspaceId: workspaceId, splitId: splitId)
+        }) {
             try await api.fetch(
                 Endpoints.billSplitDraft(workspaceId, splitId),
                 method: "PUT",

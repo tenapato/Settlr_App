@@ -195,6 +195,22 @@ if rg -q '\.preferredColorScheme\(\.dark\)' Settlr/Views/Main/CardsView.swift Se
     exit 1
 fi
 
+# Task 9: payer-correct result states, settlement safeguards, and branded QR.
+grep -Fq 'Ready to settle.' Settlr/Views/Main/Split/SplitResultView.swift
+grep -Fq 'Show QR' Settlr/Views/Main/Split/SplitResultView.swift
+grep -Fq 'Scan to join' Settlr/Views/Main/Split/SplitQRSheet.swift
+grep -Fq 'Share split' Settlr/Views/Main/Split/SplitResultView.swift
+grep -Fq 'Mark paid' Settlr/Views/Main/Split/SplitResultView.swift
+grep -Fq 'Undo' Settlr/Views/Main/Split/SplitResultView.swift
+grep -Fq 'Waiting to upload' Settlr/Views/Main/Split/SplitScanFlow.swift
+grep -Fq 'reservesCenterBranding' Settlr/Views/Main/Split/SplitQRSheet.swift
+grep -Fq 'protectedCenter' Settlr/Views/Main/Split/SplitQRSheet.swift
+grep -Fq 'showSettledEditExplanation' Settlr/Views/Main/Split/SplitDetailView.swift
+grep -Fq 'Everyone paid their own share' Settlr/Views/Main/Split/SplitResultView.swift
+grep -Fq 'Amount to collect' Settlr/Views/Main/Split/SplitResultView.swift
+grep -Fq 'retry' Settlr/ViewModels/BillSplitVM.swift
+grep -Fq 'testResultPresentationKeepsSettlementCopyPayerCorrect' SettlrTests/EachOwnPresentationTests.swift
+
 # Task 8: Signature Scanner capture, review, and payer/division ordering.
 grep -Fq 'How was it paid?' Settlr/Views/Main/Split/SplitCreateSheet.swift
 grep -Fq 'I paid it all' Settlr/Views/Main/Split/SplitCreateSheet.swift

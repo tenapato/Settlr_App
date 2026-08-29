@@ -152,8 +152,8 @@ struct SplitScanFlow: View {
             Theme.bg.ignoresSafeArea()
             VStack(spacing: 16) {
                 Spacer()
-                SettlrPulseLoadingView(message: "Saved on this phone")
-                Text("We'll upload this split when you're back online.")
+                SettlrPulseLoadingView(message: "Waiting to upload")
+                Text("This split is saved on this phone and will upload when you're back online.")
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.muted)
                     .multilineTextAlignment(.center)
