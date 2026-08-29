@@ -133,3 +133,10 @@ grep -Fq '.interactiveDismissDisabled(isSaving)' Settlr/Views/Main/Savings/Savin
 # current-workspace, successful-account guards as the root presenter.
 grep -Fq 'savingsVM.loadedWorkspaceID == workspaceId' Settlr/Views/Main/Activity/ActivityView.swift
 grep -Fq 'savingsVM.errorMessage == nil' Settlr/Views/Main/Activity/ActivityView.swift
+
+# Activity detail-sheet compiler regression: keep the SavingsAccount lookup
+# explicitly typed and separate from the destination view expression.
+if ! grep -Fq 'let account: SavingsAccount? = vm.savingsAccounts.first { $0.id == destination.id }' Settlr/Views/Main/Activity/ActivityView.swift; then
+  echo "Activity savings sheet must bind its account lookup to a typed local before building the destination view." >&2
+  exit 1
+fi

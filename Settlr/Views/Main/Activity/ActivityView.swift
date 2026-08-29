@@ -157,7 +157,8 @@ struct ActivityView: View {
                     )
                 }
                 .sheet(item: $selectedSavingsAccount) { destination in
-                    SavingsActivityDestinationView(account: vm.savingsAccounts.first { $0.id == destination.id }, accountID: destination.id, entries: vm.savings)
+                    let account: SavingsAccount? = vm.savingsAccounts.first { $0.id == destination.id }
+                    SavingsActivityDestinationView(account: account, accountID: destination.id, entries: vm.savings)
                 }
                 .sheet(item: $selectedSplit) { destination in
                     NavigationStack { SplitDetailView(workspaceId: workspaceId, splitId: destination.id, vm: BillSplitVM()) }
