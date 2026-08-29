@@ -134,9 +134,24 @@ grep -Fq '.interactiveDismissDisabled(isSaving)' Settlr/Views/Main/Savings/Savin
 grep -Fq 'savingsVM.loadedWorkspaceID == workspaceId' Settlr/Views/Main/Activity/ActivityView.swift
 grep -Fq 'savingsVM.errorMessage == nil' Settlr/Views/Main/Activity/ActivityView.swift
 
-# Activity detail-sheet compiler regression: keep the SavingsAccount lookup
-# explicitly typed and separate from the destination view expression.
-if ! grep -Fq 'let account: SavingsAccount? = vm.savingsAccounts.first { $0.id == destination.id }' Settlr/Views/Main/Activity/ActivityView.swift; then
-  echo "Activity savings sheet must bind its account lookup to a typed local before building the destination view." >&2
+# Activity body type-check regression: keep navigation, detail sheets, form
+# sheets, and lifecycle handlers in separately type-checked view layers.
+activity_view=Settlr/Views/Main/Activity/ActivityView.swift
+for layer in \
+  'private var activityBaseNavigation: some View' \
+  'private var activityDetailSheets: some View' \
+  'private var activityFormSheets: some View' \
+  'private var activityLifecycle: some View'; do
+  if ! grep -Fq "$layer" "$activity_view"; then
+    echo "ActivityView must define the separately type-checked layer: $layer" >&2
+    exit 1
+  fi
+done
+if ! grep -Fq 'activityLifecycle' "$activity_view"; then
+  echo "ActivityView.body must terminate at the lifecycle view layer." >&2
+  exit 1
+fi
+if ! grep -Fq 'private func savingsDestinationView' "$activity_view"; then
+  echo "Activity savings destination content must be isolated in a helper view function." >&2
   exit 1
 fi

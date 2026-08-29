@@ -92,6 +92,10 @@ struct ActivityView: View {
     }
 
     var body: some View {
+        activityLifecycle
+    }
+
+    private var activityBaseNavigation: some View {
         NavigationStack {
             ZStack { Theme.bg.ignoresSafeArea(); content }
                 .navigationTitle("Activity")
@@ -116,125 +120,136 @@ struct ActivityView: View {
                         }
                     }
                 }
-                .sheet(isPresented: $showFilterSheet) { ActivityFilterSheet(vm: vm, user: user) }
-                .sheet(item: $selectedExpense) { expense in
-                    ExpenseDetailSheet(
-                        workspaceId: workspaceId,
-                        expense: expense,
-                        categories: vm.categories,
-                        cards: vm.cards,
-                        onUpdated: { updated in
-                            guard appState.activeWorkspace?.id == workspaceId else { return }
-                            if let index = vm.expenses.firstIndex(where: { $0.id == updated.id }) { vm.expenses[index] = updated }
-                            recompute()
-                        },
-                        onDeleted: {
-                            guard appState.activeWorkspace?.id == workspaceId else { return }
-                            vm.expenses.removeAll { $0.id == expense.id }
-                            selectedExpense = nil
-                            recompute()
-                        },
-                        isWorkspaceCurrent: { appState.activeWorkspace?.id == workspaceId }
-                    )
+        }
+    }
+
+    private var activityDetailSheets: some View {
+        activityBaseNavigation
+            .sheet(isPresented: $showFilterSheet) { ActivityFilterSheet(vm: vm, user: user) }
+            .sheet(item: $selectedExpense) { expense in
+                ExpenseDetailSheet(
+                    workspaceId: workspaceId,
+                    expense: expense,
+                    categories: vm.categories,
+                    cards: vm.cards,
+                    onUpdated: { updated in
+                        guard appState.activeWorkspace?.id == workspaceId else { return }
+                        if let index = vm.expenses.firstIndex(where: { $0.id == updated.id }) { vm.expenses[index] = updated }
+                        recompute()
+                    },
+                    onDeleted: {
+                        guard appState.activeWorkspace?.id == workspaceId else { return }
+                        vm.expenses.removeAll { $0.id == expense.id }
+                        selectedExpense = nil
+                        recompute()
+                    },
+                    isWorkspaceCurrent: { appState.activeWorkspace?.id == workspaceId }
+                )
+            }
+            .sheet(item: $selectedIncome) { income in
+                IncomeDetailSheet(
+                    workspaceId: workspaceId,
+                    income: income,
+                    categories: vm.categories,
+                    onUpdated: { updated in
+                        guard appState.activeWorkspace?.id == workspaceId else { return }
+                        if let index = vm.incomes.firstIndex(where: { $0.id == updated.id }) { vm.incomes[index] = updated }
+                        recompute()
+                    },
+                    onDeleted: {
+                        guard appState.activeWorkspace?.id == workspaceId else { return }
+                        vm.incomes.removeAll { $0.id == income.id }
+                        selectedIncome = nil
+                        recompute()
+                    },
+                    isWorkspaceCurrent: { appState.activeWorkspace?.id == workspaceId }
+                )
+            }
+            .sheet(item: $selectedSavingsAccount) { destination in
+                savingsDestinationView(destination)
+            }
+            .sheet(item: $selectedSplit) { destination in
+                NavigationStack { SplitDetailView(workspaceId: workspaceId, splitId: destination.id, vm: BillSplitVM()) }
+            }
+    }
+
+    private var activityFormSheets: some View {
+        activityDetailSheets
+            // Activity owns leaf-form presentation while it is visible;
+            // MainTabView's root bindings are inactive on this tab.
+            .sheet(isPresented: $showExpenseForm) {
+                ExpenseFormSheet(
+                    workspaceId: workspaceId,
+                    categories: vm.categories.isEmpty ? expensesVM.categories : vm.categories
+                ) { body in
+                    Task {
+                        let generation = await expensesVM.workspaceMutationGeneration(for: workspaceId)
+                        await expensesVM.create(
+                            workspaceId: workspaceId,
+                            body: body,
+                            expectedGeneration: generation
+                        )
+                        await reloadActivityIfCurrentWorkspace()
+                    }
                 }
-                .sheet(item: $selectedIncome) { income in
-                    IncomeDetailSheet(
-                        workspaceId: workspaceId,
-                        income: income,
-                        categories: vm.categories,
-                        onUpdated: { updated in
-                            guard appState.activeWorkspace?.id == workspaceId else { return }
-                            if let index = vm.incomes.firstIndex(where: { $0.id == updated.id }) { vm.incomes[index] = updated }
-                            recompute()
-                        },
-                        onDeleted: {
-                            guard appState.activeWorkspace?.id == workspaceId else { return }
-                            vm.incomes.removeAll { $0.id == income.id }
-                            selectedIncome = nil
-                            recompute()
-                        },
-                        isWorkspaceCurrent: { appState.activeWorkspace?.id == workspaceId }
-                    )
-                }
-                .sheet(item: $selectedSavingsAccount) { destination in
-                    let account: SavingsAccount? = vm.savingsAccounts.first { $0.id == destination.id }
-                    SavingsActivityDestinationView(account: account, accountID: destination.id, entries: vm.savings)
-                }
-                .sheet(item: $selectedSplit) { destination in
-                    NavigationStack { SplitDetailView(workspaceId: workspaceId, splitId: destination.id, vm: BillSplitVM()) }
-                }
-                // Activity owns leaf-form presentation while it is visible;
-                // MainTabView's root bindings are inactive on this tab.
-                .sheet(isPresented: $showExpenseForm) {
-                    ExpenseFormSheet(
-                        workspaceId: workspaceId,
-                        categories: vm.categories.isEmpty ? expensesVM.categories : vm.categories
-                    ) { body in
-                        Task {
-                            let generation = await expensesVM.workspaceMutationGeneration(for: workspaceId)
-                            await expensesVM.create(
+            }
+            .sheet(isPresented: $showIncomeForm) {
+                IncomeFormSheet(
+                    workspaceId: workspaceId,
+                    categories: vm.categories.isEmpty ? incomeVM.categories : vm.categories
+                ) { body, repeatEvery in
+                    Task {
+                        let generation = await incomeVM.workspaceMutationGeneration(for: workspaceId)
+                        if let repeatEvery {
+                            _ = await incomeVM.createRecurring(
+                                workspaceId: workspaceId,
+                                body: CreateRecurringIncomeBody(
+                                    amountCents: body.amountCents,
+                                    description: body.description,
+                                    frequency: repeatEvery.rawValue,
+                                    startDate: body.occurredAt,
+                                    categoryId: body.categoryId,
+                                    reload: false,
+                                    expectedGeneration: generation
+                                )
+                            )
+                        } else {
+                            await incomeVM.create(
                                 workspaceId: workspaceId,
                                 body: body,
+                                expectedGeneration: generation
+                            )
+                        }
+                        await reloadActivityIfCurrentWorkspace()
+                    }
+                }
+            }
+            .sheet(isPresented: activitySavingsFormPresentation) {
+                SavingsEntryFormSheet(
+                    workspaceId: workspaceId,
+                    accounts: savingsVM.accounts,
+                    defaultAccountId: savingsVM.selectedAccountId,
+                    onSave: { body in
+                        Task {
+                            let generation = await savingsVM.workspaceMutationGeneration(for: workspaceId)
+                            await savingsVM.createEntry(
+                                workspaceId: workspaceId,
+                                body: body,
+                                reload: false,
                                 expectedGeneration: generation
                             )
                             await reloadActivityIfCurrentWorkspace()
                         }
                     }
-                }
-                .sheet(isPresented: $showIncomeForm) {
-                    IncomeFormSheet(
-                        workspaceId: workspaceId,
-                        categories: vm.categories.isEmpty ? incomeVM.categories : vm.categories
-                    ) { body, repeatEvery in
-                        Task {
-                            let generation = await incomeVM.workspaceMutationGeneration(for: workspaceId)
-                            if let repeatEvery {
-                                _ = await incomeVM.createRecurring(
-                                    workspaceId: workspaceId,
-                                    body: CreateRecurringIncomeBody(
-                                        amountCents: body.amountCents,
-                                        description: body.description,
-                                        frequency: repeatEvery.rawValue,
-                                        startDate: body.occurredAt,
-                                        categoryId: body.categoryId,
-                                        reload: false,
-                                        expectedGeneration: generation
-                                    )
-                                )
-                            } else {
-                                await incomeVM.create(
-                                    workspaceId: workspaceId,
-                                    body: body,
-                                    expectedGeneration: generation
-                                )
-                            }
-                            await reloadActivityIfCurrentWorkspace()
-                        }
-                    }
-                }
-                .sheet(isPresented: activitySavingsFormPresentation) {
-                    SavingsEntryFormSheet(
-                        workspaceId: workspaceId,
-                        accounts: savingsVM.accounts,
-                        defaultAccountId: savingsVM.selectedAccountId,
-                        onSave: { body in
-                            Task {
-                                let generation = await savingsVM.workspaceMutationGeneration(for: workspaceId)
-                                await savingsVM.createEntry(
-                                    workspaceId: workspaceId,
-                                    body: body,
-                                    reload: false,
-                                    expectedGeneration: generation
-                                )
-                                await reloadActivityIfCurrentWorkspace()
-                            }
-                        }
-                    )
-                }
-                .sheet(isPresented: $showSavingsAccounts) {
-                    SavingsAccountsSheet(workspaceId: workspaceId, vm: savingsVM)
-                }
-        }
+                )
+            }
+            .sheet(isPresented: $showSavingsAccounts) {
+                SavingsAccountsSheet(workspaceId: workspaceId, vm: savingsVM)
+            }
+    }
+
+    private var activityLifecycle: some View {
+        activityFormSheets
         .task(id: workspaceId) {
             showExpenseForm = false
             showIncomeForm = false
@@ -290,6 +305,11 @@ struct ActivityView: View {
             }
             Task { await vm.load(workspaceId: workspaceId, user: appState.currentUser, refreshSession: { await appState.refreshSession() }) }
         }
+    }
+
+    private func savingsDestinationView(_ destination: ActivitySavingsDestination) -> some View {
+        let account: SavingsAccount? = vm.savingsAccounts.first { $0.id == destination.id }
+        return SavingsActivityDestinationView(account: account, accountID: destination.id, entries: vm.savings)
     }
 
     @ViewBuilder private var content: some View {
