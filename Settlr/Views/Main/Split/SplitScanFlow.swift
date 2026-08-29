@@ -32,6 +32,12 @@ struct SplitScanFlow: View {
     @State private var resultSplit: BillSplit?
     @State private var queuedResult = false
     @State private var flowDraft: SplitDraft?
+    @State private var flowDraftTotalEdited = false
+    @State private var flowOrigin: SplitScanFlowOrigin = .capturedReceipt
+
+    private var flowMetadata: SplitScanFlowMetadata {
+        SplitScanFlowMetadata(origin: flowOrigin, totalEdited: flowDraftTotalEdited)
+    }
 
     var body: some View {
         NavigationStack {
@@ -93,10 +99,12 @@ struct SplitScanFlow: View {
             prefill: prefill,
             notice: notice,
             initialDraft: flowDraft,
-            onBackToReview: { draft in
+            initialTotalEdited: flowDraft == nil ? nil : flowDraftTotalEdited,
+            onBackToReview: flowMetadata.canReturnToReview ? { draft, totalEdited in
                 flowDraft = draft
+                flowDraftTotalEdited = totalEdited
                 stage = .review
-            },
+            } : nil,
             onCancelFlow: { dismiss() },
             dismissOnSave: false
         ) { outcome in
@@ -167,6 +175,8 @@ struct SplitScanFlow: View {
         vm.beginReceiptScan()
         errorMessage = nil
         flowDraft = nil
+        flowDraftTotalEdited = false
+        flowOrigin = .capturedReceipt
         photoRecovery.clear()
         busyImage = image
         withAnimation(.easeOut(duration: 0.2)) { busyMessage = "Reading the receipt…" }
@@ -196,6 +206,7 @@ struct SplitScanFlow: View {
                     // Text-only Automatic fallback has no photo recovery path.
                     notice = "No signal, so the items couldn't be read automatically — type them in."
                     prefill = nil
+                    flowOrigin = .manual
                     stage = .split
                 } else {
                     // OCR failed or a non-photo parser failed; another capture is
@@ -246,12 +257,17 @@ struct SplitScanFlow: View {
         errorMessage = nil
         notice = "Enter the receipt items manually."
         prefill = nil
+        flowDraft = nil
+        flowDraftTotalEdited = false
+        flowOrigin = .manual
         stage = .split
     }
 
     private func resetCapture() {
         prefill = nil
         flowDraft = nil
+        flowDraftTotalEdited = false
+        flowOrigin = .capturedReceipt
         notice = nil
         errorMessage = nil
         busyMessage = nil

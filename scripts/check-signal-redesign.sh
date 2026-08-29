@@ -218,6 +218,13 @@ grep -Fq 'testAutomaticUsesMeaningfulUnverifiedOnDeviceRowsWithoutCallingServer'
 grep -Fq 'testExplicitOnDeviceUsesMeaningfulUnverifiedRowsWithoutCallingServer' SettlrTests/ParserPreferenceTests.swift
 grep -Fq 'hasUsableRows(result)' Settlr/Views/Main/Split/ReceiptReconciler.swift
 
+# Task 8 fix round 2: manual flow origin and total tracking survive navigation.
+grep -Fq 'struct SplitScanFlowMetadata' Settlr/Views/Main/Split/SplitDraft.swift
+grep -Fq 'flowOrigin = .manual' Settlr/Views/Main/Split/SplitScanFlow.swift
+grep -Fq 'initialTotalEdited' Settlr/Views/Main/Split/SplitCreateSheet.swift
+grep -Fq 'testManualFlowOriginDoesNotOfferReviewBack' SettlrTests/SplitDraftTests.swift
+grep -Fq 'testDerivedTotalRestorationKeepsTrackingItemTotals' SettlrTests/SplitDraftTests.swift
+
 # Task 7 fix round 1: shared CardsVM ownership, gated overflow, and retained
 # data recovery after refresh failures.
 grep -Fq 'CardsView(workspaceId: workspaceId, vm: cardsVM)' Settlr/Views/Main/CardsRootView.swift

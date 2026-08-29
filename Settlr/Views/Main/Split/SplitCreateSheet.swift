@@ -16,7 +16,8 @@ struct SplitCreateSheet: View {
     var editingSplit: BillSplit? = nil
     /// Restores a scanner draft when the user backs up to Review.
     var initialDraft: SplitDraft? = nil
-    var onBackToReview: ((SplitDraft) -> Void)? = nil
+    var initialTotalEdited: Bool? = nil
+    var onBackToReview: ((SplitDraft, Bool) -> Void)? = nil
     var onCancelFlow: (() -> Void)? = nil
     /// Scanner owns the full-screen stack. Standalone editor presentations keep
     /// the historical dismiss-on-save behavior.
@@ -162,7 +163,7 @@ struct SplitCreateSheet: View {
                 if onBackToReview != nil {
                     ToolbarItemGroup(placement: .navigationBarLeading) {
                         Button("Back") {
-                            onBackToReview?(draft)
+                            onBackToReview?(draft, totalEdited)
                         }
                         .foregroundStyle(Theme.muted)
                         Button("Cancel") {
@@ -368,7 +369,7 @@ struct SplitCreateSheet: View {
         if scanNotice == nil, let notice { scanNotice = notice }
         if let initialDraft {
             draft = initialDraft
-            totalEdited = true
+            totalEdited = initialTotalEdited ?? true
             hasScanned = true
         } else if let editingSplit {
             draft = SplitDraft(split: editingSplit)

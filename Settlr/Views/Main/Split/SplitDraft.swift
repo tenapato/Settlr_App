@@ -1,5 +1,19 @@
 import Foundation
 
+enum SplitScanFlowOrigin {
+    case capturedReceipt
+    case manual
+}
+
+struct SplitScanFlowMetadata {
+    let origin: SplitScanFlowOrigin
+    let totalEdited: Bool
+
+    var canReturnToReview: Bool {
+        origin == .capturedReceipt
+    }
+}
+
 /// Complete, reusable state for both composing and editing a split.
 ///
 /// Money stays in integer cents here. Text-field formatting belongs to the

@@ -94,6 +94,23 @@ final class SplitDraftTests: XCTestCase {
         }
     }
 
+    func testManualFlowOriginDoesNotOfferReviewBack() {
+        XCTAssertFalse(SplitScanFlowMetadata(origin: .manual, totalEdited: false).canReturnToReview)
+        XCTAssertTrue(SplitScanFlowMetadata(origin: .capturedReceipt, totalEdited: false).canReturnToReview)
+    }
+
+    func testDerivedTotalRestorationKeepsTrackingItemTotals() {
+        let metadata = SplitScanFlowMetadata(origin: .capturedReceipt, totalEdited: false)
+        XCTAssertFalse(metadata.totalEdited)
+
+        var draft = makeDraft(itemTotal: 1_000, selectedTotal: 1_000)
+        draft.items[0].unitPriceCents = 1_500
+        draft.selectedTotalCents = draft.calculatedTotalCents
+
+        XCTAssertFalse(draft.reconciliation.requiresDecision)
+        XCTAssertEqual(draft.selectedTotalCents, 1_500)
+    }
+
     func testReconciliationUsesLargerOfOnePesoAndPointOnePercentTolerance() {
         // This catches rounding thresholds that mistakenly force a decision for
         // a one-peso receipt difference or ignore a material discrepancy.
