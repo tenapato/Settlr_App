@@ -83,9 +83,6 @@ struct QuickActionLauncher: View {
             .accessibilityHint(isOpen ? "Dismisses the quick action menu" : "Shows quick actions")
             .accessibilityAddTraits(.isButton)
         }
-        .onExitCommand {
-            if isOpen { onSetOpen(false) }
-        }
         .onChange(of: isOpen) { _, open in
             menuFocused = open
         }
