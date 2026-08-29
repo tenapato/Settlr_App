@@ -87,9 +87,11 @@ struct ReceiptCaptureView: View {
             Image(systemName: systemName)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.ink)
-                .frame(width: 38, height: 38)
+                .frame(width: 44, height: 44)
                 .background(Circle().fill(.ultraThinMaterial))
         }
+        .contentShape(Circle())
+        .accessibilityLabel(systemName == "xmark" ? "Close" : "Open saved splits")
     }
 
     /// A receipt-shaped cut-out — tall and narrow — so people frame the whole
@@ -98,12 +100,35 @@ struct ReceiptCaptureView: View {
         GeometryReader { geo in
             let width = geo.size.width * 0.74
             let height = min(geo.size.height * 0.56, width * 1.5)
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Theme.accent.opacity(0.75), style: StrokeStyle(lineWidth: 2, dash: [9, 7]))
-                .frame(width: width, height: height)
-                .position(x: geo.size.width / 2, y: geo.size.height * 0.44)
-                .allowsHitTesting(false)
+            let origin = CGPoint(
+                x: (geo.size.width - width) / 2,
+                y: geo.size.height * 0.44 - height / 2
+            )
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Theme.accent.opacity(0.16), lineWidth: 1)
+                    .frame(width: width, height: height)
+                ForEach(0..<4, id: \.self) { index in
+                    scannerCorner(index: index, width: width, height: height)
+                }
+            }
+            .frame(width: width, height: height)
+            .position(x: geo.size.width / 2, y: origin.y + height / 2)
+            .allowsHitTesting(false)
         }
+    }
+
+    private func scannerCorner(index: Int, width: CGFloat, height: CGFloat) -> some View {
+        let isLeft = index % 2 == 0
+        let isTop = index < 2
+        return Path { path in
+            let x = isLeft ? 2 : width - 2
+            let y = isTop ? 2 : height - 2
+            path.move(to: CGPoint(x: x, y: isTop ? y + 26 : y - 26))
+            path.addLine(to: CGPoint(x: x, y: y))
+            path.addLine(to: CGPoint(x: isLeft ? x + 26 : x - 26, y: y))
+        }
+        .stroke(Theme.accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
     }
 
     private var bottomControls: some View {
@@ -228,12 +253,7 @@ struct ReceiptCaptureView: View {
     private func busyOverlay(_ message: String) -> some View {
         ZStack {
             Color.black.opacity(0.72).ignoresSafeArea()
-            VStack(spacing: 14) {
-                ProgressView().tint(Theme.accent).scaleEffect(1.3)
-                Text(message)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Theme.ink)
-            }
+            SettlrPulseLoadingView(message: message)
         }
         .transition(.opacity)
     }

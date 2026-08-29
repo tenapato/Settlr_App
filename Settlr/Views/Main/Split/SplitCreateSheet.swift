@@ -14,6 +14,9 @@ struct SplitCreateSheet: View {
     var notice: String?
     /// Non-nil uses this same form as the complete, versioned split editor.
     var editingSplit: BillSplit? = nil
+    /// Scanner owns the full-screen stack. Standalone editor presentations keep
+    /// the historical dismiss-on-save behavior.
+    var dismissOnSave: Bool = true
     let onSaved: (SplitSaveOutcome) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -110,6 +113,7 @@ struct SplitCreateSheet: View {
                 ScrollView {
                     VStack(spacing: 20) {
                         scanBanner
+                        receiptReviewSection
                         VStack(spacing: 0) {
                             SignalFormRow(label: "Where") {
                                 TextField("Restaurant or store", text: $draft.merchant)
@@ -406,19 +410,14 @@ struct SplitCreateSheet: View {
     /// table the answer is known before anybody starts tapping.
     private var splitModeSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionEyebrow("Splitting this bill")
-            SegmentedToggle(
-                selection: $draft.payer,
-                options: [
-                    ToggleOption(value: "me", label: "I paid it all", icon: "person.fill"),
-                    ToggleOption(value: "each_own", label: "Each paid their own", icon: "person.2.fill"),
-                ]
-            )
+            SectionEyebrow("How was it paid?")
+            payerChoices
+            SectionEyebrow("How should it be divided?")
             SegmentedToggle(
                 selection: $draft.splitMode,
                 options: [
                     ToggleOption(value: "by_item", label: "By item", icon: "list.bullet"),
-                    ToggleOption(value: "even", label: "Even", icon: "equal"),
+                    ToggleOption(value: "even", label: "Evenly", icon: "equal")
                 ]
             )
 
@@ -460,6 +459,126 @@ struct SplitCreateSheet: View {
                 .foregroundStyle(Theme.faint)
                 .padding(.horizontal, 4)
         }
+    }
+
+    private var payerChoices: some View {
+        VStack(spacing: 0) {
+            payerChoice(
+                value: "me",
+                title: "I paid it all",
+                detail: "Track what everyone owes you",
+                icon: "person.fill"
+            )
+            FormRowDivider()
+            payerChoice(
+                value: "each_own",
+                title: "Each paid their own",
+                detail: "No one needs to pay you back",
+                icon: "person.2.fill"
+            )
+        }
+        .background(Theme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Theme.line, lineWidth: 1)
+        )
+    }
+
+    private func payerChoice(value: String, title: String, detail: String, icon: String) -> some View {
+        let selected = draft.payer == value
+        return Button {
+            draft.payer = value
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(selected ? Theme.accentText : Theme.muted)
+                    .frame(width: 24)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                    Text(detail)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.muted)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(selected ? Theme.accentText : Theme.faint)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 13)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityValue(selected ? "Selected" : "Not selected")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    /// Scan results are deliberately a calm summary. Signal attention is only
+    /// used for an unverified row or a material reconciliation mismatch.
+    @ViewBuilder
+    private var receiptReviewSection: some View {
+        if hasScanned {
+            VStack(alignment: .leading, spacing: 8) {
+                SectionEyebrow("Review")
+                FormCard {
+                    reviewRow("Merchant", draft.merchant.isEmpty ? "Not found" : draft.merchant, attention: draft.merchant.isEmpty)
+                    FormRowDivider()
+                    reviewRow("Printed total", formatSplitMoney(draft.selectedTotalCents), attention: reconciliation.isMaterial)
+                    FormRowDivider()
+                    reviewRow("Date", draft.occurredAt.formatted(date: .abbreviated, time: .omitted))
+                    FormRowDivider()
+                    reviewRow("Payment method", paymentMethodLabel)
+                    FormRowDivider()
+                    reviewRow("Category", draft.categoryId == nil ? "Uncategorized" : "Selected")
+                    FormRowDivider()
+                    reviewRow("Parser confidence", parserConfidence, attention: !draft.unverifiedItems.isEmpty || !draft.scanWarnings.isEmpty)
+                }
+
+                if !draft.unverifiedItems.isEmpty {
+                    FormCard {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label("Unverified rows", systemImage: "exclamationmark.triangle.fill")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Theme.warning)
+                            ForEach(draft.unverifiedItems) { item in
+                                Text("• " + (item.name.isEmpty ? "Unnamed item" : item.name))
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Theme.muted)
+                            }
+                        }
+                        .padding(14)
+                    }
+                }
+            }
+        }
+    }
+
+    private var paymentMethodLabel: String {
+        draft.paymentChannel == "credit_card" ? "Credit card" : "Cash / debit"
+    }
+
+    private var parserConfidence: String {
+        draft.unverifiedItems.isEmpty && draft.scanWarnings.isEmpty ? "High confidence" : "Needs attention"
+    }
+
+    private func reviewRow(_ label: String, _ value: String, attention: Bool = false) -> some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 14))
+                .foregroundStyle(Theme.muted)
+            Spacer(minLength: 12)
+            Text(value)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(attention ? Theme.warning : Theme.ink)
+                .multilineTextAlignment(.trailing)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
 
     /// Optional names for the rest of the table.
@@ -1056,7 +1175,7 @@ struct SplitCreateSheet: View {
             switch outcome {
             case .created, .queued:
                 onSaved(outcome)
-                dismiss()
+                if dismissOnSave { dismiss() }
             case .rejected(let message):
                 // The server looked at this and said no. Stay open with every
                 // field intact so it can be fixed — exactly as before.
@@ -1094,7 +1213,7 @@ struct SplitCreateSheet: View {
             )
             if saved, let updated = vm.detail {
                 onSaved(.created(updated))
-                dismiss()
+                if dismissOnSave { dismiss() }
             } else {
                 errorMessage = vm.errorMessage
             }

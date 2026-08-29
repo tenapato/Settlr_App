@@ -195,6 +195,20 @@ if rg -q '\.preferredColorScheme\(\.dark\)' Settlr/Views/Main/CardsView.swift Se
     exit 1
 fi
 
+# Task 8: Signature Scanner capture, review, and payer/division ordering.
+grep -Fq 'How was it paid?' Settlr/Views/Main/Split/SplitCreateSheet.swift
+grep -Fq 'I paid it all' Settlr/Views/Main/Split/SplitCreateSheet.swift
+grep -Fq 'Each paid their own' Settlr/Views/Main/Split/SplitCreateSheet.swift
+grep -Fq 'By item' Settlr/Views/Main/Split/SplitCreateSheet.swift
+grep -Fq 'Evenly' Settlr/Views/Main/Split/SplitCreateSheet.swift
+grep -Fq 'enum SplitScanStage' Settlr/Views/Main/Split/SplitScanFlow.swift
+grep -Fq 'case capture, review, split, result' Settlr/Views/Main/Split/SplitScanFlow.swift
+grep -Fq 'accessibilityReduceMotion' Settlr/Views/Main/Split/ScanningOverlay.swift
+grep -Fq 'Review' Settlr/Views/Main/Split/SplitCreateSheet.swift
+grep -Fq 'Parser confidence' Settlr/Views/Main/Split/SplitCreateSheet.swift
+grep -Fq 'Unverified rows' Settlr/Views/Main/Split/SplitCreateSheet.swift
+grep -Fq 'SplitDraftTests.swift' Settlr.xcodeproj/project.pbxproj
+
 # Task 7 fix round 1: shared CardsVM ownership, gated overflow, and retained
 # data recovery after refresh failures.
 grep -Fq 'CardsView(workspaceId: workspaceId, vm: cardsVM)' Settlr/Views/Main/CardsRootView.swift

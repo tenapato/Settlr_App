@@ -79,6 +79,21 @@ final class SplitDraftTests: XCTestCase {
         XCTAssertEqual(draft.unverifiedItems.map(\.name), ["TACO"])
     }
 
+    func testCreateBodyPreservesEveryPayerAndDivisionCombination() {
+        for payer in ["me", "each_own"] {
+            for splitMode in ["by_item", "even"] {
+                var draft = makeDraft(itemTotal: 1_000, selectedTotal: 1_000)
+                draft.payer = payer
+                draft.splitMode = splitMode
+
+                let body = draft.makeCreateBody()
+
+                XCTAssertEqual(body.payer, payer)
+                XCTAssertEqual(body.splitMode, splitMode)
+            }
+        }
+    }
+
     func testReconciliationUsesLargerOfOnePesoAndPointOnePercentTolerance() {
         // This catches rounding thresholds that mistakenly force a decision for
         // a one-peso receipt difference or ignore a material discrepancy.

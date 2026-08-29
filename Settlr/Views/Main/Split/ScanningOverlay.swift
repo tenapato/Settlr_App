@@ -13,6 +13,7 @@ struct ScanningOverlay: View {
 
     @State private var sweep: CGFloat = 0
     @State private var pulse = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let cardWidth: CGFloat = 216
     private let cardHeight: CGFloat = 300
@@ -40,6 +41,7 @@ struct ScanningOverlay: View {
         }
         .transition(.opacity)
         .onAppear {
+            guard !reduceMotion else { return }
             withAnimation(.linear(duration: 1.6).repeatForever(autoreverses: false)) {
                 sweep = 1
             }
@@ -85,7 +87,7 @@ struct ScanningOverlay: View {
                     .frame(height: 2)
                     .shadow(color: Theme.accent.opacity(0.9), radius: 8)
             }
-            .offset(y: -60 + travel * sweep)
+            .offset(y: reduceMotion ? 0 : -60 + travel * sweep)
         }
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .allowsHitTesting(false)
