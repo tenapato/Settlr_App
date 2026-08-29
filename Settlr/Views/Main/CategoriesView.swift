@@ -4,6 +4,7 @@ import SwiftUI
 
 // MARK: - ViewModel
 
+@MainActor
 @Observable
 final class CategoriesVM {
     var categories: [Category] = []

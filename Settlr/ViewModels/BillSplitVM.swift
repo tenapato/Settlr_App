@@ -14,6 +14,7 @@ enum BillSplitPaymentConflictPresentation {
 /// create flow. Every number shown comes back from the server — the app never
 /// does share math of its own, so the app, the web link and the ledger can't
 /// disagree about who owes what.
+@MainActor
 @Observable
 final class BillSplitVM {
     enum ClaimMutationResult: Equatable {

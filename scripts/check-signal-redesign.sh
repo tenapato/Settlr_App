@@ -114,7 +114,7 @@ grep -Fq 'workspaceMutationGeneration(for workspaceId: String)' Settlr/ViewModel
 grep -Fq 'expectedGeneration: Int? = nil' Settlr/ViewModels/ExpensesVM.swift
 grep -Fq 'expectedGeneration: Int? = nil' Settlr/ViewModels/IncomeVM.swift
 grep -Fq 'expectedGeneration: Int? = nil' Settlr/Views/Main/Savings/SavingsVM.swift
-grep -Fq 'guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }' Settlr/Views/Main/Savings/SavingsVM.swift
+grep -Fq 'if generation == loadGeneration, activeWorkspaceID == workspaceId {' Settlr/Views/Main/Savings/SavingsVM.swift
 grep -Fq 'showRootSavingsAccounts' Settlr/Views/Main/MainTabView.swift
 grep -Fq 'prepareGlobalSavingsForm()' Settlr/Views/Main/MainTabView.swift
 grep -Fq 'savingsVM.hasLoadedAccounts' Settlr/Views/Main/MainTabView.swift

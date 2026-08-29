@@ -143,9 +143,10 @@ final class ActivityVM {
         isLoading = true
         errorMessage = nil
         defer {
-            guard generation == loadGeneration else { return }
-            isLoading = false
-            hasLoaded = true
+            if generation == loadGeneration, activeWorkspaceID == workspaceId {
+                isLoading = false
+                hasLoaded = true
+            }
         }
 
         async let expenseResult = fetch(

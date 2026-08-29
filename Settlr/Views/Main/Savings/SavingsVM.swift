@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 
+@MainActor
 @Observable
 final class SavingsVM {
     var accounts: [SavingsAccount] = []
@@ -98,8 +99,9 @@ final class SavingsVM {
     private func performLoad(workspaceId: String, generation: Int) async {
         guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }
         defer {
-            guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }
-            isLoading = false
+            if generation == loadGeneration, activeWorkspaceID == workspaceId {
+                isLoading = false
+            }
         }
 
         // Recurring rules are supplementary: the endpoint may be absent on a given

@@ -3,6 +3,7 @@ import Observation
 
 // MARK: - ViewModel
 
+@MainActor
 @Observable
 final class CardPaymentsVM {
     var month: String = {

@@ -19,7 +19,7 @@ struct HeroAmountField: View {
                     .font(.system(size: 30, weight: .semibold, design: .rounded))
                     .foregroundStyle(tint)
 
-                TextField(text: $amountText, prompt: Text("0.00").foregroundStyle(Theme.faint))
+                TextField("", text: $amountText, prompt: Text("0.00").foregroundStyle(Theme.faint))
                     .focused(focus)
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.center)

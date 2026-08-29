@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 
+@MainActor
 @Observable
 final class DashboardVM {
     var summary: SummaryResponse?
