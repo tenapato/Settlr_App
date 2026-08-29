@@ -161,7 +161,7 @@ struct SplitScanFlow: View {
                 Spacer()
                 Button("Done") { dismiss() }
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Theme.bg)
+                    .foregroundStyle(Theme.buttonInk)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(Theme.accent)

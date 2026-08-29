@@ -211,7 +211,7 @@ struct SplitDetailView: View {
             VStack(spacing: 18) {
                 header(split)
                 if let error = vm.errorMessage {
-                    Text(error)
+                    Text("\(error) Retry when you're ready.")
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.expense)
                         .frame(maxWidth: .infinity, alignment: .leading)

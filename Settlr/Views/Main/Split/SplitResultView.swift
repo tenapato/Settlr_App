@@ -23,6 +23,23 @@ struct SplitResultPresentation: Equatable {
         payerMode == .organizerPaid ? "Amount to collect" : nil
     }
 
+    var showsParticipantBalances: Bool {
+        payerMode != .unavailable
+    }
+
+    func statusHeadline(isOpen: Bool) -> String {
+        guard payerMode == .organizerPaid else { return statusHeadline }
+        return isOpen ? "Finish claiming to settle." : statusHeadline
+    }
+
+    func showsSettlementControls(isOpen: Bool, hasOwnerContext: Bool) -> Bool {
+        hasOwnerContext && !isOpen && payerMode == .organizerPaid
+    }
+
+    static func aggregateOtherShares(participantShares: [Int]) -> Int {
+        participantShares.reduce(0, +)
+    }
+
     func participantStatus(isOrganizer: Bool, isSettled: Bool) -> String {
         switch payerMode {
         case .organizerPaid:
@@ -67,6 +84,12 @@ struct SplitResultView: View {
         currentSplit.organizer?.owedCents ?? 0
     }
 
+    private var otherSharesCents: Int {
+        SplitResultPresentation.aggregateOtherShares(
+            participantShares: currentSplit.guests.map(\.owedCents)
+        )
+    }
+
     private var amountToCollectCents: Int {
         // `outstandingCents` is server-owned and already includes the exact
         // extras allocation used by the settlement endpoint.
@@ -85,15 +108,21 @@ struct SplitResultView: View {
                 header
                 ScrollView {
                     VStack(spacing: 12) {
+                        mutationErrorBanner
+                        settlementGuidance
                         summaryCard
-                        participantsSection
-                        unclaimedNotice
-                        editingSafeguard
+                        if presentation.showsParticipantBalances {
+                            participantsSection
+                            unclaimedNotice
+                            editingSafeguard
+                        }
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 16)
                 }
-                footer
+                if presentation.showsParticipantBalances {
+                    footer
+                }
             }
         }
         .navigationTitle("Split result")
@@ -112,12 +141,14 @@ struct SplitResultView: View {
             Text(currentSplit.merchant)
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(Theme.muted)
-            Text(formatSplitMoney(currentSplit.totalCents, currency: currentSplit.currency))
-                .font(.system(size: 38, weight: .bold, design: .monospaced))
-                .foregroundStyle(Theme.ink)
-                .minimumScaleFactor(0.7)
-                .lineLimit(1)
-            Text(presentation.statusHeadline)
+            if presentation.showsParticipantBalances {
+                Text(formatSplitMoney(currentSplit.totalCents, currency: currentSplit.currency))
+                    .font(.system(size: 38, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Theme.ink)
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+            }
+            Text(presentation.statusHeadline(isOpen: currentSplit.isOpen))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(
                     currentSplit.payerMode == .unavailable ? Theme.warning : Theme.accentText
@@ -126,8 +157,43 @@ struct SplitResultView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(currentSplit.merchant), total \(formatSplitMoney(currentSplit.totalCents, currency: currentSplit.currency))")
-        .accessibilityValue(presentation.statusHeadline)
+        .accessibilityLabel(headerAccessibilityLabel)
+        .accessibilityValue(presentation.statusHeadline(isOpen: currentSplit.isOpen))
+    }
+
+    private var headerAccessibilityLabel: String {
+        guard presentation.showsParticipantBalances else {
+            return "\(currentSplit.merchant), split mode unavailable"
+        }
+        return "\(currentSplit.merchant), total \(formatSplitMoney(currentSplit.totalCents, currency: currentSplit.currency))"
+    }
+
+    @ViewBuilder
+    private var mutationErrorBanner: some View {
+        if let error = vm?.errorMessage {
+            Label("\(error) Retry when you're ready.", systemImage: "arrow.triangle.2.circlepath")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Theme.expense)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(Theme.expense.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+    }
+
+    @ViewBuilder
+    private var settlementGuidance: some View {
+        if hasOwnerSettlementContext,
+           currentSplit.isOpen,
+           currentSplit.payerMode == .organizerPaid {
+            Label("Finish claiming to settle. Close claiming to lock the shares before marking anyone paid.", systemImage: "lock.open")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Theme.warning)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(Theme.warning.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
     }
 
     @ViewBuilder
@@ -149,7 +215,7 @@ struct SplitResultView: View {
                 SectionEyebrow("Individual shares")
                 resultAmountRow("Bill total", currentSplit.totalCents)
                 resultAmountRow(presentation.organizerShareLabel, organizerShareCents, emphasis: true)
-                resultAmountRow(presentation.otherSharesLabel ?? "Everyone else's shares", max(0, currentSplit.totalCents - organizerShareCents))
+                resultAmountRow(presentation.otherSharesLabel ?? "Everyone else's shares", otherSharesCents)
                 Text("Everyone pays the restaurant directly. No reimbursements are recorded.")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.muted)
@@ -235,9 +301,10 @@ struct SplitResultView: View {
                     .strikethrough(person.isSettled && currentSplit.payerMode == .organizerPaid, color: Theme.faint)
             }
 
-            if hasOwnerSettlementContext,
-               currentSplit.payerMode == .organizerPaid,
-               !person.isOrganizer {
+            if presentation.showsSettlementControls(
+                isOpen: currentSplit.isOpen,
+                hasOwnerContext: hasOwnerSettlementContext
+            ), !person.isOrganizer {
                 settlementButton(for: person)
             }
         }

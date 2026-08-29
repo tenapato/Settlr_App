@@ -210,6 +210,15 @@ grep -Fq 'Everyone paid their own share' Settlr/Views/Main/Split/SplitResultView
 grep -Fq 'Amount to collect' Settlr/Views/Main/Split/SplitResultView.swift
 grep -Fq 'retry' Settlr/ViewModels/BillSplitVM.swift
 grep -Fq 'testResultPresentationKeepsSettlementCopyPayerCorrect' SettlrTests/EachOwnPresentationTests.swift
+grep -Fq 'func showsSettlementControls' Settlr/Views/Main/Split/SplitResultView.swift
+grep -Fq 'static func aggregateOtherShares' Settlr/Views/Main/Split/SplitResultView.swift
+grep -Fq 'showsParticipantBalances' Settlr/Views/Main/Split/SplitResultView.swift
+grep -Fq 'Finish claiming to settle.' Settlr/Views/Main/Split/SplitResultView.swift
+grep -Fq 'Retry when you'\''re ready.' Settlr/Views/Main/Split/SplitResultView.swift
+grep -Fq 'Retry when you'\''re ready.' Settlr/Views/Main/Split/SplitDetailView.swift
+grep -Fq 'currentSplit.isOpen' Settlr/Views/Main/Split/SplitResultView.swift
+grep -Fq 'currentSplit.guests.map' Settlr/Views/Main/Split/SplitResultView.swift
+grep -Fq 'Theme.buttonInk' Settlr/Views/Main/Split/SplitScanFlow.swift
 
 # Task 8: Signature Scanner capture, review, and payer/division ordering.
 grep -Fq 'How was it paid?' Settlr/Views/Main/Split/SplitCreateSheet.swift
