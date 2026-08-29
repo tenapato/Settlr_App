@@ -136,7 +136,7 @@ grep -Fq '.interactiveDismissDisabled(isSaving)' Settlr/Views/Main/Savings/Savin
 # Task 5 fix round 5: Activity's Savings entry presenter must use the same
 # current-workspace, successful-account guards as the root presenter.
 grep -Fq 'savingsVM.loadedWorkspaceID == workspaceId' Settlr/Views/Main/Activity/ActivityView.swift
-grep -Fq 'savingsVM.errorMessage == nil' Settlr/Views/Main/Activity/ActivityView.swift
+grep -Fq 'savingsVM.accountsErrorMessage == nil' Settlr/Views/Main/Activity/ActivityView.swift
 
 # Activity body type-check regression: keep navigation, detail sheets, form
 # sheets, and lifecycle handlers in separately type-checked view layers.
@@ -165,7 +165,7 @@ for field in targetAmountCents targetDate goalStatus progressPct remainingCents;
   grep -Fq "$field" Settlr/Models/Savings.swift
 done
 grep -Fq 'struct SavingsGoalCard' Settlr/Views/Main/Savings/SavingsView.swift
-grep -Fq 'SavingsGoalCard(account: account)' Settlr/Views/Main/Savings/SavingsView.swift
+grep -Fq 'SavingsGoalCard(account: account, isSelected: vm.selectedAccountId == account.id)' Settlr/Views/Main/Savings/SavingsView.swift
 grep -Fq 'YOUR GOALS' Settlr/Views/Main/Savings/SavingsView.swift
 grep -Fq 'FLEXIBLE SAVINGS' Settlr/Views/Main/Savings/SavingsView.swift
 grep -Fq 'accountsErrorMessage' Settlr/Views/Main/Savings/SavingsVM.swift

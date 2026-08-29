@@ -96,3 +96,20 @@ bash scripts/check-app-source-regressions.sh           PASS
 ruby scripts/test-testflight-workflow.rb                PASS
 git diff --check                                         PASS
 ```
+
+## Fix Round 2
+
+- Updated the Activity presenter source guard to assert the split
+  `accountsErrorMessage` readiness state rather than the aggregate mutation
+  error.
+- Updated the Savings goal-card source guard to match its direct call with
+  the selected-account argument after the hierarchy refactor.
+
+Fix Round 2 checks:
+
+```text
+bash scripts/check-signal-redesign.sh                   PASS
+bash scripts/check-app-source-regressions.sh           PASS
+standalone Savings goal harness                         PASS
+git diff --check                                         PASS
+```
