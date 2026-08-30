@@ -156,8 +156,8 @@ enum Theme {
         highContrastDark: 0xB3B8BA
     )
     static let faint     = Color.settlr(
-        light: 0x929890,
-        dark: 0x5E6466,
+        light: 0x7A817B,
+        dark: 0x6F7578,
         highContrastLight: 0x5F665F,
         highContrastDark: 0x9DA3A5
     )

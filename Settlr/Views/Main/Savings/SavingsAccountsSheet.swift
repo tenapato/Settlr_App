@@ -124,7 +124,7 @@ struct SavingsAccountsSheet: View {
             } label: {
                 Text("Create account")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.bg)
+                    .foregroundStyle(Theme.buttonInk)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
                     .background(Theme.accent)
@@ -269,7 +269,7 @@ struct SavingsAccountFormSheet: View {
         _name = State(initialValue: account?.name ?? "")
         _colorHex = State(initialValue: hex)
         _pickedColor = State(initialValue: Color(hex: hex))
-        _targetAmountText = State(initialValue: account.map { String(format: "%.2f", Double($0.targetAmountCents ?? 0) / 100.0) } ?? "")
+        _targetAmountText = State(initialValue: savingsTargetAmountText(for: account?.targetAmountCents))
         _targetDate = State(initialValue: Self.parseDate(account?.targetDate))
         _hasTargetDate = State(initialValue: account?.targetDate != nil)
     }
@@ -351,7 +351,7 @@ struct SavingsAccountFormSheet: View {
                         }
                     } label: {
                         if isSaving {
-                            ProgressView().tint(Theme.bg)
+                            ProgressView().tint(Theme.buttonInk)
                         } else {
                             Text(isEditing ? "Save Changes" : "Create Account")
                         }

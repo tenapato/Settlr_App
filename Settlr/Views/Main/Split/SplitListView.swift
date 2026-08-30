@@ -276,7 +276,7 @@ struct SplitListView: View {
             Button { showCreate = true } label: {
                 Text("Split a bill")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.bg)
+                    .foregroundStyle(Theme.buttonInk)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
                     .background(Theme.accent)

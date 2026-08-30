@@ -1,5 +1,10 @@
 import Foundation
 
+func savingsTargetAmountText(for targetAmountCents: Int?) -> String {
+    guard let targetAmountCents else { return "" }
+    return String(format: "%.2f", Double(targetAmountCents) / 100.0)
+}
+
 enum SavingsTargetAmountError: Error, Equatable {
     case invalid
 }

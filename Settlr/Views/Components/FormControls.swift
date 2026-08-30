@@ -307,7 +307,7 @@ struct SegmentedToggle: View {
                         Text(opt.label)
                             .font(.system(size: 14, weight: .semibold))
                     }
-                    .foregroundStyle(isSelected ? Theme.bg : Theme.muted)
+                    .foregroundStyle(isSelected ? Theme.buttonInk : Theme.muted)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
                     .background(

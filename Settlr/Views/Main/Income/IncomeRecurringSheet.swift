@@ -106,7 +106,7 @@ struct IncomeRecurringSheet: View {
             } label: {
                 Text("Create rule")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.bg)
+                    .foregroundStyle(Theme.buttonInk)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
                     .background(Theme.accent)

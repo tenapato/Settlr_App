@@ -18,6 +18,11 @@ final class SavingsGoalTests: XCTestCase {
         XCTAssertNil(account.goalStatus)
         XCTAssertNil(account.progressPct)
         XCTAssertNil(account.remainingCents)
+        XCTAssertEqual(savingsTargetAmountText(for: account.targetAmountCents), "")
+    }
+
+    func testGoalTargetPresentationSeedsExistingAmount() {
+        XCTAssertEqual(savingsTargetAmountText(for: 10_025), "100.25")
     }
 
     func testCreateGoalBodyIncludesOptionalTargetFields() throws {

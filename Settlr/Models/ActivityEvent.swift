@@ -153,7 +153,10 @@ enum ActivityComposer {
             if let splitID = expense.billSplitId, splitByID[splitID]?.status == "open" {
                 continue
             }
-            let isSplit = expense.billSplitId.flatMap { splitByID[$0] } != nil
+            let splitID = expense.billSplitId.flatMap { id in
+                splitByID[id] == nil ? nil : id
+            }
+            let isSplit = splitID != nil
             // Prefer the concrete card relationship when present; the channel
             // is the fallback for cash and older payloads.
             let payment = expense.creditCardId != nil || expense.paymentChannel == "credit_card" ? "Card" : "Cash"
@@ -162,11 +165,11 @@ enum ActivityComposer {
                 ActivityEvent(
                     id: "expense:\(expense.id)",
                     occurredAt: parseDate(expense.occurredAt),
-                    kind: .expense,
+                    kind: isSplit ? .split : .expense,
                     title: expense.description,
                     context: context,
                     amountCents: -abs(expense.amountCents),
-                    destinationID: expense.id,
+                    destinationID: splitID ?? expense.id,
                     categoryID: expense.categoryId,
                     paymentSource: expense.creditCardId ?? expense.paymentChannel,
                     marker: isSplit ? "Split" : nil
@@ -209,26 +212,10 @@ enum ActivityComposer {
             )
         }
 
-        let expenseSplitIDs = Set(expenses.compactMap { expense -> String? in
-            guard let splitID = expense.billSplitId, splitByID[splitID]?.status != "open" else { return nil }
-            return splitID
-        })
-        // A split with no owned expense still needs a completed timeline entry;
-        // when its expense exists, emitting this row would duplicate the bill.
-        for split in splits where split.status != "open" && !expenseSplitIDs.contains(split.id) {
-            events.append(
-                ActivityEvent(
-                    id: "split:\(split.id)",
-                    occurredAt: parseDate(split.occurredAt),
-                    kind: .split,
-                    title: split.merchant,
-                    context: "Split · \(split.status.capitalized)",
-                    amountCents: -abs(split.totalCents),
-                    destinationID: split.id,
-                    marker: "Split"
-                )
-            )
-        }
+        // Closed splits are timeline money only when the expenses endpoint
+        // supplies their persisted owned Expense. A summary total describes
+        // the table, not necessarily the organizer's ledger (notably each-own),
+        // and an independent expenses failure must never fabricate a debit.
 
         return (
             timeline: events.sorted {

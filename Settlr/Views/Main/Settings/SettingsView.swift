@@ -35,7 +35,7 @@ struct SettingsView: View {
                             SectionCard {
                                 VStack(alignment: .leading, spacing: 12) {
                                     Text("Account")
-                                        .font(.system(size: 12, weight: .semibold))
+                                        .font(.caption.weight(.semibold))
                                         .foregroundStyle(Theme.muted)
                                         .textCase(.uppercase)
                                         .tracking(0.8)
@@ -51,10 +51,10 @@ struct SettingsView: View {
                                         }
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(user.name)
-                                                .font(.system(size: 16, weight: .semibold))
+                                                .font(.headline)
                                                 .foregroundStyle(Theme.ink)
                                             Text(user.email)
-                                                .font(.system(size: 13))
+                                                .font(.subheadline)
                                                 .foregroundStyle(Theme.muted)
                                         }
                                     }
@@ -66,7 +66,7 @@ struct SettingsView: View {
                         SectionCard {
                             VStack(alignment: .leading, spacing: 12) {
                                 Text("Appearance")
-                                    .font(.system(size: 12, weight: .semibold))
+                                    .font(.caption.weight(.semibold))
                                     .foregroundStyle(Theme.muted)
                                     .textCase(.uppercase)
                                     .tracking(0.8)
@@ -91,7 +91,7 @@ struct SettingsView: View {
                             SectionCard {
                                 VStack(alignment: .leading, spacing: 12) {
                                     Text("Workspace")
-                                        .font(.system(size: 12, weight: .semibold))
+                                        .font(.caption.weight(.semibold))
                                         .foregroundStyle(Theme.muted)
                                         .textCase(.uppercase)
                                         .tracking(0.8)
@@ -99,15 +99,15 @@ struct SettingsView: View {
                                     HStack {
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(workspace.name)
-                                                .font(.system(size: 16, weight: .semibold))
+                                                .font(.headline)
                                                 .foregroundStyle(Theme.ink)
                                             Text(workspace.kind.capitalized)
-                                                .font(.system(size: 13))
+                                                .font(.subheadline)
                                                 .foregroundStyle(Theme.muted)
                                         }
                                         Spacer()
                                         Text(workspace.role.capitalized)
-                                            .font(.system(size: 13, weight: .medium))
+                                            .font(.subheadline.weight(.medium))
                                             .foregroundStyle(Theme.accentText)
                                             .padding(.horizontal, 10)
                                             .padding(.vertical, 4)
@@ -123,7 +123,7 @@ struct SettingsView: View {
                                             Image(systemName: "arrow.left.arrow.right")
                                                 .font(.system(size: 14, weight: .semibold))
                                             Text("Switch Workspace")
-                                                .font(.system(size: 15, weight: .medium))
+                                                .font(.body.weight(.medium))
                                             Spacer()
                                             Image(systemName: "chevron.right")
                                                 .font(.system(size: 12, weight: .semibold))
@@ -157,7 +157,7 @@ struct SettingsView: View {
                         SectionCard {
                             VStack(alignment: .leading, spacing: 12) {
                                 Text("Receipts")
-                                    .font(.system(size: 12, weight: .semibold))
+                                    .font(.caption.weight(.semibold))
                                     .foregroundStyle(Theme.muted)
                                     .textCase(.uppercase)
                                     .tracking(0.8)
@@ -166,10 +166,10 @@ struct SettingsView: View {
                                     HStack {
                                         VStack(alignment: .leading, spacing: 3) {
                                             Text("Receipt parsing")
-                                                .font(.system(size: 16, weight: .medium))
+                                                .font(.body.weight(.medium))
                                                 .foregroundStyle(Theme.ink)
                                             Text("Automatic keeps parsing on your device when possible.")
-                                                .font(.system(size: 13))
+                                                .font(.footnote)
                                                 .foregroundStyle(Theme.muted)
                                         }
                                         Spacer()
@@ -185,7 +185,7 @@ struct SettingsView: View {
 
                                     if receiptParser == ReceiptParserPreference.serverPhoto.rawValue {
                                         Text("Experimental")
-                                            .font(.system(size: 9, weight: .bold))
+                                            .font(.caption2.weight(.bold))
                                             .textCase(.uppercase)
                                             .foregroundStyle(Theme.accentText)
                                             .padding(.horizontal, 7)
@@ -199,15 +199,15 @@ struct SettingsView: View {
 
                                     if receiptParser == ReceiptParserPreference.onDevice.rawValue {
                                         Text("Receipt text stays on this phone. If the device model is unavailable, you'll be offered Automatic or On server instead.")
-                                            .font(.system(size: 12))
+                                            .font(.footnote)
                                             .foregroundStyle(Theme.muted)
                                     } else if receiptParser == ReceiptParserPreference.server.rawValue {
                                         Text("Only recognized receipt text is sent for parsing. The photo stays on this phone.")
-                                            .font(.system(size: 12))
+                                            .font(.footnote)
                                             .foregroundStyle(Theme.muted)
                                     } else if receiptParser == ReceiptParserPreference.serverPhoto.rawValue {
                                         Text("The receipt photo and recognized text are sent securely to the server for AI parsing. The server does not store the photo. If Save captures to Photos is enabled, a local copy is saved to your photo library. The AI provider does not use it to train its models.")
-                                            .font(.system(size: 12))
+                                            .font(.footnote)
                                             .foregroundStyle(Theme.muted)
                                     }
                                 }
@@ -217,10 +217,10 @@ struct SettingsView: View {
                                 Toggle(isOn: $saveCapturedReceiptsToPhotos) {
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text("Save captures to Photos")
-                                            .font(.system(size: 16, weight: .medium))
+                                            .font(.body.weight(.medium))
                                             .foregroundStyle(Theme.ink)
                                         Text("Keep a copy of new receipt photos in your library.")
-                                            .font(.system(size: 13))
+                                            .font(.footnote)
                                             .foregroundStyle(Theme.muted)
                                     }
                                 }
@@ -238,7 +238,7 @@ struct SettingsView: View {
                                     Image(systemName: "rectangle.portrait.and.arrow.right")
                                         .font(.system(size: 16))
                                     Text("Sign Out")
-                                        .font(.system(size: 16, weight: .medium))
+                                        .font(.body.weight(.medium))
                                     Spacer()
                                 }
                                 .foregroundStyle(Theme.expense)
@@ -250,14 +250,14 @@ struct SettingsView: View {
                         SectionCard {
                             VStack(alignment: .leading, spacing: 12) {
                                 Text("Danger Zone")
-                                    .font(.system(size: 12, weight: .semibold))
+                                    .font(.caption.weight(.semibold))
                                     .foregroundStyle(Theme.muted)
                                     .textCase(.uppercase)
                                     .tracking(0.8)
 
                                 if let error = deleteAccountError {
                                     Text(error)
-                                        .font(.system(size: 13))
+                                        .font(.footnote)
                                         .foregroundStyle(Theme.expense)
                                 }
 
@@ -268,7 +268,7 @@ struct SettingsView: View {
                                         Image(systemName: "person.crop.circle.badge.minus")
                                             .font(.system(size: 16))
                                         Text("Delete Account")
-                                            .font(.system(size: 16, weight: .medium))
+                                            .font(.body.weight(.medium))
                                         Spacer()
                                         if isDeletingAccount {
                                             ProgressView().tint(Theme.expense)

@@ -23,7 +23,7 @@ final class ActivityEventTests: XCTestCase {
 
     func testCompletedSplitOwnedByExpenseIsNotDuplicated() throws {
         let expense: Expense = try decode("""
-        {"id":"e-1","description":"Dinner","amountCents":30000,"currency":"MXN","occurredAt":"2026-08-20T20:00:00Z","categoryId":null,"creditCardId":null,"paymentChannel":"cash","notes":null,"msiInstallment":null,"msiCount":null,"deferredInstallment":null,"deferredCount":null,"billSplitId":"split-1"}
+        {"id":"e-1","description":"Dinner","amountCents":30000,"currency":"MXN","occurredAt":"2026-08-20T20:00:00Z","categoryId":"cat-1","creditCardId":null,"paymentChannel":"cash","notes":null,"msiInstallment":null,"msiCount":null,"deferredInstallment":null,"deferredCount":null,"billSplitId":"split-1"}
         """)
         let split: BillSplitSummary = try decode("""
         {"id":"split-1","shareToken":"token","shareUrl":null,"merchant":"Dinner","currency":"MXN","occurredAt":"2026-08-20T20:00:00Z","totalCents":30000,"status":"settled","payer":"organizer_paid","participantCount":2,"settledCount":2,"pendingCount":0,"outstandingCents":0}
@@ -33,7 +33,26 @@ final class ActivityEventTests: XCTestCase {
 
         XCTAssertEqual(result.timeline.count, 1)
         XCTAssertEqual(result.timeline.first?.id, "expense:e-1")
+        XCTAssertEqual(result.timeline.first?.kind, .split)
+        XCTAssertEqual(result.timeline.first?.destinationID, "split-1")
+        XCTAssertEqual(result.timeline.first?.amountCents, -30000)
+        XCTAssertEqual(result.timeline.first?.categoryID, "cat-1")
+        XCTAssertEqual(result.timeline.first?.paymentSource, "cash")
         XCTAssertTrue(result.timeline.first?.context.contains("Split") == true)
+        XCTAssertTrue(result.attention.isEmpty)
+    }
+
+    func testClosedSplitWithoutLoadedExpenseDoesNotFabricateLedgerMoney() throws {
+        let split: BillSplitSummary = try decode("""
+        {"id":"split-each-own","shareToken":"token","shareUrl":null,"merchant":"Dinner","currency":"MXN","occurredAt":"2026-08-20T20:00:00Z","totalCents":30000,"status":"closed","payer":"each_own","participantCount":2,"settledCount":0,"pendingCount":0,"outstandingCents":0}
+        """)
+
+        // This is also the shape produced when the independent expenses route
+        // fails while the split list succeeds. A summary total is not proof of
+        // an owned expense, especially for each-own accounting.
+        let result = ActivityComposer.compose(expenses: [], income: [], savings: [], splits: [split])
+
+        XCTAssertTrue(result.timeline.isEmpty)
         XCTAssertTrue(result.attention.isEmpty)
     }
 

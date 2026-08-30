@@ -330,10 +330,10 @@ struct SavingsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(selected ? Theme.bg : Theme.ink)
+                        .foregroundStyle(selected ? Theme.buttonInk : Theme.ink)
                         .lineLimit(1)
                     AmountLabel(cents: balanceCents, font: .system(size: 11, weight: .medium))
-                        .foregroundStyle(selected ? Theme.bg.opacity(0.7) : Theme.muted)
+                        .foregroundStyle(selected ? Theme.buttonInk.opacity(0.7) : Theme.muted)
                 }
             }
             .padding(.horizontal, 12)
@@ -372,7 +372,7 @@ struct SavingsView: View {
             Button { showManageAccounts = true } label: {
                 Text("Create account")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.bg)
+                    .foregroundStyle(Theme.buttonInk)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
                     .background(Theme.accent)
@@ -417,7 +417,7 @@ struct SavingsView: View {
             Button { showForm = true } label: {
                 Text("Add deposit or withdrawal")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.bg)
+                    .foregroundStyle(Theme.buttonInk)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
                     .background(Theme.accent)

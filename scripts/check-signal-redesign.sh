@@ -16,7 +16,7 @@ grep -Fq 'case home, activity, savings, cards' Settlr/Views/Components/FloatingT
 grep -Fq 'struct QuickActionLauncher' Settlr/Views/Components/QuickActionLauncher.swift
 grep -Fq 'Scan and split' Settlr/Views/Components/QuickActionLauncher.swift
 grep -Fq '@State private var showCategories = false' Settlr/Views/Main/MainTabView.swift
-grep -Fq '.sheet(isPresented: $showCategories)' Settlr/Views/Main/MainTabView.swift
+grep -Fq '.sheet(isPresented: categoriesPresentation)' Settlr/Views/Main/MainTabView.swift
 grep -Fq 'CategoriesView(workspaceId: appState.activeWorkspace?.id ?? "")' Settlr/Views/Main/MainTabView.swift
 grep -Fq 'await expensesVM.loadCategories' Settlr/Views/Main/MainTabView.swift
 grep -Fq 'await incomeVM.loadCategories' Settlr/Views/Main/MainTabView.swift
@@ -314,3 +314,38 @@ grep -Fq 'guard isCurrentWorkspace else { throw CancellationError() }' Settlr/Vi
 grep -Fq 'else if let err = vm.errorMessage, vm.cards.isEmpty' Settlr/Views/Main/CardsView.swift
 grep -Fq 'private let ownsViewModel: Bool' Settlr/Views/Main/CardsView.swift
 grep -Fq 'guard ownsViewModel else { return }' Settlr/Views/Main/CardsView.swift
+
+# Final whole-branch fix wave: these are wiring guards only. The XCTest cases
+# and standalone harnesses own the accounting and ordering behavior.
+if grep -Fq 'id: "split:\(split.id)"' Settlr/Models/ActivityEvent.swift; then
+    echo "Activity must not synthesize ledger money from a split summary." >&2
+    exit 1
+fi
+grep -Fq 'testClosedSplitWithoutLoadedExpenseDoesNotFabricateLedgerMoney' SettlrTests/ActivityEventTests.swift
+grep -Fq 'savingsTargetAmountText(for: account?.targetAmountCents)' Settlr/Views/Main/Savings/SavingsAccountsSheet.swift
+grep -Fq 'testFlexibleAccountKeepsGoalFieldsNil' SettlrTests/SavingsGoalTests.swift
+grep -Fq 'struct BillSplitDetailResponseGate' Settlr/Models/BillSplit.swift
+grep -Fq 'detailResponseGate.beginLoad()' Settlr/ViewModels/BillSplitVM.swift
+grep -Fq 'detailResponseGate.beginMutation()' Settlr/ViewModels/BillSplitVM.swift
+grep -Fq 'detailResponseGate.commitMutation' Settlr/ViewModels/BillSplitVM.swift
+grep -Fq 'testOlderDetailLoadCannotOverwriteNewerMutation' SettlrTests/SplitPaymentMethodTests.swift
+grep -Fq 'launcherTask?.cancel()' Settlr/Views/Main/MainTabView.swift
+grep -Fq 'launcherContextIsValid' Settlr/Views/Main/MainTabView.swift
+grep -Fq 'guardedPresentation' Settlr/Views/Main/MainTabView.swift
+grep -Fq 'categoriesPresentation' Settlr/Views/Main/MainTabView.swift
+grep -Fq 'splitScanPresentation' Settlr/Views/Main/MainTabView.swift
+grep -Fq 'splitListPresentation' Settlr/Views/Main/MainTabView.swift
+grep -Fq 'light: 0x7A817B' Settlr/Views/Components/DesignSystem.swift
+grep -Fq 'dark: 0x6F7578' Settlr/Views/Components/DesignSystem.swift
+
+for contrast_view in \
+  Settlr/Views/Components/FormControls.swift \
+  Settlr/Views/Main/Savings/SavingsView.swift \
+  Settlr/Views/Main/Savings/SavingsAccountsSheet.swift \
+  Settlr/Views/Main/Savings/SavingsRecurringSheet.swift \
+  Settlr/Views/Main/Income/IncomeRecurringSheet.swift \
+  Settlr/Views/Main/Split/SplitCreateSheet.swift \
+  Settlr/Views/Main/Split/ReceiptCaptureView.swift \
+  Settlr/Views/Main/Split/SplitListView.swift; do
+  grep -Fq 'Theme.buttonInk' "$contrast_view"
+done

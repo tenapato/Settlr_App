@@ -270,14 +270,14 @@ struct SplitCreateSheet: View {
             } label: {
                 HStack(spacing: 10) {
                     if isScanning {
-                        ProgressView().tint(Theme.bg)
+                        ProgressView().tint(Theme.buttonInk)
                     } else {
                         Image(systemName: "doc.viewfinder").font(.system(size: 17, weight: .semibold))
                     }
                     Text(isScanning ? "Reading receipt…" : (hasScanned ? "Scan again" : "Scan receipt"))
                         .font(.system(size: 16, weight: .semibold))
                 }
-                .foregroundStyle(Theme.bg)
+                .foregroundStyle(Theme.buttonInk)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
                 .background(Theme.accent)
@@ -922,6 +922,7 @@ struct SplitCreateSheet: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Theme.accent)
+                    .foregroundStyle(Theme.buttonInk)
                 }
                 .font(.system(size: 13, weight: .semibold))
 
@@ -977,7 +978,7 @@ struct SplitCreateSheet: View {
         } label: {
             Text("\(percent)%")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(isActive ? Theme.bg : Theme.muted)
+                .foregroundStyle(isActive ? Theme.buttonInk : Theme.muted)
                 .padding(.horizontal, 12)
                 .frame(minHeight: 44)
                 .background(isActive ? Theme.accent : Theme.surface2)

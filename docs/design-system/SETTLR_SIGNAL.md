@@ -30,6 +30,7 @@ The three offset bars are the Settlr mark. Use the existing asset. Do not redraw
 | `color.muted` | `#898F92` | Supporting copy and inactive navigation |
 | `color.faint` | `#6F7578` | Eyebrows, placeholders, tertiary metadata |
 | `color.signal` | `#CAFF3A` | Primary action, selection, focus, live progress |
+| `color.buttonInk` | `#080A08` | Text, icons, and progress on signal-filled controls |
 
 ### Light
 
@@ -44,6 +45,7 @@ The three offset bars are the Settlr mark. Use the existing asset. Do not redraw
 | `color.faint` | `#7A817B` | Eyebrows and placeholders |
 | `color.signalText` | `#597500` | Signal text and icons on light surfaces |
 | `color.signalFill` | `#A8D522` | Primary filled controls |
+| `color.buttonInk` | `#11140A` | Text, icons, and progress on signal-filled controls |
 
 When Increase Contrast is enabled, separators strengthen from `#DADDD6` to `#AEB4AA` in Light and from `#2D3135` to `#596065` in Dark. Muted and faint ink strengthen at the same time. Screens keep using the semantic tokens rather than branching on accessibility settings themselves.
 
@@ -219,6 +221,8 @@ Workspace/profile, available amount, three-part summary, preserved insight ticke
 
 Title, compact filter row, attention item for open splits when needed, Signal timeline.
 
+A closed split enters the financial timeline only through its persisted owned Expense. Never infer an organizer debit from the split total: each-own splits and a partial expenses-route failure make that amount categorically unsafe. The owned Expense appears exactly once and carries the Split marker.
+
 ### Savings
 
 Total saved, month movement, account objects, target progress when provided, recent entries.
@@ -260,6 +264,8 @@ A closed split with recorded settlements cannot reopen claiming or editing. Its 
 ## Feature gates
 
 Build tabs, launcher actions, filters, and subviews from the current availability helpers. A hidden feature must not leave behind a picker value, empty tab, or request to a gated route.
+
+When access, user, or workspace changes, dismiss every affected presenter and cancel delayed launcher work. A delayed action rechecks the captured user, workspace, and feature immediately before presentation.
 
 Home is always present. Activity appears when any of expenses, income, or bill splits is available. It includes savings events only when Savings is enabled. Savings requires `savings`. Cards and card management require `credit_cards`. Payment summaries require `credit_cards` and `card_payments`. Bill splitting requires `bill_splits`.
 
@@ -303,6 +309,7 @@ Use motion to explain cause and effect. Standard durations should feel native ra
 - SwiftUI native controls first.
 - SF Symbols first.
 - Server values remain authoritative for financial state.
+- Detail GET responses use request generations and cannot overwrite a newer split mutation or refresh.
 - Decode new optional response fields safely.
 - Preserve the existing pending split queue and `409` conflict behavior.
 - Do not introduce an endpoint when existing route data can support the design.

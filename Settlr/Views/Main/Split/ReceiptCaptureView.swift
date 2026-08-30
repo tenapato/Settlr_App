@@ -263,7 +263,7 @@ struct ReceiptCaptureView: View {
                     .shadow(color: Theme.accent.opacity(0.45), radius: 18, y: 4)
                 Image(systemName: "doc.viewfinder")
                     .font(.system(size: 30, weight: .semibold))
-                    .foregroundStyle(Theme.bg)
+                    .foregroundStyle(Theme.buttonInk)
             }
         }
         .buttonStyle(.plain)

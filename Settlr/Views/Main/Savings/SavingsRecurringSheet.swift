@@ -113,7 +113,7 @@ struct SavingsRecurringSheet: View {
                 } label: {
                     Text("Schedule deposit")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Theme.bg)
+                        .foregroundStyle(Theme.buttonInk)
                         .padding(.horizontal, 24)
                         .padding(.vertical, 12)
                         .background(Theme.accent)

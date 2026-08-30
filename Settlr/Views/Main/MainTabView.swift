@@ -17,6 +17,7 @@ struct MainTabView: View {
     @State private var showSplitList = false
     @State private var showSplitScan = false
     @State private var createdSplitId: String?
+    @State private var launcherTask: Task<Void, Never>?
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -44,9 +45,13 @@ struct MainTabView: View {
         // whose content no longer exists.
         .onAppear(perform: reconcileSelectedTab)
         .onChange(of: availableTabs) { _, _ in reconcileSelectedTab() }
+        .onChange(of: launcherAccessSignature) { _, _ in reconcileFeaturePresenters() }
+        .onDisappear { launcherTask?.cancel() }
         // Splitting starts at the camera, not at a form.
-        .fullScreenCover(isPresented: $showSplitScan) {
+        .fullScreenCover(isPresented: splitScanPresentation) {
             SplitScanFlow(workspaceId: appState.activeWorkspace?.id ?? "") { outcome in
+                guard appState.currentUser?.has(.billSplits) == true,
+                      appState.activeWorkspace != nil else { return }
                 // Only a split that reached the server has an id worth opening.
                 // A queued one lands in the list's "Waiting to upload" section,
                 // and deep-linking a local id would spin forever.
@@ -54,7 +59,7 @@ struct MainTabView: View {
                 showSplitList = true
             }
         }
-        .sheet(isPresented: $showSplitList) {
+        .sheet(isPresented: splitListPresentation) {
             SplitListView(
                 workspaceId: appState.activeWorkspace?.id ?? "",
                 initialSplitId: createdSplitId
@@ -108,7 +113,7 @@ struct MainTabView: View {
         .sheet(isPresented: rootSavingsAccountsPresentation) {
             SavingsAccountsSheet(workspaceId: rootWorkspaceID, vm: savingsVM)
         }
-        .sheet(isPresented: $showCategories) {
+        .sheet(isPresented: categoriesPresentation) {
             CategoriesView(workspaceId: appState.activeWorkspace?.id ?? "")
         }
     }
@@ -118,17 +123,54 @@ struct MainTabView: View {
     }
 
     private var rootExpenseFormPresentation: Binding<Bool> {
-        Binding(get: { showExpenseForm && selectedTab != .activity }, set: { showExpenseForm = $0 })
+        Binding(
+            get: {
+                expenseFeaturePresentation.wrappedValue && selectedTab != .activity
+            },
+            set: { expenseFeaturePresentation.wrappedValue = $0 }
+        )
+    }
+
+    private var expenseFeaturePresentation: Binding<Bool> {
+        guardedPresentation($showExpenseForm, feature: .expenses)
     }
 
     private var rootIncomeFormPresentation: Binding<Bool> {
-        Binding(get: { showIncomeForm && selectedTab != .activity }, set: { showIncomeForm = $0 })
+        Binding(
+            get: {
+                incomeFeaturePresentation.wrappedValue && selectedTab != .activity
+            },
+            set: { incomeFeaturePresentation.wrappedValue = $0 }
+        )
+    }
+
+    private var incomeFeaturePresentation: Binding<Bool> {
+        guardedPresentation($showIncomeForm, feature: .income)
+    }
+
+    private var savingsFeaturePresentation: Binding<Bool> {
+        guardedPresentation($showSavingsForm, feature: .savings)
+    }
+
+    private func guardedPresentation(_ source: Binding<Bool>, feature: AppFeature) -> Binding<Bool> {
+        Binding(
+            get: {
+                source.wrappedValue
+                    && appState.currentUser?.has(feature) == true
+                    && !rootWorkspaceID.isEmpty
+            },
+            set: { requested in
+                source.wrappedValue = requested
+                    && appState.currentUser?.has(feature) == true
+                    && !rootWorkspaceID.isEmpty
+            }
+        )
     }
 
     private var rootSavingsFormPresentation: Binding<Bool> {
         Binding(
             get: {
-                showSavingsForm
+                savingsFeaturePresentation.wrappedValue
                     && selectedTab != .savings
                     && selectedTab != .activity
                     && savingsVM.loadedWorkspaceID == rootWorkspaceID
@@ -136,8 +178,10 @@ struct MainTabView: View {
                     && savingsVM.hasLoadedAccounts
                     && !savingsVM.accounts.isEmpty
                     && savingsVM.accountsErrorMessage == nil
+                    && appState.currentUser?.has(.savings) == true
+                    && !rootWorkspaceID.isEmpty
             },
-            set: { showSavingsForm = $0 }
+            set: { savingsFeaturePresentation.wrappedValue = $0 }
         )
     }
 
@@ -147,8 +191,43 @@ struct MainTabView: View {
         Binding(
             get: {
                 showRootSavingsAccounts && selectedTab != .savings && selectedTab != .activity
+                    && appState.currentUser?.has(.savings) == true
+                    && !rootWorkspaceID.isEmpty
             },
             set: { showRootSavingsAccounts = $0 }
+        )
+    }
+
+    private var categoriesPresentation: Binding<Bool> {
+        Binding(
+            get: {
+                showCategories
+                    && appState.currentUser?.has(.categories) == true
+                    && !rootWorkspaceID.isEmpty
+            },
+            set: { showCategories = $0 }
+        )
+    }
+
+    private var splitScanPresentation: Binding<Bool> {
+        Binding(
+            get: {
+                showSplitScan
+                    && appState.currentUser?.has(.billSplits) == true
+                    && !rootWorkspaceID.isEmpty
+            },
+            set: { showSplitScan = $0 }
+        )
+    }
+
+    private var splitListPresentation: Binding<Bool> {
+        Binding(
+            get: {
+                showSplitList
+                    && appState.currentUser?.has(.billSplits) == true
+                    && !rootWorkspaceID.isEmpty
+            },
+            set: { showSplitList = $0 }
         )
     }
 
@@ -184,14 +263,37 @@ struct MainTabView: View {
 
     private var availableTabs: [Tab] { Tab.available(for: appState.currentUser) }
 
+    private var launcherAccessSignature: String {
+        let disabled = (appState.currentUser?.disabledFeatures ?? []).sorted().joined(separator: ",")
+        return "\(appState.currentUser?.id ?? "signed-out")|\(appState.currentUser?.role ?? "member")|\(rootWorkspaceID)|\(disabled)"
+    }
+
     private func reconcileSelectedTab() {
-        if appState.currentUser?.has(.savings) != true {
-            showSavingsForm = false
-            showRootSavingsAccounts = false
-        }
+        reconcileFeaturePresenters()
         guard !availableTabs.contains(selectedTab) else { return }
         selectedTab = .home
         // An open palette may have been showing actions that just went away.
+        if fabOpen { setFabOpen(false) }
+    }
+
+    private func reconcileFeaturePresenters() {
+        launcherTask?.cancel()
+        launcherTask = nil
+
+        let user = appState.currentUser
+        let hasWorkspace = !rootWorkspaceID.isEmpty
+        if !hasWorkspace || user?.has(.expenses) != true { showExpenseForm = false }
+        if !hasWorkspace || user?.has(.income) != true { showIncomeForm = false }
+        if !hasWorkspace || user?.has(.savings) != true {
+            showSavingsForm = false
+            showRootSavingsAccounts = false
+        }
+        if !hasWorkspace || user?.has(.categories) != true { showCategories = false }
+        if !hasWorkspace || user?.has(.billSplits) != true {
+            showSplitScan = false
+            showSplitList = false
+            createdSplitId = nil
+        }
         if fabOpen { setFabOpen(false) }
     }
 
@@ -215,9 +317,7 @@ struct MainTabView: View {
                         : "Scan a receipt",
                     systemImage: "doc.viewfinder", role: .signature
                 ) {
-                    setFabOpen(false)
-                    Task {
-                        try? await Task.sleep(nanoseconds: 320_000_000)
+                    scheduleLauncherAction(requiredFeature: .billSplits) { _, _ in
                         showSplitScan = true
                     }
                 }
@@ -236,11 +336,10 @@ struct MainTabView: View {
         if ActivitySegment.expenses.isAvailable(for: user) {
             actions.append(
                 QuickActionItem(id: "expense", title: "Expense", subtitle: "Add an expense", systemImage: "arrow.up", role: .standard) {
-                    openLedgerForm(.expenses) {
-                        Task {
-                            await expensesVM.loadCategories(workspaceId: appState.activeWorkspace?.id ?? "")
-                            showExpenseForm = true
-                        }
+                    openLedgerForm(.expenses, requiredFeature: .expenses) { workspaceId, userId in
+                        await expensesVM.loadCategories(workspaceId: workspaceId)
+                        guard launcherContextIsValid(workspaceId: workspaceId, userId: userId, feature: .expenses) else { return }
+                        showExpenseForm = true
                     }
                 }
             )
@@ -248,11 +347,10 @@ struct MainTabView: View {
         if ActivitySegment.income.isAvailable(for: user) {
             actions.append(
                 QuickActionItem(id: "income", title: "Income", subtitle: "Add income", systemImage: "arrow.down", role: .standard) {
-                    openLedgerForm(.income) {
-                        Task {
-                            await incomeVM.loadCategories(workspaceId: appState.activeWorkspace?.id ?? "")
-                            showIncomeForm = true
-                        }
+                    openLedgerForm(.income, requiredFeature: .income) { workspaceId, userId in
+                        await incomeVM.loadCategories(workspaceId: workspaceId)
+                        guard launcherContextIsValid(workspaceId: workspaceId, userId: userId, feature: .income) else { return }
+                        showIncomeForm = true
                     }
                 }
             )
@@ -260,7 +358,7 @@ struct MainTabView: View {
         if ActivitySegment.savings.isAvailable(for: user) {
             actions.append(
                 QuickActionItem(id: "savings", title: "Savings", subtitle: "Add savings", systemImage: "banknote", role: .standard) {
-                    openLedgerForm(.savings) { prepareGlobalSavingsForm() }
+                    openLedgerForm(.savings, requiredFeature: .savings) { _, _ in prepareGlobalSavingsForm() }
                 }
             )
         }
@@ -269,13 +367,41 @@ struct MainTabView: View {
 
     /// Closes the palette and presents the form without changing the originating
     /// tab. This keeps dismissal returning users to where they started.
-    private func openLedgerForm(_ segment: ActivitySegment, present: @escaping () -> Void) {
-        setFabOpen(false)
+    private func openLedgerForm(
+        _ segment: ActivitySegment,
+        requiredFeature: AppFeature,
+        present: @escaping @MainActor (_ workspaceId: String, _ userId: String) async -> Void
+    ) {
         activitySegment = segment
-        Task {
+        scheduleLauncherAction(requiredFeature: requiredFeature, action: present)
+    }
+
+    private func scheduleLauncherAction(
+        requiredFeature: AppFeature,
+        action: @escaping @MainActor (_ workspaceId: String, _ userId: String) async -> Void
+    ) {
+        setFabOpen(false)
+        launcherTask?.cancel()
+        guard let userId = appState.currentUser?.id,
+              !rootWorkspaceID.isEmpty,
+              appState.currentUser?.has(requiredFeature) == true else { return }
+        let workspaceId = rootWorkspaceID
+        launcherTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: 320_000_000)
-            present()
+            guard !Task.isCancelled,
+                  launcherContextIsValid(workspaceId: workspaceId, userId: userId, feature: requiredFeature) else { return }
+            await action(workspaceId, userId)
         }
+    }
+
+    private func launcherContextIsValid(
+        workspaceId: String,
+        userId: String,
+        feature: AppFeature
+    ) -> Bool {
+        appState.currentUser?.id == userId
+            && appState.activeWorkspace?.id == workspaceId
+            && appState.currentUser?.has(feature) == true
     }
 
     // MARK: - Bottom bar
@@ -347,9 +473,9 @@ struct MainTabView: View {
         ActivityView(
             workspaceId: workspaceId,
             selectedSegment: $activitySegment,
-            showExpenseForm: $showExpenseForm,
-            showIncomeForm: $showIncomeForm,
-            showSavingsForm: $showSavingsForm,
+            showExpenseForm: expenseFeaturePresentation,
+            showIncomeForm: incomeFeaturePresentation,
+            showSavingsForm: savingsFeaturePresentation,
             expensesVM: expensesVM,
             incomeVM: incomeVM,
             savingsVM: savingsVM
