@@ -194,13 +194,15 @@ struct CardDetailSheet: View {
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(network == val ? Theme.buttonInk : Theme.muted)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
+                            .frame(minHeight: 44)
                             .background(
                                 RoundedRectangle(cornerRadius: 9)
                                     .fill(network == val ? Theme.accent : Theme.surface)
                             )
                     }
                     .buttonStyle(.plain)
+                    .accessibilityValue(network == val ? "Selected" : "Not selected")
+                    .accessibilityAddTraits(network == val ? .isSelected : [])
                 }
             }
         }

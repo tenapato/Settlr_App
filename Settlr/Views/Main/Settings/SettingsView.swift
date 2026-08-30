@@ -78,6 +78,9 @@ struct SettingsView: View {
                                 }
                                 .pickerStyle(.segmented)
                                 .tint(Theme.accent)
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
+                                .accessibilityLabel("App appearance")
                                 .accessibilityValue(appearance.title)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -127,6 +130,7 @@ struct SettingsView: View {
                                                 .foregroundStyle(Theme.faint)
                                         }
                                         .foregroundStyle(Theme.ink)
+                                        .frame(minHeight: 44)
                                         .padding(.horizontal, 14)
                                         .padding(.vertical, 12)
                                         .background(
@@ -227,7 +231,7 @@ struct SettingsView: View {
 
                         // Sign out
                         SectionCard {
-                            Button {
+                            Button(role: .destructive) {
                                 showSignOutConfirm = true
                             } label: {
                                 HStack {
@@ -238,6 +242,7 @@ struct SettingsView: View {
                                     Spacer()
                                 }
                                 .foregroundStyle(Theme.expense)
+                                .frame(minHeight: 44)
                             }
                         }
 
@@ -256,7 +261,7 @@ struct SettingsView: View {
                                         .foregroundStyle(Theme.expense)
                                 }
 
-                                Button {
+                                Button(role: .destructive) {
                                     showDeleteAccountConfirm = true
                                 } label: {
                                     HStack {
@@ -270,6 +275,7 @@ struct SettingsView: View {
                                         }
                                     }
                                     .foregroundStyle(Theme.expense)
+                                    .frame(minHeight: 44)
                                 }
                                 .disabled(isDeletingAccount)
                             }

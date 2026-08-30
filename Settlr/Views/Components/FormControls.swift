@@ -286,13 +286,18 @@ struct ToggleOption: Identifiable {
 struct SegmentedToggle: View {
     @Binding var selection: String
     let options: [ToggleOption]
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 6) {
             ForEach(options) { opt in
                 let isSelected = selection == opt.value
                 Button {
-                    withAnimation(.spring(duration: 0.22)) { selection = opt.value }
+                    if reduceMotion {
+                        selection = opt.value
+                    } else {
+                        withAnimation(.spring(duration: 0.22)) { selection = opt.value }
+                    }
                 } label: {
                     HStack(spacing: 6) {
                         if let icon = opt.icon {
@@ -311,6 +316,9 @@ struct SegmentedToggle: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(opt.label)
+                .accessibilityValue(isSelected ? "Selected" : "Not selected")
+                .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             }
         }
         .padding(5)

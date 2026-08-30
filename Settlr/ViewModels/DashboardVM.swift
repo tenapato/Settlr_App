@@ -17,11 +17,16 @@ final class DashboardVM {
     }()
 
     private let api = APIClient.shared
+    private var loadGeneration = 0
 
     @MainActor
     func load(workspaceId: String) async {
+        loadGeneration += 1
+        let generation = loadGeneration
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            if generation == loadGeneration { isLoading = false }
+        }
 
         let month = selectedMonth
         let currentPath = Endpoints.summary(workspaceId) + MonthRangeQuery.summaryQuery(month: month)
@@ -35,15 +40,22 @@ final class DashboardVM {
 
         do {
             let freshSummary = try await currentTask
+            let freshPreviousSummary = await previousTask
+            guard generation == loadGeneration, selectedMonth == month else { return }
+            // Commit the two comparison periods as one snapshot. A failed or
+            // superseded month request must not pair retained current data with
+            // a previous-month response from a different selection.
             summary = freshSummary
+            previousSummary = freshPreviousSummary
             lastUpdated = Date()
             errorMessage = nil
         } catch {
+            _ = await previousTask
+            guard generation == loadGeneration, selectedMonth == month else { return }
             // Keep the last valid summary visible while a refresh fails. The
             // view presents the error inline so a transient network failure
             // cannot erase the user's financial context.
             errorMessage = error.localizedDescription
         }
-        previousSummary = await previousTask
     }
 }

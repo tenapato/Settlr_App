@@ -59,7 +59,6 @@ struct ExpensesView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
         .task { await vm.load(workspaceId: workspaceId) }
         .onChange(of: vm.selectedMonth) { _, _ in
             Task { await vm.load(workspaceId: workspaceId) }

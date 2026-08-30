@@ -220,6 +220,40 @@ grep -Fq 'currentSplit.isOpen' Settlr/Views/Main/Split/SplitResultView.swift
 grep -Fq 'currentSplit.guests.map' Settlr/Views/Main/Split/SplitResultView.swift
 grep -Fq 'Theme.buttonInk' Settlr/Views/Main/Split/SplitScanFlow.swift
 
+# Task 10: app appearance is owned by SettlrApp. Redesigned roots inherit it,
+# and the workspace bootstrap uses the cold-start Settlr pulse.
+if rg -n '\.preferredColorScheme\(\.dark\)' Settlr/Views; then
+    echo "Leaf views must inherit the app appearance preference." >&2
+    exit 1
+fi
+
+for signal_root in \
+  Settlr/ContentView.swift \
+  Settlr/Views/Auth/LoginView.swift \
+  Settlr/Views/Auth/SignupView.swift \
+  Settlr/Views/Auth/AccountDeactivatedView.swift \
+  Settlr/Views/WorkspacePickerView.swift \
+  Settlr/Views/Main/Settings/SettingsView.swift \
+  Settlr/Views/Main/Dashboard/DashboardView.swift \
+  Settlr/Views/Main/Activity/ActivityView.swift \
+  Settlr/Views/Main/Savings/SavingsView.swift \
+  Settlr/Views/Main/CardsRootView.swift \
+  Settlr/Views/Main/CategoriesView.swift \
+  Settlr/Views/Main/Split/SplitScanFlow.swift \
+  Settlr/Views/Main/Split/SplitResultView.swift \
+  Settlr/Views/Main/Split/SplitDetailView.swift; do
+  if ! grep -Fq 'Theme.bg' "$signal_root"; then
+    echo "Signal root must use Theme.bg: $signal_root" >&2
+    exit 1
+  fi
+done
+
+grep -Fq 'SettlrPulseLoadingView(message: "Getting your workspace")' Settlr/ContentView.swift
+grep -Fq 'ForEach(SettlrAppearance.allCases)' Settlr/Views/Main/Settings/SettingsView.swift
+grep -Fq 'case dark' Settlr/Models/AppearancePreference.swift
+grep -Fq 'case light' Settlr/Models/AppearancePreference.swift
+grep -Fq 'case system' Settlr/Models/AppearancePreference.swift
+
 # Task 8: Signature Scanner capture, review, and payer/division ordering.
 grep -Fq 'How was it paid?' Settlr/Views/Main/Split/SplitCreateSheet.swift
 grep -Fq 'I paid it all' Settlr/Views/Main/Split/SplitCreateSheet.swift

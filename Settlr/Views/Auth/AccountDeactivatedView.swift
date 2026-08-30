@@ -23,12 +23,12 @@ struct AccountDeactivatedView: View {
                     .background(Circle().fill(Theme.warning.opacity(0.12)))
 
                 Text("Account deactivated")
-                    .font(.system(size: 24, weight: .bold))
+                    .font(.title2.bold())
                     .foregroundStyle(Theme.ink)
                     .padding(.top, 24)
 
                 Text("An administrator has turned off access to this account. Your data has not been deleted.")
-                    .font(.system(size: 15))
+                    .font(.body)
                     .foregroundStyle(Theme.muted)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -41,14 +41,14 @@ struct AccountDeactivatedView: View {
                 }
 
                 Text("Contact support if you think this is a mistake.")
-                    .font(.system(size: 13))
+                    .font(.footnote)
                     .foregroundStyle(Theme.faint)
                     .multilineTextAlignment(.center)
                     .padding(.top, 20)
 
                 Spacer(minLength: 0)
 
-                Button {
+                Button(role: .destructive) {
                     guard !isSigningOut else { return }
                     isSigningOut = true
                     Task {
@@ -57,24 +57,24 @@ struct AccountDeactivatedView: View {
                     }
                 } label: {
                     Text(isSigningOut ? "Signing out…" : "Sign out")
+                        .frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .buttonStyle(PrimaryButtonStyle())
+                .buttonStyle(.bordered)
                 .disabled(isSigningOut)
             }
             .padding(.horizontal, 32)
             .padding(.vertical, 48)
         }
-        .preferredColorScheme(.dark)
     }
 
     private func reasonCard(_ reason: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("REASON")
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .font(.caption2.weight(.semibold).monospaced())
                 .kerning(1)
                 .foregroundStyle(Theme.faint)
             Text(reason)
-                .font(.system(size: 14))
+                .font(.subheadline)
                 .foregroundStyle(Theme.ink)
                 .fixedSize(horizontal: false, vertical: true)
         }

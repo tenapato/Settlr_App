@@ -349,7 +349,12 @@ struct ActivityView: View {
                 .padding(.horizontal, 12).frame(minHeight: 36)
                 .background(selected ? Theme.accent.opacity(0.2) : Theme.surface2).clipShape(Capsule())
                 .overlay(Capsule().strokeBorder(selected ? Theme.accent.opacity(0.55) : Theme.line, lineWidth: 1))
-        }.buttonStyle(.plain).frame(minHeight: 44)
+        }
+        .buttonStyle(.plain)
+        .frame(minHeight: 44)
+        .accessibilityLabel(title)
+        .accessibilityValue(selected ? "Selected" : "Not selected")
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private var timelineContent: some View {

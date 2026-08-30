@@ -64,7 +64,6 @@ struct ReceiptCaptureView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
         .task { await camera.start() }
         .onDisappear {
             camera.setTorch(enabled: false)

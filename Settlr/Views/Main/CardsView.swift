@@ -147,8 +147,7 @@ struct CardsView: View {
 
             ZStack {
                 if vm.isLoading && vm.cards.isEmpty {
-                    ProgressView()
-                        .tint(Theme.accent)
+                    SettlrPulseLoadingView(message: "Loading cards")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .transition(.opacity)
                 } else if let err = vm.errorMessage, vm.cards.isEmpty {
@@ -171,7 +170,9 @@ struct CardsView: View {
                     Image(systemName: "plus")
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(Theme.accentText)
+                        .frame(width: 44, height: 44)
                 }
+                .accessibilityLabel("Add credit card")
             }
         }
         .sheet(isPresented: $vm.showCreateSheet) {
@@ -213,7 +214,9 @@ struct CardsView: View {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.system(size: 14))
                                 .foregroundStyle(Theme.faint)
+                                .frame(width: 44, height: 44)
                         }
+                        .accessibilityLabel("Clear card search")
                     }
                 }
                 .padding(.horizontal, 14)
@@ -274,12 +277,17 @@ private struct CardTile: View {
     let card: CreditCard
     let rank: Int
     @State private var appeared = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VirtualCardFace(card: card, style: .compact)
             .opacity(appeared ? 1 : 0)
             .offset(y: appeared ? 0 : 14)
             .onAppear {
+                guard !reduceMotion else {
+                    appeared = true
+                    return
+                }
                 let delay = Double(rank) * 0.06
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.8).delay(delay)) {
                     appeared = true
@@ -336,11 +344,13 @@ private struct CreateCardSheet: View {
                                             .font(.system(size: 13, weight: .semibold))
                                             .foregroundStyle(vm.newNetwork == val ? Theme.buttonInk : Theme.muted)
                                             .frame(maxWidth: .infinity)
-                                            .padding(.vertical, 10)
+                                            .frame(minHeight: 44)
                                             .background(RoundedRectangle(cornerRadius: 9)
                                                 .fill(vm.newNetwork == val ? Theme.accent : Theme.surface))
                                     }
                                     .buttonStyle(.plain)
+                                    .accessibilityValue(vm.newNetwork == val ? "Selected" : "Not selected")
+                                    .accessibilityAddTraits(vm.newNetwork == val ? .isSelected : [])
                                 }
                             }
                         }
@@ -452,6 +462,7 @@ struct CardsEmptyView: View {
                     .foregroundStyle(Theme.buttonInk)
                     .padding(.horizontal, 28).padding(.vertical, 12)
                     .background(RoundedRectangle(cornerRadius: 12).fill(Theme.accent))
+                    .frame(minHeight: 44)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -473,6 +484,7 @@ struct CardsErrorView: View {
             Button("Retry", action: onRetry)
                 .foregroundStyle(Theme.accentText)
                 .font(.system(size: 15, weight: .semibold))
+                .frame(minWidth: 44, minHeight: 44)
         }
         .padding(.horizontal, 32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -75,7 +75,6 @@ struct SplitListView: View {
                 Text("It hasn't uploaded yet, so it will be gone for good.")
             }
         }
-        .preferredColorScheme(.dark)
         .task {
             if openSplitId == nil { openSplitId = initialSplitId }
             await vm.load(workspaceId: workspaceId)

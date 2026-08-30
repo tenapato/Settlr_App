@@ -271,6 +271,7 @@ struct FortnightNavigator: View {
     let referenceDate: Date
     @Binding var selection: FortnightNavigatorMode
     let onSelect: (FortnightNavigatorMode) -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 0) {
@@ -290,7 +291,7 @@ struct FortnightNavigator: View {
 
             VStack(spacing: 7) {
                 Text(state.label)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(.body.weight(.semibold).monospacedDigit())
                     .foregroundStyle(Theme.ink)
                     .contentTransition(.numericText())
                 Capsule()
@@ -317,7 +318,7 @@ struct FortnightNavigator: View {
             .accessibilityLabel("Next fortnight")
         }
         .frame(maxWidth: .infinity)
-        .animation(.snappy(duration: 0.2), value: selection)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: selection)
     }
 
     private var state: FortnightNavigatorState {
@@ -348,17 +349,18 @@ struct FortnightNavigator: View {
 
 private struct DueSummary: View {
     let totals: CardPaymentsTotals
+    @ScaledMetric(relativeTo: .largeTitle) private var amountSize: CGFloat = 32
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("PAYMENT DUE")
-                .font(.system(size: 11, weight: .bold))
+                .font(.caption2.bold())
                 .tracking(1.2)
                 .foregroundStyle(Theme.accentText)
-            AmountLabel(cents: totals.remainingDueCents, font: .system(size: 32, weight: .bold))
+            AmountLabel(cents: totals.remainingDueCents, font: .system(size: amountSize, weight: .bold))
                 .foregroundStyle(Theme.ink)
             Text(totals.remainingDueCents == 0 ? "Everything is paid" : "Still owed across your cards")
-                .font(.system(size: 13))
+                .font(.footnote)
                 .foregroundStyle(Theme.muted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -382,12 +384,13 @@ struct SignalRefreshWarning: View {
             Image(systemName: "exclamationmark.triangle")
                 .foregroundStyle(Theme.warning)
             Text(message)
-                .font(.system(size: 12, weight: .medium))
+                .font(.caption.weight(.medium))
                 .foregroundStyle(Theme.muted)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Button("Retry", action: onRetry)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(Theme.accentText)
+                .frame(minWidth: 44, minHeight: 44)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)

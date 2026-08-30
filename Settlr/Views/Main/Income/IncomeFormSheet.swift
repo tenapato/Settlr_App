@@ -78,11 +78,20 @@ struct IncomeFormSheet: View {
                                 categoryRow
                             }
                             if !isEditing {
-                                FormToggleRow(
-                                    label: "Repeat",
-                                    caption: "Adds this automatically from the date above.",
-                                    isOn: $repeats
-                                )
+                                SignalNativeFormRow {
+                                    Toggle(isOn: $repeats) {
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text("Repeat")
+                                                .font(.body.weight(.medium))
+                                                .foregroundStyle(Theme.muted)
+                                            Text("Adds this automatically from the date above.")
+                                                .font(.caption)
+                                                .foregroundStyle(Theme.faint)
+                                        }
+                                    }
+                                    .tint(Theme.accent)
+                                    .frame(minHeight: 44)
+                                }
                                 if repeats {
                                     SignalNativeFormRow {
                                         Menu {

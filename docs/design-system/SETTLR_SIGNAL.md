@@ -1,6 +1,6 @@
 # Settlr Signal design system
 
-Version 1.0, drafted August 28, 2026.
+Version 1.1, finalized August 29, 2026.
 
 This document is the implementation reference for Settlr's iOS redesign. The companion preview is `settlr-signal-components.html` in this directory. Product behavior and screen architecture are specified in `docs/superpowers/specs/2026-08-28-signal-black-app-redesign-design.md`.
 
@@ -9,6 +9,8 @@ This document is the implementation reference for Settlr's iOS redesign. The com
 Settlr is a dark financial tool with one bright signal. The system should feel sharp and energetic when the user acts, then get out of the way while they read money and status.
 
 Dark is the default appearance. Settings also offers Light and System. System follows the iPhone appearance after the user selects it.
+
+`SettlrApp` owns the appearance override. Screens and sheets inherit that choice. Leaf views never force Dark, including the scanner editor, split payment method sheet, Savings management, Categories, authentication, and workspace selection.
 
 Use lime for selection, progress, focus, and the primary action. Do not fill every card with it. Near-black space is part of the identity.
 
@@ -43,6 +45,8 @@ The three offset bars are the Settlr mark. Use the existing asset. Do not redraw
 | `color.signalText` | `#597500` | Signal text and icons on light surfaces |
 | `color.signalFill` | `#A8D522` | Primary filled controls |
 
+When Increase Contrast is enabled, separators strengthen from `#DADDD6` to `#AEB4AA` in Light and from `#2D3135` to `#596065` in Dark. Muted and faint ink strengthen at the same time. Screens keep using the semantic tokens rather than branching on accessibility settings themselves.
+
 ### Semantic colors
 
 Semantic colors explain money or risk. They do not replace the brand signal.
@@ -68,6 +72,8 @@ Use the SwiftUI system font. Apply `.monospacedDigit()` to money, percentages, d
 | Eyebrow/status | 10–11 pt | Semibold | Tracked uppercase, short phrases only |
 
 Dynamic Type wins over the reference sizes. Do not cap body text below the user's requested size. Reflow layouts before reducing type.
+
+Use semantic text styles for labels and reading copy. Display money may use `@ScaledMetric` relative to `.largeTitle`, with one-line scaling as a final guard for unusually long amounts. Fixed sizes are reserved for icons and small geometry, not text.
 
 ## Spacing and shape
 
@@ -152,6 +158,8 @@ The first action is a lime `Scan and split` hero. Expense, Income, and Savings a
 
 Use the native segmented pattern for mutually exclusive, closely related options such as By item and Evenly. For payer mode, use two explicit selectable rows because the accounting consequence needs supporting copy.
 
+Every segment announces its label and `Selected` or `Not selected` value. The current option carries the selected accessibility trait. Reduce Motion changes selection without a spring.
+
 ### Content cards
 
 Use cards for objects with their own identity or state: savings accounts, credit cards, goal summaries, and result summaries. Do not use a card as a universal section wrapper.
@@ -190,6 +198,8 @@ After a delay, expose Retry or a specific recovery path. Reduce Motion holds one
 
 Explain what failed and what remains safe. Keep the relevant retry action nearby. Field validation belongs beneath the field. A network error must not erase valid cached information.
 
+Home uses the exact recovery promise `Saved Home data is still visible and may be out of date.` Categories, Cards, Activity, and Savings use the same honest pattern with screen-specific copy. A failed month change keeps the current and comparison summaries from the same successful snapshot.
+
 ## Navigation patterns
 
 - Tabs own their navigation stacks.
@@ -221,6 +231,14 @@ Due summary, approved fortnight navigator, swipeable cards, payment status and a
 
 Capture, Review, payer/division choice, assignment, Result, QR sheet.
 
+While `Scan again` is reading OCR or waiting on parsing, the editor fields and save action stay locked. The scan button shows the in-flight state so a late response cannot overwrite edits made during the request.
+
+### Authentication and workspace
+
+Authentication uses the existing logo, adaptive compact fields, one filled primary action, and inline service errors. The layouts scroll for the keyboard and accessibility text sizes. Apple controls switch to their readable system style for the active appearance.
+
+Workspace bootstrap uses `Getting your workspace` with the Settlr pulse. Workspace selection reserves cards for real workspace objects. Create workspace is a separate primary action, and a load failure keeps sign-out available while offering Retry.
+
 ## Bill-split language
 
 Use the current accounting language consistently:
@@ -237,6 +255,8 @@ Use the current accounting language consistently:
 
 Do not describe an `each_own` split as collecting. Do not show mark-paid controls when nobody owes the organizer.
 
+A closed split with recorded settlements cannot reopen claiming or editing. Its action routes to `Undo settlements to reopen`, and the explanation tells the organizer to undo every settlement first.
+
 ## Feature gates
 
 Build tabs, launcher actions, filters, and subviews from the current availability helpers. A hidden feature must not leave behind a picker value, empty tab, or request to a gated route.
@@ -249,12 +269,14 @@ Home is always present. Activity appears when any of expenses, income, or bill s
 - Dynamic Type at accessibility sizes.
 - VoiceOver label, value, hint, and trait where useful.
 - Currency-aware amount speech.
+- Selected traits and values for filters, segmented choices, account chips, and selectable cards.
 - Color-independent status.
 - Reduce Motion alternatives for ticker, scanner, and launcher.
 - Increase Contrast support for separators and muted ink.
 - Keyboard focus and dismissal for every form.
 - QR action has a visible text label.
 - Haptics supplement visual feedback and never replace it.
+- Editors that can receive a late network or OCR response lock conflicting fields while the request is in flight.
 
 ## Motion
 

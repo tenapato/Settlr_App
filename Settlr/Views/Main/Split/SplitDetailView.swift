@@ -86,10 +86,10 @@ struct SplitDetailView: View {
                 )
             }
         }
-        .alert("Undo settlements before editing", isPresented: $showSettledEditExplanation) {
+        .alert("Undo settlements before reopening", isPresented: $showSettledEditExplanation) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("At least one person is already marked paid. Undo those settlements, then reopen the split to edit its money and items.")
+            Text("At least one person is already marked paid. Undo every settlement before reopening claiming or editing the split.")
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -98,6 +98,7 @@ struct SplitDetailView: View {
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Theme.ink)
                         .rotationEffect(.degrees(refreshSpin))
+                        .frame(width: 44, height: 44)
                 }
                 .disabled(isRefreshing)
                 .accessibilityLabel("Check for new claims")
@@ -136,6 +137,7 @@ struct SplitDetailView: View {
                     Image(systemName: "ellipsis.circle")
                         .font(.system(size: 17))
                         .foregroundStyle(Theme.ink)
+                        .frame(width: 44, height: 44)
                 }
             }
         }
@@ -596,7 +598,7 @@ struct SplitDetailView: View {
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(Theme.muted)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 9)
+                        .frame(minHeight: 44)
                         .background(Theme.surface2)
                         .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                 }
@@ -610,7 +612,7 @@ struct SplitDetailView: View {
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(Theme.ink)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 9)
+                                .frame(minHeight: 44)
                                 .background(Theme.surface2)
                                 .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                         }
@@ -971,6 +973,7 @@ struct SplitDetailView: View {
                 Image(systemName: person.isSettled ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 20))
                     .foregroundStyle(person.isSettled ? Theme.income : Theme.faint)
+                    .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
             .disabled(vm.isSaving)
@@ -986,19 +989,24 @@ struct SplitDetailView: View {
 
     @ViewBuilder
     private func lockButton(_ split: BillSplit) -> some View {
+        let hasSettlements = split.participants.contains(where: \.isSettled)
         VStack(spacing: 6) {
             Button {
-                Task {
-                    _ = await vm.setStatus(
-                        workspaceId: workspaceId,
-                        splitId: splitId,
-                        status: split.isOpen ? "locked" : "open"
-                    )
+                if !split.isOpen && hasSettlements {
+                    showSettledEditExplanation = true
+                } else {
+                    Task {
+                        _ = await vm.setStatus(
+                            workspaceId: workspaceId,
+                            splitId: splitId,
+                            status: split.isOpen ? "locked" : "open"
+                        )
+                    }
                 }
             } label: {
-                Text(lockButtonTitle(split))
+                Text(!split.isOpen && hasSettlements ? "Undo settlements to reopen" : lockButtonTitle(split))
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(split.isOpen ? Theme.bg : Theme.ink)
+                    .foregroundStyle(split.isOpen ? Theme.buttonInk : Theme.ink)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(split.isOpen ? Theme.accent : Theme.surface2)
@@ -1006,7 +1014,11 @@ struct SplitDetailView: View {
             }
             .disabled(vm.isSaving)
 
-            Text(lockButtonCaption(split))
+            Text(
+                !split.isOpen && hasSettlements
+                    ? "Settled shares must be undone before claiming can reopen."
+                    : lockButtonCaption(split)
+            )
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.faint)
                 .multilineTextAlignment(.center)

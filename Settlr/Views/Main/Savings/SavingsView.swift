@@ -9,6 +9,7 @@ struct SavingsView: View {
     @State private var showRecurring = false
     @State private var entryToEdit: SavingsEntry?
     @State private var entryToDelete: SavingsEntry?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Group {
@@ -22,7 +23,6 @@ struct SavingsView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
         .task { await vm.load(workspaceId: workspaceId) }
         .onChange(of: vm.selectedAccountId) { _, _ in
             Task { await vm.load(workspaceId: workspaceId) }
@@ -91,12 +91,16 @@ struct SavingsView: View {
                                     : "arrow.trianglehead.2.clockwise.rotate.90")
                                     .foregroundStyle(Theme.accent)
                                     .font(.system(size: 16, weight: .semibold))
+                                    .frame(width: 44, height: 44)
                             }
+                            .accessibilityLabel("Manage recurring savings")
                             Button { showManageAccounts = true } label: {
                                 Image(systemName: "slider.horizontal.3")
                                     .foregroundStyle(Theme.accent)
                                     .font(.system(size: 16, weight: .semibold))
+                                    .frame(width: 44, height: 44)
                             }
+                            .accessibilityLabel("Manage savings accounts")
                         }
                     // Always ask for an entry; the showForm handler diverts to account
                     // creation only if the workspace is confirmed to have no accounts.
@@ -104,7 +108,9 @@ struct SavingsView: View {
                         Image(systemName: "plus")
                             .foregroundStyle(Theme.accent)
                             .font(.system(size: 18, weight: .semibold))
+                            .frame(width: 44, height: 44)
                     }
+                    .accessibilityLabel("Add savings entry")
                 }
             }
         }
@@ -148,7 +154,7 @@ struct SavingsView: View {
                 .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
         }
-        .animation(.easeOut(duration: 0.2), value: entryToDelete != nil)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: entryToDelete != nil)
     }
 
     // MARK: - Balance header
@@ -167,7 +173,7 @@ struct SavingsView: View {
             )
             .foregroundStyle(Theme.ink)
             .contentTransition(.numericText())
-            .animation(.snappy(duration: 0.25), value: vm.displayBalanceCents)
+            .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: vm.displayBalanceCents)
 
             HStack(spacing: 20) {
                 metric(label: "This month", cents: monthMovementCents, tint: monthMovementCents >= 0 ? Theme.income : Theme.expense)
@@ -342,6 +348,8 @@ struct SavingsView: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityValue(selected ? "Selected" : "Not selected")
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     // MARK: - Entries list
@@ -369,6 +377,7 @@ struct SavingsView: View {
                     .padding(.vertical, 12)
                     .background(Theme.accent)
                     .clipShape(Capsule())
+                    .frame(minHeight: 44)
             }
             Spacer()
         }
@@ -413,6 +422,7 @@ struct SavingsView: View {
                     .padding(.vertical, 12)
                     .background(Theme.accent)
                     .clipShape(Capsule())
+                    .frame(minHeight: 44)
             }
             Spacer()
         }
@@ -461,6 +471,8 @@ private struct FlexibleSavingsCard: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(isSelected ? Theme.accent.opacity(0.65) : Color.clear, lineWidth: 1)
         )
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -480,7 +492,8 @@ struct SavingsGoalCard: View {
         case "funded": return "Funded"
         case "past_due": return "Past due"
         case "in_progress": return "In progress"
-        default: return "Goal"
+        case "not_started", nil: return "Not started"
+        default: return "Status unavailable"
         }
     }
 
@@ -561,16 +574,29 @@ struct SavingsGoalCard: View {
         )
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Savings goal for \(account.name)")
-        .accessibilityValue("\(account.progressPct ?? 0) percent, \(statusLabel)")
+        .accessibilityValue(accessibilityValue)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var accessibilityValue: String {
+        var parts = ["\(account.progressPct ?? 0) percent", statusLabel]
+        if let remaining = account.remainingCents, remaining > 0 {
+            parts.append("\(AmountLabelText(cents: remaining)) remaining")
+        }
+        if let targetDate = account.targetDate {
+            parts.append("Target date \(targetDate.prefix(10))")
+        }
+        return parts.joined(separator: ", ")
     }
 }
 
 private func AmountLabelText(cents: Int) -> String {
     let formatter = NumberFormatter()
-    formatter.numberStyle = .currency
-    formatter.currencyCode = "MXN"
+    formatter.numberStyle = .decimal
+    formatter.minimumFractionDigits = 2
     formatter.maximumFractionDigits = 2
-    return formatter.string(from: NSNumber(value: Double(cents) / 100.0)) ?? "$0.00"
+    let number = formatter.string(from: NSNumber(value: Double(cents) / 100.0)) ?? "0.00"
+    return "MXN $\(number)"
 }
 
 // MARK: - Entry row

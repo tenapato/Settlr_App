@@ -26,6 +26,7 @@ struct SplitCreateSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let queue = PendingSplitQueue.shared
     private let network = NetworkMonitor.shared
 
@@ -101,6 +102,7 @@ struct SplitCreateSheet: View {
             && (draft.paymentChannel != "credit_card" || draft.creditCardId != nil)
             && !reconciliation.requiresDecision
             && (!isEditing || network.isOnline)
+            && !isScanning
     }
 
     /// What one person pays on an even split, shown live so the table can settle
@@ -156,6 +158,7 @@ struct SplitCreateSheet: View {
                     .padding(.bottom, 32)
                 }
                 .scrollDismissesKeyboard(.interactively)
+                .disabled(isScanning || isSubmitting)
             }
             .navigationTitle(isEditing ? "Edit Bill Split" : "Split a Bill")
             .navigationBarTitleDisplayMode(.inline)
@@ -247,6 +250,7 @@ struct SplitCreateSheet: View {
         .onAppear { applyInitialDraftOnce() }
         .onChange(of: canUseCreditCards) { _, _ in normalizeCardPaymentState() }
         .onDisappear { photoRecovery.clear() }
+        .interactiveDismissDisabled(isScanning || isSubmitting)
     }
 
     private var saveButtonTitle: String {
@@ -280,6 +284,7 @@ struct SplitCreateSheet: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .disabled(isScanning)
+            .accessibilityHint(isScanning ? "Receipt fields are locked until reading finishes." : "Opens the receipt scanner.")
 
             if let scanNotice {
                 Text(scanNotice)
@@ -756,7 +761,7 @@ struct SplitCreateSheet: View {
                     Text("\(item.wrappedValue.quantity)×")
                         .font(.system(size: 13, design: .monospaced))
                         .foregroundStyle(item.wrappedValue.quantity > 1 ? Theme.accentText : Theme.faint)
-                        .frame(width: 34)
+                        .frame(width: 44, height: 44)
                 }
 
                 TextField(
@@ -772,15 +777,18 @@ struct SplitCreateSheet: View {
                     .frame(width: 88)
 
                 Button {
-                    withAnimation(.easeOut(duration: 0.15)) {
+                    let remove = {
                         draft.items.removeAll { $0.id == item.wrappedValue.id }
                         if draft.items.isEmpty { draft.items = [SplitDraft.Item()] }
                         draft.mismatchAcknowledged = false
                     }
+                    if reduceMotion { remove() }
+                    else { withAnimation(.easeOut(duration: 0.15)) { remove() } }
                 } label: {
                     Image(systemName: "minus.circle")
                         .font(.system(size: 15))
                         .foregroundStyle(Theme.faint)
+                        .frame(width: 44, height: 44)
                 }
             }
             Menu {
@@ -799,6 +807,7 @@ struct SplitCreateSheet: View {
                 )
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Theme.muted)
+                .frame(minHeight: 44)
             }
             if item.wrappedValue.verification == .unverified {
                 Label("Unverified receipt row — check its name, quantity, and price", systemImage: "exclamationmark.triangle.fill")
@@ -970,7 +979,7 @@ struct SplitCreateSheet: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(isActive ? Theme.bg : Theme.muted)
                 .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+                .frame(minHeight: 44)
                 .background(isActive ? Theme.accent : Theme.surface2)
                 .clipShape(Capsule())
         }

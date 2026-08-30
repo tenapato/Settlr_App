@@ -208,7 +208,11 @@ struct MainTabView: View {
             let waiting = appState.currentUser.map { PendingSplitQueue.shared.pendingCount(userId: $0.id) } ?? 0
             actions.append(
                 QuickActionItem(
-                    id: "scan-and-split", title: "Scan and split", subtitle: waiting > 0 ? "(waiting) waiting" : "Scan a receipt",
+                    id: "scan-and-split",
+                    title: "Scan and split",
+                    subtitle: waiting > 0
+                        ? "\(waiting) split\(waiting == 1 ? "" : "s") waiting to upload"
+                        : "Scan a receipt",
                     systemImage: "doc.viewfinder", role: .signature
                 ) {
                     setFabOpen(false)

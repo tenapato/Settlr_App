@@ -477,6 +477,7 @@ struct InsightTicker: View {
                 ForEach(Array(insights.enumerated()), id: \.element.id) { i, insight in
                     Button(action: onTap) {
                         TickerLineView(insight: insight)
+                            .frame(minHeight: 44)
                     }
                     .buttonStyle(.plain)
                     if i < insights.count - 1 { TickerDot() }
@@ -484,6 +485,7 @@ struct InsightTicker: View {
             }
         }
         .scrollIndicators(.hidden)
+        .frame(minHeight: 44)
     }
 
     private var animatedRow: some View {
@@ -494,10 +496,10 @@ struct InsightTicker: View {
                 measuringCopy
                 scrollingContent(viewportWidth: outerGeo.size.width)
             }
-            .frame(width: outerGeo.size.width, height: 20, alignment: .leading)
+            .frame(width: outerGeo.size.width, height: 44, alignment: .leading)
             .clipped()
         }
-        .frame(height: 20)
+        .frame(height: 44)
         .contentShape(Rectangle())
         .gesture(dragGesture)
         .onAppear {
@@ -666,6 +668,7 @@ struct SpendingInsightsTicker: View {
     var onTap: () -> Void = {}
 
     @State private var appeared = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var insights: [SpendingInsight] {
         SpendingInsights.build(current: summary, previous: previous, months: months)
@@ -677,9 +680,12 @@ struct SpendingInsightsTicker: View {
         } else {
             InsightTicker(insights: insights, onTap: onTap)
                 .padding(.horizontal, 24)
-                .opacity(appeared ? 1 : 0)
-                .offset(y: appeared ? 0 : 12)
-                .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.15), value: appeared)
+                .opacity(reduceMotion || appeared ? 1 : 0)
+                .offset(y: reduceMotion || appeared ? 0 : 12)
+                .animation(
+                    reduceMotion ? nil : .spring(response: 0.6, dampingFraction: 0.8).delay(0.15),
+                    value: appeared
+                )
                 .onAppear { reveal() }
                 .onChange(of: summary.expenseCents) { _, _ in
                     appeared = false
@@ -689,8 +695,11 @@ struct SpendingInsightsTicker: View {
     }
 
     private func reveal() {
-        withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.15)) {
-            appeared = true
+        if reduceMotion { appeared = true }
+        else {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.15)) {
+                appeared = true
+            }
         }
     }
 }

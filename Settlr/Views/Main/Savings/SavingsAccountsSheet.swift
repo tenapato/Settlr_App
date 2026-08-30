@@ -10,6 +10,7 @@ struct SavingsAccountsSheet: View {
     @State private var editingAccount: SavingsAccount?
     @State private var accountToDelete: SavingsAccount?
     @State private var isSavingAccount = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         NavigationStack {
@@ -39,7 +40,9 @@ struct SavingsAccountsSheet: View {
                         Image(systemName: "plus")
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(Theme.accent)
+                            .frame(width: 44, height: 44)
                     }
+                    .accessibilityLabel("Create savings account")
                 }
             }
             .sheet(isPresented: $showAccountForm) {
@@ -102,9 +105,8 @@ struct SavingsAccountsSheet: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
                 }
             }
-            .animation(.easeOut(duration: 0.2), value: accountToDelete != nil)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: accountToDelete != nil)
         }
-        .preferredColorScheme(.dark)
     }
 
     private var emptyState: some View {
@@ -180,7 +182,7 @@ struct SavingsAccountsSheet: View {
                             .foregroundStyle(Theme.muted)
                         if let target = account.targetAmountCents {
                             HStack(spacing: 4) {
-                                Text(account.goalStatus == "funded" ? "Funded" : "Goal")
+                                Text(accountGoalStatus(account))
                                 AmountLabel(cents: target, font: .system(size: 11, weight: .medium))
                             }
                             .font(.system(size: 11))
@@ -201,9 +203,10 @@ struct SavingsAccountsSheet: View {
                         Image(systemName: "pencil")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Theme.muted)
-                            .frame(width: 36, height: 36)
+                            .frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Edit \(account.name)")
 
                     Button {
                         accountToDelete = account
@@ -211,9 +214,10 @@ struct SavingsAccountsSheet: View {
                         Image(systemName: "trash")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Theme.expense)
-                            .frame(width: 36, height: 36)
+                            .frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Delete \(account.name)")
                 }
                 .padding(.vertical, 4)
                 .listRowBackground(Theme.surface)
@@ -309,8 +313,12 @@ struct SavingsAccountFormSheet: View {
                                                 .foregroundStyle(Theme.bg)
                                         }
                                     }
+                                    .frame(width: 44, height: 44)
                                 }
                                 .buttonStyle(.plain)
+                                .accessibilityLabel("Account color \(hex)")
+                                .accessibilityValue(colorHex.lowercased() == hex.lowercased() ? "Selected" : "Not selected")
+                                .accessibilityAddTraits(colorHex.lowercased() == hex.lowercased() ? .isSelected : [])
                             }
                         }
 
@@ -377,7 +385,6 @@ struct SavingsAccountFormSheet: View {
             }
             .onAppear { nameFocused = true }
         }
-        .preferredColorScheme(.dark)
         .interactiveDismissDisabled(isSaving)
     }
 
@@ -443,6 +450,16 @@ struct SavingsAccountFormSheet: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: date)
+    }
+}
+
+private func accountGoalStatus(_ account: SavingsAccount) -> String {
+    switch account.goalStatus {
+    case "funded": return "Funded"
+    case "past_due": return "Past due"
+    case "in_progress": return "In progress"
+    case "not_started", nil: return "Not started"
+    default: return "Status unavailable"
     }
 }
 

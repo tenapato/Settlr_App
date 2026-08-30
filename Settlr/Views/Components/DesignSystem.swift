@@ -41,6 +41,7 @@ struct CompactSharedClaimControl: View {
                 : presentation.accessibilityLabel(isEnabled: isEnabled)
         )
         .accessibilityAddTraits(isEnabled && !isLoading ? .isButton : [])
+        .accessibilityAddTraits(presentation.isSelected ? .isSelected : [])
     }
 }
 
@@ -71,7 +72,7 @@ struct CompactUnitClaimStepper: View {
             Button(action: decrement) {
                 Image(systemName: "minus")
                     .font(.system(size: 10, weight: .bold))
-                    .frame(width: 23, height: 23)
+                    .frame(width: 44, height: 44)
             }
             .disabled(!canDecrement)
             .accessibilityLabel("Remove one")
@@ -86,7 +87,7 @@ struct CompactUnitClaimStepper: View {
             Button(action: increment) {
                 Image(systemName: "plus")
                     .font(.system(size: 10, weight: .bold))
-                    .frame(width: 23, height: 23)
+                    .frame(width: 44, height: 44)
             }
             .disabled(!canIncrement)
             .accessibilityLabel("Add one")
@@ -117,9 +118,22 @@ private extension UIColor {
 }
 
 private extension Color {
-    static func settlr(light: UInt32, dark: UInt32) -> Color {
+    static func settlr(
+        light: UInt32,
+        dark: UInt32,
+        highContrastLight: UInt32? = nil,
+        highContrastDark: UInt32? = nil
+    ) -> Color {
         Color(uiColor: UIColor { traits in
-            UIColor(hex: traits.userInterfaceStyle == .dark ? dark : light)
+            let isDark = traits.userInterfaceStyle == .dark
+            let isHighContrast = traits.accessibilityContrast == .high
+            let value: UInt32
+            if isHighContrast {
+                value = isDark ? (highContrastDark ?? dark) : (highContrastLight ?? light)
+            } else {
+                value = isDark ? dark : light
+            }
+            return UIColor(hex: value)
         })
     }
 }
@@ -128,10 +142,25 @@ enum Theme {
     static let bg        = Color.settlr(light: 0xF3F3ED, dark: 0x090A0B)
     static let surface   = Color.settlr(light: 0xFFFFFF, dark: 0x15181B)
     static let surface2  = Color.settlr(light: 0xE9EBE4, dark: 0x1D2124)
-    static let line      = Color.settlr(light: 0xDADDD6, dark: 0x2D3135)
+    static let line      = Color.settlr(
+        light: 0xDADDD6,
+        dark: 0x2D3135,
+        highContrastLight: 0xAEB4AA,
+        highContrastDark: 0x596065
+    )
     static let ink       = Color.settlr(light: 0x141614, dark: 0xF4F5EF)
-    static let muted     = Color.settlr(light: 0x69706A, dark: 0x898F92)
-    static let faint     = Color.settlr(light: 0x929890, dark: 0x5E6466)
+    static let muted     = Color.settlr(
+        light: 0x69706A,
+        dark: 0x898F92,
+        highContrastLight: 0x4C524D,
+        highContrastDark: 0xB3B8BA
+    )
+    static let faint     = Color.settlr(
+        light: 0x929890,
+        dark: 0x5E6466,
+        highContrastLight: 0x5F665F,
+        highContrastDark: 0x9DA3A5
+    )
     static let accent    = Color.settlr(light: 0xA8D522, dark: 0xCAFF3A)
     static let accentText = Color.settlr(light: 0x597500, dark: 0xCAFF3A)
     static let buttonInk = Color.settlr(light: 0x11140A, dark: 0x080A08)
@@ -222,6 +251,7 @@ struct PrimaryButtonStyle: ButtonStyle {
     struct PrimaryButtonBody: View {
         let configuration: ButtonStyleConfiguration
         @Environment(\.isEnabled) private var isEnabled
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
         var body: some View {
             configuration.label
@@ -231,8 +261,8 @@ struct PrimaryButtonStyle: ButtonStyle {
                 .frame(height: 52)
                 .background(RoundedRectangle(cornerRadius: 14).fill(Theme.accent))
                 .opacity(isEnabled ? (configuration.isPressed ? 0.85 : 1) : 0.4)
-                .scaleEffect(configuration.isPressed ? 0.99 : 1)
-                .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+                .scaleEffect(configuration.isPressed && !reduceMotion ? 0.99 : 1)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: configuration.isPressed)
         }
     }
 }

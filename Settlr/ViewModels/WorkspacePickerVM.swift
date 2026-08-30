@@ -16,6 +16,7 @@ final class WorkspacePickerVM {
     @MainActor
     func load() async {
         isLoading = true
+        errorMessage = nil
         defer { isLoading = false }
         do {
             let response: WorkspacesResponse = try await api.fetch(Endpoints.workspaces)
@@ -40,6 +41,7 @@ final class WorkspacePickerVM {
             return nil
         }
         isCreating = true
+        errorMessage = nil
         defer { isCreating = false }
         do {
             let response: CreateWorkspaceResponse = try await api.fetch(

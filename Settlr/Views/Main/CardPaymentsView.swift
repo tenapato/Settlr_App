@@ -267,7 +267,7 @@ private struct FortnightFilterBar: View {
                 }
                 .foregroundStyle(selected == .all ? Theme.muted : Theme.accentText)
                 .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .frame(minHeight: 44)
                 .background(
                     Capsule()
                         .fill(Theme.surface)
@@ -293,12 +293,14 @@ private struct FortnightFilterBar: View {
 private struct MonthSelectorBar: View {
     @Binding var selectedMonth: String
     let onChanged: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack {
             Button { change(by: -1) } label: {
                 Image(systemName: "chevron.left")
                     .foregroundStyle(Theme.muted)
+                    .frame(width: 44, height: 44)
             }
             Spacer()
             Button {
@@ -307,16 +309,18 @@ private struct MonthSelectorBar: View {
                 onChanged()
             } label: {
                 Text(displayLabel)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(Theme.ink)
+                    .frame(minHeight: 44)
                     .contentTransition(.numericText())
-                    .animation(.snappy(duration: 0.2), value: selectedMonth)
+                    .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: selectedMonth)
             }
             .buttonStyle(.plain)
             Spacer()
             Button { change(by: 1) } label: {
                 Image(systemName: "chevron.right")
                     .foregroundStyle(Theme.muted)
+                    .frame(width: 44, height: 44)
             }
         }
         .padding(.vertical, 12)
@@ -396,10 +400,10 @@ struct CardPaymentTile: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(row.label)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(Theme.ink)
                     Text(maskedNumber)
-                        .font(.system(size: 12, design: .monospaced))
+                        .font(.caption.monospaced())
                         .foregroundStyle(Theme.faint)
                 }
                 Spacer()
@@ -409,14 +413,14 @@ struct CardPaymentTile: View {
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("To pay")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.caption2.weight(.semibold))
                         .foregroundStyle(Theme.muted)
                         .tracking(0.5).textCase(.uppercase)
-                    AmountLabel(cents: row.paymentDueCents, font: .system(size: 22, weight: .bold))
+                    AmountLabel(cents: row.paymentDueCents, font: .title2.bold())
                         .foregroundStyle(Theme.ink)
                     if row.dueSource == "override" {
                         Text("Statement override · spend \(moneyString(row.spentCents))")
-                            .font(.system(size: 11))
+                            .font(.caption2)
                             .foregroundStyle(Theme.faint)
                     }
                 }
@@ -424,11 +428,11 @@ struct CardPaymentTile: View {
                 if let due = paymentDueDateLabel {
                     VStack(alignment: .trailing, spacing: 3) {
                         Text("Due")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.caption2.weight(.semibold))
                             .foregroundStyle(Theme.muted)
                             .tracking(0.5).textCase(.uppercase)
                         Text(due)
-                            .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                            .font(.subheadline.weight(.semibold).monospaced())
                             .foregroundStyle(Theme.accentText)
                     }
                 }
@@ -440,11 +444,11 @@ struct CardPaymentTile: View {
                 if let pct = row.utilizationPct {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Usage")
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(.caption2.weight(.semibold))
                             .foregroundStyle(Theme.muted)
                             .tracking(0.5).textCase(.uppercase)
                         Text(String(format: pct.truncatingRemainder(dividingBy: 1) == 0 ? "%.0f%%" : "%.1f%%", pct))
-                            .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                            .font(.caption.weight(.semibold).monospaced())
                             .foregroundStyle(utilizationColor)
                     }
                 }
@@ -460,12 +464,12 @@ struct CardPaymentTile: View {
                             .tint(row.paidInFull ? Theme.ink : Theme.buttonInk)
                     } else {
                         Text(row.paidInFull ? "Undo paid status" : "Mark as paid")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(row.paidInFull ? Theme.muted : Theme.buttonInk)
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
+                .frame(minHeight: 44)
                 .background(
                     RoundedRectangle(cornerRadius: 11)
                         .fill(row.paidInFull ? Theme.surface2 : Theme.accent)
@@ -496,7 +500,7 @@ struct CardPaymentTile: View {
 
     private var statusTag: some View {
         Text(row.paidInFull ? "PAID" : "OPEN")
-            .font(.system(size: 10, weight: .bold))
+            .font(.caption2.bold())
             .tracking(1)
             .foregroundStyle(row.paidInFull ? Theme.income : Theme.warning)
             .padding(.horizontal, 10)
@@ -541,15 +545,15 @@ struct CardPaymentTile: View {
     private func miniStat(label: String, cents: Int?) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.system(size: 10, weight: .semibold))
+                .font(.caption2.weight(.semibold))
                 .foregroundStyle(Theme.muted)
                 .tracking(0.5).textCase(.uppercase)
             if let cents {
-                AmountLabel(cents: cents, font: .system(size: 13, weight: .semibold))
+                AmountLabel(cents: cents, font: .caption.weight(.semibold))
                     .foregroundStyle(Theme.ink)
             } else {
                 Text("—")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(Theme.faint)
             }
         }
@@ -612,6 +616,7 @@ struct FortnightEmptyView: View {
                     .foregroundStyle(Theme.buttonInk)
                     .padding(.horizontal, 28).padding(.vertical, 12)
                     .background(RoundedRectangle(cornerRadius: 12).fill(Theme.accent))
+                    .frame(minHeight: 44)
             }
         }
         .padding(.horizontal, 32)
@@ -634,6 +639,7 @@ struct PaymentsErrorView: View {
             Button("Retry", action: onRetry)
                 .foregroundStyle(Theme.accentText)
                 .font(.system(size: 15, weight: .semibold))
+                .frame(minWidth: 44, minHeight: 44)
         }
         .padding(.horizontal, 32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

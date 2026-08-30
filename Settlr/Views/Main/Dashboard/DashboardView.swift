@@ -86,7 +86,7 @@ struct DashboardView: View {
                 )
 
                 if let errorMessage = vm.errorMessage {
-                    DashboardRecoveryCard(message: errorMessage) {
+                    DashboardRecoveryCard(message: errorMessage, hasCachedData: true) {
                         Task { await vm.load(workspaceId: workspaceId) }
                     }
                     .padding(.horizontal, 20)
@@ -97,7 +97,7 @@ struct DashboardView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 56)
         } else if let errorMessage = vm.errorMessage {
-            DashboardRecoveryCard(message: errorMessage) {
+            DashboardRecoveryCard(message: errorMessage, hasCachedData: false) {
                 Task { await vm.load(workspaceId: workspaceId) }
             }
             .padding(.horizontal, 20)
@@ -116,7 +116,7 @@ private struct DashboardWorkspaceHeader: View {
             VStack(alignment: .leading, spacing: 3) {
                 SectionEyebrow("WORKSPACE", color: Theme.faint)
                 Text(name)
-                    .font(.system(size: 30, weight: .bold))
+                    .font(.largeTitle.bold())
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
@@ -173,6 +173,7 @@ private struct DashboardContent: View {
 
 private struct AvailableBalanceHero: View {
     let summary: SummaryResponse
+    @ScaledMetric(relativeTo: .largeTitle) private var amountSize: CGFloat = 44
 
     private var isPositive: Bool { summary.availableCents >= 0 }
     private var amountColor: Color { isPositive ? Theme.accentText : Theme.expense }
@@ -182,7 +183,7 @@ private struct AvailableBalanceHero: View {
             SectionEyebrow("AVAILABLE THIS MONTH")
             AmountLabel(
                 cents: summary.availableCents,
-                font: .system(size: 44, weight: .bold, design: .rounded)
+                font: .system(size: amountSize, weight: .bold, design: .rounded)
             )
             .foregroundStyle(amountColor)
             .contentTransition(.numericText(countsDown: summary.availableCents < 0))
@@ -194,7 +195,7 @@ private struct AvailableBalanceHero: View {
                     .fill(amountColor)
                     .frame(width: 6, height: 6)
                 Text(isPositive ? "After savings" : "Below zero after savings")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.subheadline.weight(.medium))
                     .foregroundStyle(Theme.muted)
             }
         }
@@ -210,7 +211,7 @@ private struct FlowSummary: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Monthly movement")
-                .font(.system(size: 18, weight: .semibold))
+                .font(.headline)
                 .foregroundStyle(Theme.ink)
 
             HStack(spacing: 0) {
@@ -241,11 +242,11 @@ private struct SummaryMetric: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(label)
-                .font(.system(size: 12, weight: .medium))
+                .font(.caption.weight(.medium))
                 .foregroundStyle(Theme.muted)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
-            AmountLabel(cents: cents, font: .system(size: 15, weight: .semibold))
+            AmountLabel(cents: cents, font: .subheadline.weight(.semibold))
                 .foregroundStyle(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.55)
@@ -264,11 +265,11 @@ private struct RecentActivityPreview: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Recent activity")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.headline)
                     .foregroundStyle(Theme.ink)
                 Spacer()
                 Text("This month")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.caption.weight(.medium))
                     .foregroundStyle(Theme.faint)
             }
 
@@ -281,10 +282,10 @@ private struct RecentActivityPreview: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(summary.transactionCount == 0 ? "No transactions yet" : "\(summary.transactionCount) transactions")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Theme.ink)
                     Text("\(summary.incomeCount) income · \(summary.expenseCount) spending")
-                        .font(.system(size: 13))
+                        .font(.footnote)
                         .foregroundStyle(Theme.muted)
                 }
                 Spacer(minLength: 0)
@@ -298,6 +299,7 @@ private struct RecentActivityPreview: View {
 
 private struct DashboardRecoveryCard: View {
     let message: String
+    let hasCachedData: Bool
     let onRetry: () -> Void
 
     var body: some View {
@@ -305,17 +307,23 @@ private struct DashboardRecoveryCard: View {
             Image(systemName: "exclamationmark.triangle")
                 .foregroundStyle(Theme.warning)
             VStack(alignment: .leading, spacing: 3) {
-                Text("Couldn’t refresh Home")
-                    .font(.system(size: 14, weight: .semibold))
+                Text(hasCachedData ? "Couldn’t refresh Home" : "Couldn’t load Home")
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.ink)
+                if hasCachedData {
+                    Text("Saved Home data is still visible and may be out of date.")
+                        .font(.caption)
+                        .foregroundStyle(Theme.warning)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 Text(message)
-                    .font(.system(size: 12))
+                    .font(.caption)
                     .foregroundStyle(Theme.muted)
-                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 4)
             Button("Retry", action: onRetry)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Theme.accentText)
                 .frame(minWidth: 44, minHeight: 44)
         }
@@ -347,7 +355,7 @@ private struct MonthPickerRow: View {
                 selectedMonth = f.string(from: Date())
             } label: {
                 Text(displayMonth)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(Theme.ink)
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .contentTransition(.numericText())

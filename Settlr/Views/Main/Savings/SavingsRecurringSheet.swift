@@ -8,6 +8,7 @@ struct SavingsRecurringSheet: View {
     @State private var showForm = false
     @State private var editingRule: RecurringSavings?
     @State private var ruleToDelete: RecurringSavings?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         NavigationStack {
@@ -35,8 +36,10 @@ struct SavingsRecurringSheet: View {
                         Image(systemName: "plus")
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(Theme.accentText)
+                            .frame(width: 44, height: 44)
                     }
                     .disabled(vm.accounts.isEmpty)
+                    .accessibilityLabel("Add recurring savings")
                 }
             }
             .sheet(isPresented: $showForm) {
@@ -85,7 +88,7 @@ struct SavingsRecurringSheet: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
                 }
             }
-            .animation(.easeOut(duration: 0.2), value: ruleToDelete != nil)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: ruleToDelete != nil)
         }
     }
 
@@ -172,6 +175,7 @@ struct SavingsRecurringSheet: View {
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(Theme.accentText)
                         .buttonStyle(.plain)
+                        .frame(minWidth: 44, minHeight: 44)
 
                         Button {
                             editingRule = rule
@@ -180,9 +184,10 @@ struct SavingsRecurringSheet: View {
                             Image(systemName: "pencil")
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(Theme.muted)
-                                .frame(width: 32, height: 32)
+                                .frame(width: 44, height: 44)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("Edit recurring savings")
 
                         Button {
                             ruleToDelete = rule
@@ -190,9 +195,10 @@ struct SavingsRecurringSheet: View {
                             Image(systemName: "trash")
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(Theme.expense)
-                                .frame(width: 32, height: 32)
+                                .frame(width: 44, height: 44)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("Delete recurring savings")
                     }
                 }
                 .padding(.vertical, 4)

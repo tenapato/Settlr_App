@@ -26,10 +26,11 @@ enum Tab: CaseIterable {
 struct FloatingTabBar: View {
     @Binding var selected: Tab
     /// Only the tabs this user's features leave reachable — an admin can switch
-    /// off cards or payments, and a bar item that leads nowhere is worse than
+    /// off cards or savings, and a bar item that leads nowhere is worse than
     /// a shorter bar.
     var tabs: [Tab] = Tab.allCases
     @Namespace private var indicatorNS
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 2) {
@@ -46,7 +47,8 @@ struct FloatingTabBar: View {
         let isSelected = selected == tab
 
         Button {
-            withAnimation(.snappy(duration: 0.3)) { selected = tab }
+            if reduceMotion { selected = tab }
+            else { withAnimation(.snappy(duration: 0.3)) { selected = tab } }
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: tab.icon)

@@ -50,6 +50,35 @@ private struct TransactionDetailDivider: View {
     }
 }
 
+private struct TransactionRecoveryBanner: View {
+    let message: String
+    let onRetry: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle")
+                .foregroundStyle(Theme.warning)
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(Theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button("Retry", action: onRetry)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Theme.accentText)
+                .frame(minWidth: 44, minHeight: 44)
+        }
+        .padding(.horizontal, 12)
+        .background(Theme.surface2, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .accessibilityElement(children: .contain)
+    }
+}
+
+private enum TransactionRetryAction {
+    case edit
+    case delete
+}
+
 private extension View {
     func transactionDetailSheetStyle() -> some View {
         self
@@ -75,6 +104,8 @@ struct ExpenseDetailSheet: View {
     @State private var showEditForm = false
     @State private var showDeleteConfirmation = false
     @State private var isDeleting = false
+    @State private var operationErrorMessage: String?
+    @State private var retryAction: TransactionRetryAction?
 
     init(
         workspaceId: String,
@@ -125,6 +156,16 @@ struct ExpenseDetailSheet: View {
                         amountCents: expense.amountCents,
                         amountColor: Theme.ink
                     )
+
+                    if let operationErrorMessage {
+                        TransactionRecoveryBanner(message: operationErrorMessage) {
+                            switch retryAction {
+                            case .edit: showEditForm = true
+                            case .delete: showDeleteConfirmation = true
+                            case nil: break
+                            }
+                        }
+                    }
 
                     TransactionDetailCard {
                         HStack(alignment: .top, spacing: 8) {
@@ -180,10 +221,12 @@ struct ExpenseDetailSheet: View {
                         Button { showEditForm = true } label: {
                             Image(systemName: "pencil")
                                 .foregroundStyle(Theme.accentText)
+                                .frame(width: 44, height: 44)
                         }
                         if onDeleted != nil {
                             Button(role: .destructive) { showDeleteConfirmation = true } label: {
                                 Image(systemName: "trash")
+                                    .frame(width: 44, height: 44)
                             }
                             .disabled(isDeleting)
                         }
@@ -211,6 +254,8 @@ struct ExpenseDetailSheet: View {
             ) { body in
                 Task {
                     if let updated = await updateExpense(body) {
+                        operationErrorMessage = nil
+                        retryAction = nil
                         expense = updated
                         onUpdated(updated)
                     }
@@ -230,6 +275,8 @@ struct ExpenseDetailSheet: View {
             guard isWorkspaceCurrent() else { return nil }
             return response.expense
         } catch {
+            operationErrorMessage = "Couldn’t update this expense. Saved data is unchanged. \(error.localizedDescription)"
+            retryAction = .edit
             return nil
         }
     }
@@ -248,7 +295,8 @@ struct ExpenseDetailSheet: View {
             onDeleted()
             dismiss()
         } catch {
-            // Keep the detail sheet open so the user can retry after a failure.
+            operationErrorMessage = "Couldn’t delete this expense. It is still saved. \(error.localizedDescription)"
+            retryAction = .delete
         }
     }
 }
@@ -267,6 +315,8 @@ struct IncomeDetailSheet: View {
     @State private var showEditForm = false
     @State private var showDeleteConfirmation = false
     @State private var isDeleting = false
+    @State private var operationErrorMessage: String?
+    @State private var retryAction: TransactionRetryAction?
 
     init(
         workspaceId: String,
@@ -298,6 +348,16 @@ struct IncomeDetailSheet: View {
                         amountCents: income.amountCents,
                         amountColor: Theme.income
                     )
+
+                    if let operationErrorMessage {
+                        TransactionRecoveryBanner(message: operationErrorMessage) {
+                            switch retryAction {
+                            case .edit: showEditForm = true
+                            case .delete: showDeleteConfirmation = true
+                            case nil: break
+                            }
+                        }
+                    }
 
                     TransactionDetailCard {
                         HStack(alignment: .top, spacing: 8) {
@@ -341,10 +401,12 @@ struct IncomeDetailSheet: View {
                         Button { showEditForm = true } label: {
                             Image(systemName: "pencil")
                                 .foregroundStyle(Theme.accentText)
+                                .frame(width: 44, height: 44)
                         }
                         if onDeleted != nil {
                             Button(role: .destructive) { showDeleteConfirmation = true } label: {
                                 Image(systemName: "trash")
+                                    .frame(width: 44, height: 44)
                             }
                             .disabled(isDeleting)
                         }
@@ -372,6 +434,8 @@ struct IncomeDetailSheet: View {
             ) { body, _ in
                 Task {
                     if let updated = await updateIncome(body) {
+                        operationErrorMessage = nil
+                        retryAction = nil
                         income = updated
                         onUpdated(updated)
                     }
@@ -391,6 +455,8 @@ struct IncomeDetailSheet: View {
             guard isWorkspaceCurrent() else { return nil }
             return response.income
         } catch {
+            operationErrorMessage = "Couldn’t update this income. Saved data is unchanged. \(error.localizedDescription)"
+            retryAction = .edit
             return nil
         }
     }
@@ -409,7 +475,8 @@ struct IncomeDetailSheet: View {
             onDeleted()
             dismiss()
         } catch {
-            // Keep the detail sheet open so the user can retry after a failure.
+            operationErrorMessage = "Couldn’t delete this income. It is still saved. \(error.localizedDescription)"
+            retryAction = .delete
         }
     }
 }
