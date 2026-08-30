@@ -254,6 +254,19 @@ grep -Fq 'case dark' Settlr/Models/AppearancePreference.swift
 grep -Fq 'case light' Settlr/Models/AppearancePreference.swift
 grep -Fq 'case system' Settlr/Models/AppearancePreference.swift
 
+# Task 10 fix round 1: shared destructive confirmation inherits adaptive
+# Signal colors, and manual workspace creation cannot race bootstrap loading.
+delete_dialog=Settlr/Views/Components/DeleteConfirmDialog.swift
+for token in Theme.scrim Theme.expense Theme.destructiveButtonInk Theme.surface Theme.surface2 Theme.line Theme.ink Theme.muted; do
+  grep -Fq "$token" "$delete_dialog"
+done
+if grep -Fq 'Color(hex:' "$delete_dialog"; then
+    echo "DeleteConfirmDialog must not retain forced-dark literal colors." >&2
+    exit 1
+fi
+grep -Fq 'if (vm.errorMessage == nil || !vm.workspaces.isEmpty) && !vm.isLoading {' Settlr/Views/WorkspacePickerView.swift
+grep -Fq 'guard !isLoading else { return nil }' Settlr/ViewModels/WorkspacePickerVM.swift
+
 # Task 8: Signature Scanner capture, review, and payer/division ordering.
 grep -Fq 'How was it paid?' Settlr/Views/Main/Split/SplitCreateSheet.swift
 grep -Fq 'I paid it all' Settlr/Views/Main/Split/SplitCreateSheet.swift

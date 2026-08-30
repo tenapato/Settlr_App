@@ -164,8 +164,10 @@ enum Theme {
     static let accent    = Color.settlr(light: 0xA8D522, dark: 0xCAFF3A)
     static let accentText = Color.settlr(light: 0x597500, dark: 0xCAFF3A)
     static let buttonInk = Color.settlr(light: 0x11140A, dark: 0x080A08)
+    static let scrim     = Color.settlr(light: 0x141614, dark: 0x000000)
     static let income    = Color.settlr(light: 0x2F7A4A, dark: 0x65D98A)
     static let expense   = Color.settlr(light: 0xB52F3A, dark: 0xFF7070)
+    static let destructiveButtonInk = Color.settlr(light: 0xFFFFFF, dark: 0x080A08)
     static let warning   = Color.settlr(light: 0x9A6500, dark: 0xFFB547)
 
     /// Categorical palette for charts, ordered by rank.

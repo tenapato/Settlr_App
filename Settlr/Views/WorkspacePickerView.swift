@@ -45,7 +45,7 @@ struct WorkspacePickerView: View {
                     }
                 }
 
-                if vm.errorMessage == nil || !vm.workspaces.isEmpty {
+                if (vm.errorMessage == nil || !vm.workspaces.isEmpty) && !vm.isLoading {
                     Button { vm.showCreateSheet = true } label: {
                         Label("Create workspace", systemImage: "plus")
                     }
@@ -189,7 +189,7 @@ private struct CreateWorkspaceSheet: View {
                         }
                     }
                     .foregroundStyle(Theme.accentText)
-                    .disabled(vm.isCreating)
+                    .disabled(vm.isCreating || vm.isLoading)
                 }
             }
         }

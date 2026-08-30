@@ -36,6 +36,7 @@ final class WorkspacePickerVM {
 
     @MainActor
     func createWorkspace() async -> WorkspaceWithRole? {
+        guard !isLoading else { return nil }
         guard !newWorkspaceName.trimmingCharacters(in: .whitespaces).isEmpty else {
             errorMessage = "Workspace name cannot be empty."
             return nil
