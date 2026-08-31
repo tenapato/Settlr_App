@@ -28,6 +28,7 @@ fi
 if ! rg -q 'struct CardPaymentRecordSheet: View' "$payments" ||
    ! rg -q 'Endpoints\.monthlyCardPayments' "$payments" ||
    ! rg -q 'HeroAmountField' "$payments" ||
+   ! rg -q 'handle\(try await onRecord\(body\)\)' "$payments" ||
    ! rg -q 'interactiveDismissDisabled' "$payments" ||
    ! rg -q 'month: card\.resolvedDueMonthKey' "$payments" ||
    ! rg -q 'Retry refresh' "$payments" ||

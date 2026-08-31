@@ -844,7 +844,7 @@ struct CardPaymentRecordSheet: View {
                 }
             }
             do {
-                handle(await onRecord(body))
+                handle(try await onRecord(body))
             } catch is CancellationError {
                 // Workspace changes close the source sheet; do not attach an
                 // error to a card that is no longer current.
