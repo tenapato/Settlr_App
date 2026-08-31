@@ -198,7 +198,11 @@ struct CardPaymentRecordRecovery {
         paymentWasRecorded ? .refresh : .record
     }
 
-    mutating func receive(_ result: CardPaymentRecordResult) -> CardPaymentRecordRecoveryResult {
+    mutating func receive(
+        _ result: CardPaymentRecordResult,
+        isPresentationCurrent: Bool
+    ) -> CardPaymentRecordRecoveryResult {
+        guard isPresentationCurrent else { return .ignore }
         switch result {
         case .refreshed:
             return .dismiss

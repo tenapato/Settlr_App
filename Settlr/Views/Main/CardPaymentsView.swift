@@ -689,6 +689,7 @@ struct CardPaymentRecordSheet: View {
     let card: FortnightCard
     let onRecord: (MonthlyCardPaymentBody) async throws -> CardPaymentRecordResult
     let onRefresh: () async -> CardPaymentRecordResult
+    let isPresentationCurrent: () -> Bool
 
     @Environment(\.dismiss) private var dismiss
     @State private var amountText: String
@@ -703,11 +704,13 @@ struct CardPaymentRecordSheet: View {
     init(
         card: FortnightCard,
         onRecord: @escaping (MonthlyCardPaymentBody) async throws -> CardPaymentRecordResult,
-        onRefresh: @escaping () async -> CardPaymentRecordResult
+        onRefresh: @escaping () async -> CardPaymentRecordResult,
+        isPresentationCurrent: @escaping () -> Bool
     ) {
         self.card = card
         self.onRecord = onRecord
         self.onRefresh = onRefresh
+        self.isPresentationCurrent = isPresentationCurrent
         _amountText = State(initialValue: CardPaymentDraft.formattedAmount(cents: card.row.outstandingCents))
     }
 
@@ -829,14 +832,20 @@ struct CardPaymentRecordSheet: View {
         isSaving = true
         errorMessage = nil
         Task {
-            defer { isSaving = false }
+            defer {
+                if isPresentationCurrent() {
+                    isSaving = false
+                }
+            }
             do {
                 handle(await onRecord(body))
             } catch is CancellationError {
                 // Workspace changes close the source sheet; do not attach an
                 // error to a card that is no longer current.
             } catch {
-                errorMessage = error.localizedDescription
+                if isPresentationCurrent() {
+                    errorMessage = error.localizedDescription
+                }
             }
         }
     }
@@ -845,14 +854,18 @@ struct CardPaymentRecordSheet: View {
         isSaving = true
         errorMessage = nil
         Task {
-            defer { isSaving = false }
+            defer {
+                if isPresentationCurrent() {
+                    isSaving = false
+                }
+            }
             handle(await onRefresh())
         }
     }
 
     private func handle(_ result: CardPaymentRecordResult) {
-        guard !Task.isCancelled else { return }
-        switch recovery.receive(result) {
+        guard !Task.isCancelled, isPresentationCurrent() else { return }
+        switch recovery.receive(result, isPresentationCurrent: true) {
         case .dismiss:
             dismiss()
         case .showRefreshError(let message):

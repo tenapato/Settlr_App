@@ -14,7 +14,8 @@ fi
 if ! rg -q 'CardPaymentRecordSheet' "$root" ||
    ! rg -q 'onRecordPayment' "$root" ||
    ! rg -q 'canUsePayments' "$root" ||
-   ! rg -q 'invalidateRecordPresentation' "$root"; then
+   ! rg -q 'invalidateRecordPresentation' "$root" ||
+   ! rg -q '\.onDisappear \{ invalidateRecordPresentation\(\) \}' "$root"; then
   echo "Cards root must gate and present the record-payment sheet." >&2
   exit 1
 fi
@@ -26,6 +27,8 @@ if ! rg -q 'struct CardPaymentRecordSheet: View' "$payments" ||
    ! rg -q 'month: card\.resolvedDueMonthKey' "$payments" ||
    ! rg -q 'Retry refresh' "$payments" ||
    ! rg -q 'recordPaymentRefreshFailed' "$payments" ||
+   ! rg -q 'isPresentationCurrent' "$payments" ||
+   ! rg -q 'guard !Task\.isCancelled, isPresentationCurrent\(\)' "$payments" ||
    rg -U -q 'FormCard \{[[:space:]]*SignalNativeFormRow' "$payments"; then
   echo "Record-payment sheet must use the monthly endpoint and protect an in-flight save." >&2
   exit 1

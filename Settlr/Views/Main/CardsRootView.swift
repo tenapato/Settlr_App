@@ -87,6 +87,7 @@ struct CardsRootView: View {
             paymentVM = nil
             navigatorMode = .current
         }
+        .onDisappear { invalidateRecordPresentation() }
         .sheet(isPresented: $showCardManagement) {
             CardsView(workspaceId: workspaceId, vm: cardsVM) {
                 await refreshAfterCardMutation()
@@ -105,23 +106,30 @@ struct CardsRootView: View {
             CardPaymentRecordSheet(
                 card: presentation.card,
                 onRecord: { body in
-                    guard isCurrentRecordPresentation(presentation.generation), let paymentVM else {
+                    guard isCurrentRecordPresentation(presentation), let paymentVM else {
                         return .stale
                     }
-                    return try await paymentVM.recordPayment(
+                    let result = try await paymentVM.recordPayment(
                         body,
                         workspaceId: workspaceId,
                         presentationToken: presentation.generation
                     )
+                    guard isCurrentRecordPresentation(presentation) else { return .stale }
+                    return result
                 },
                 onRefresh: {
-                    guard isCurrentRecordPresentation(presentation.generation), let paymentVM else {
+                    guard isCurrentRecordPresentation(presentation), let paymentVM else {
                         return .stale
                     }
-                    return await paymentVM.refreshRecordedPayment(
+                    let result = await paymentVM.refreshRecordedPayment(
                         workspaceId: workspaceId,
                         presentationToken: presentation.generation
                     )
+                    guard isCurrentRecordPresentation(presentation) else { return .stale }
+                    return result
+                },
+                isPresentationCurrent: {
+                    isCurrentRecordPresentation(presentation)
                 }
             )
         }
@@ -269,8 +277,11 @@ struct CardsRootView: View {
         recordPaymentPresentation = nil
     }
 
-    private func isCurrentRecordPresentation(_ generation: UInt64) -> Bool {
-        isCurrentWorkspace && canUsePayments && paymentVM?.ownsRecordPresentation(generation) == true
+    private func isCurrentRecordPresentation(_ presentation: CardPaymentRecordPresentation) -> Bool {
+        recordPaymentPresentation?.id == presentation.id &&
+            isCurrentWorkspace &&
+            canUsePayments &&
+            paymentVM?.ownsRecordPresentation(presentation.generation) == true
     }
 
     private func refreshAfterCardMutation() async {

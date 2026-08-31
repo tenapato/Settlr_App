@@ -56,10 +56,16 @@ enum CardPaymentDraftRegression {
         var recovery = CardPaymentRecordRecovery()
         expect(recovery.nextAction == .record, "starts by allowing one payment POST")
         expect(
-            recovery.receive(.recordPaymentRefreshFailed("offline")) == .showRefreshError("offline"),
+            recovery.receive(.recordPaymentRefreshFailed("offline"), isPresentationCurrent: true) == .showRefreshError("offline"),
             "keeps a recorded payment open when its refresh fails"
         )
         expect(recovery.nextAction == .refresh, "retries only the summary refresh after a recorded payment")
+
+        var staleCompletion = CardPaymentRecordRecovery()
+        expect(
+            staleCompletion.receive(.refreshed, isPresentationCurrent: false) == .ignore,
+            "ignores a successful completion after its presentation is revoked"
+        )
     }
 
     private static func date(_ value: String) -> Date {

@@ -120,3 +120,51 @@ The complete Swift parse, Foundation regression, Signal redesign guard, and diff
 - After POST success, a stale or failed refresh becomes refresh-only recovery; the sheet cannot send the append-only endpoint again.
 - A successful refresh dismisses; a refresh failure remains inline with `Retry refresh`; a stale completion does neither.
 - Signal Date and Note rows have no outer generic card/background, retain 44pt native hit targets, and keep their own hairline separators.
+
+## Fix round 2 — final presentation dismissal gate
+
+### Fix summary
+
+- `CardPaymentRecordSheet` now receives a synchronous `isPresentationCurrent` closure and checks it immediately before recovery state changes or dismissal. There is no suspension between that check and `dismiss()`.
+- The root identifies the active presentation by both generation and sheet identity, checks it before and after every awaited record/refresh operation, and returns `.stale` when ownership changed.
+- `CardsRootView.onDisappear` invalidates the presentation lifecycle, covering teardown paths where workspace state destroys the parent before an `onChange` callback can run.
+- Error and loading-state completions use the same synchronous gate, so a stale task cannot mutate an obsolete sheet.
+
+### RED evidence
+
+Pure completion-gate regression before the additional lifecycle argument:
+
+```text
+scripts/card-payment-draft-regression.swift:66:72: error: extra argument 'isPresentationCurrent' in call
+```
+
+Source guard before disappearance invalidation and sheet gate wiring:
+
+```text
+Cards root must gate and present the record-payment sheet.
+```
+
+### GREEN evidence
+
+```sh
+./scripts/check-card-payment-draft.sh && ./scripts/check-card-payment-sheet.sh && find Settlr -name '*.swift' -print0 | xargs -0 swiftc -parse && ./scripts/check-category-feature-gate.sh && sh ./scripts/check-dashboard-month-state.sh && sh ./scripts/check-activity-stale-warning.sh && sh ./scripts/check-scanner-result-settlement.sh && sh ./scripts/check-signal-redesign.sh && sh ./scripts/check-app-source-regressions.sh && git diff --check
+```
+
+Exact output:
+
+```text
+Card payment sheet source checks passed.
+Category feature-gate regression check passed.
+Dashboard month state regression passed.
+Activity retained-data warning regression check passed.
+Scanner result settlement regression check passed.
+App source regression checks passed.
+```
+
+The Foundation regression, full Swift parse, Signal redesign guard, and diff check completed silently with exit status 0. No Xcode build or XCTest command was run.
+
+### Round-2 self-review
+
+- A superseded, revoked, or destroyed presentation ignores `.refreshed` in the pure recovery regression and in the sheet's final synchronous guard.
+- Root ownership means: active sheet identity matches, workspace matches, card-payment access remains enabled, and the view model still owns the presentation generation.
+- Root rechecks that ownership after every awaited record/refresh call; the sheet repeats the synchronous check immediately before any mutation or dismissal.
