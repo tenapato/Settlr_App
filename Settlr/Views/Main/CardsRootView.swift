@@ -41,6 +41,7 @@ struct CardsRootView: View {
                     Spacer(minLength: 84)
                 }
                 .padding(.top, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .background(Theme.bg.ignoresSafeArea())
             .navigationTitle("Cards")

@@ -217,6 +217,20 @@ grep -Fq 'accountsRequestIsSettled' Settlr/Views/Main/Savings/SavingsVM.swift
 grep -Fq 'accountsRequestIsSettled(for: workspaceId)' Settlr/Views/Main/Activity/ActivityView.swift
 grep -Fq 'accountsRequestIsSettled(for: rootWorkspaceID)' Settlr/Views/Main/MainTabView.swift
 grep -Fq 'SavingsGoalTests.swift' Settlr.xcodeproj/project.pbxproj
+savings_view=Settlr/Views/Main/Savings/SavingsView.swift
+account_chips=$(sed -n '/private var accountChips: some View {/,/^    private var accountObjects:/p' "$savings_view")
+if printf '%s\n' "$account_chips" | grep -Fq '.padding(.horizontal, 24)'; then
+    echo "Savings account chips must not add a second horizontal inset inside the padded root." >&2
+    exit 1
+fi
+if [ "$(grep -Fc '.frame(maxWidth: .infinity, alignment: .leading)' "$savings_view")" -lt 4 ]; then
+    echo "Savings root and object sections must claim the full content width before centering child states." >&2
+    exit 1
+fi
+if ! rg -U -q 'private var noEntriesState: some View \{(?s).*\.frame\(maxWidth: \.infinity\)(?s).*\.padding\(\.horizontal, 32\)' "$savings_view"; then
+    echo "Savings empty entries state must center against the full screen content width." >&2
+    exit 1
+fi
 
 # Task 7: Cards root and quiet fortnight navigator.
 grep -Fq 'struct CardsRootView' Settlr/Views/Main/CardsRootView.swift
@@ -228,6 +242,11 @@ grep -Fq 'Undo paid status' Settlr/Views/Main/CardPaymentsView.swift
 grep -Fq 'SignalTraceLoadingView' Settlr/Views/Main/CardsRootView.swift
 grep -Fq 'CardsRootView(' Settlr/Views/Main/MainTabView.swift
 grep -Fq 'CardFortnightPresentationTests.swift' Settlr.xcodeproj/project.pbxproj
+cards_root=Settlr/Views/Main/CardsRootView.swift
+if ! rg -U -q '\.padding\(\.top, 8\)\n[[:space:]]+\.frame\(maxWidth: \.infinity, alignment: \.leading\)\n[[:space:]]+\}' "$cards_root"; then
+    echo "Cards root scroll content must claim the full screen width." >&2
+    exit 1
+fi
 if rg -q '\.preferredColorScheme\(\.dark\)' Settlr/Views/Main/CardsView.swift Settlr/Views/Main/CardDetailSheet.swift; then
     echo "Cards views must follow the app appearance preference." >&2
     exit 1

@@ -77,6 +77,7 @@ struct SavingsView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
                     .padding(.bottom, 120)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .refreshable { await vm.load(workspaceId: workspaceId) }
             }
@@ -235,7 +236,6 @@ struct SavingsView: View {
                     }
                 }
             }
-            .padding(.horizontal, 24)
         }
     }
 
@@ -263,6 +263,7 @@ struct SavingsView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var recentEntries: some View {
@@ -293,6 +294,7 @@ struct SavingsView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var recoveryBanner: some View {
@@ -381,6 +383,7 @@ struct SavingsView: View {
             }
             Spacer()
         }
+        .frame(maxWidth: .infinity)
         .padding(.horizontal, 32)
     }
 
@@ -426,6 +429,7 @@ struct SavingsView: View {
             }
             Spacer()
         }
+        .frame(maxWidth: .infinity)
         .padding(.horizontal, 32)
     }
 
