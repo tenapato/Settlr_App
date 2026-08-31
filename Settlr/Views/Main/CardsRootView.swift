@@ -249,7 +249,7 @@ struct CardsRootView: View {
                                 )
                             }
                         } onRecordPayment: {
-                            guard canUsePayments, isCurrentWorkspace, let paymentVM else { return }
+                            guard canUsePayments, isCurrentWorkspace else { return }
                             recordPaymentPresentation = CardPaymentRecordPresentation(
                                 card: card,
                                 generation: paymentVM.beginRecordPresentation()

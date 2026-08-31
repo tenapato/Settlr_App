@@ -20,6 +20,11 @@ if ! rg -q 'CardPaymentRecordSheet' "$root" ||
   exit 1
 fi
 
+if rg -q 'guard canUsePayments, isCurrentWorkspace, let paymentVM else' "$root"; then
+  echo "An already-unwrapped CardPaymentsVM must not be conditionally bound again." >&2
+  exit 1
+fi
+
 if ! rg -q 'struct CardPaymentRecordSheet: View' "$payments" ||
    ! rg -q 'Endpoints\.monthlyCardPayments' "$payments" ||
    ! rg -q 'HeroAmountField' "$payments" ||
