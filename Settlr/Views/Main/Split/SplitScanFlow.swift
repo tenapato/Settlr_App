@@ -129,7 +129,13 @@ struct SplitScanFlow: View {
     @ViewBuilder
     private var resultView: some View {
         if let resultSplit {
-            SplitResultView(split: resultSplit, onFinish: { dismiss() })
+            SplitResultView(
+                split: resultSplit,
+                workspaceId: workspaceId,
+                splitId: resultSplit.id,
+                vm: vm,
+                onFinish: { dismiss() }
+            )
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Close") { dismiss() }
