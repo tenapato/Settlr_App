@@ -142,7 +142,8 @@ struct QuickActionLauncher: View {
                 }
                 .lineLimit(1)
             }
-            .frame(width: 200, minHeight: 44, alignment: .leading)
+            .frame(width: 200, alignment: .leading)
+            .frame(minHeight: 44)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

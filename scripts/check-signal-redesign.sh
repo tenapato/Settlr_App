@@ -18,7 +18,8 @@ grep -Fq 'Scan and split' Settlr/Views/Components/QuickActionLauncher.swift
 launcher=Settlr/Views/Components/QuickActionLauncher.swift
 grep -Fq 'VStack(alignment: .leading, spacing: 8)' "$launcher"
 grep -Fq '.frame(width: 30, height: 30)' "$launcher"
-grep -Fq '.frame(width: 200, minHeight:' "$launcher"
+grep -Fq '.frame(width: 200, alignment: .leading)' "$launcher"
+grep -Fq '.frame(minHeight: 44)' "$launcher"
 grep -Fq '.padding(10)' "$launcher"
 grep -Fq 'colorScheme == .dark ? 0.55 : 0.12' "$launcher"
 grep -Fq '.font(.caption)' "$launcher"
@@ -32,6 +33,10 @@ if grep -Fq '.font(.system(size: isSignature' "$launcher"; then
 fi
 if grep -Fq 'minWidth: isSignature ?' "$launcher"; then
     echo "Quick action rows must share one symmetric width." >&2
+    exit 1
+fi
+if grep -Fq '.frame(width: 200, minHeight:' "$launcher"; then
+    echo "Quick action rows must use valid SwiftUI frame overloads." >&2
     exit 1
 fi
 grep -Fq 'same row and column geometry' docs/design-system/SETTLR_SIGNAL.md
