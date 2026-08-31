@@ -36,6 +36,7 @@
 		AA000000000000000000BB57 /* CardPaymentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR57 /* CardPaymentsView.swift */; };
 		AA000000000000000000BB58 /* CardPaymentFortnight.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR58 /* CardPaymentFortnight.swift */; };
 		AA000000000000000000BB11 /* DashboardSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR11 /* DashboardSummary.swift */; };
+		AA000000000000000000BB95 /* DashboardMonthState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR95 /* DashboardMonthState.swift */; };
 		AA000000000000000000BB12 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR12 /* AppState.swift */; };
 		AA000000000000000000BB13 /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR13 /* AuthViewModel.swift */; };
 		AA000000000000000000BB14 /* WorkspacePickerVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR14 /* WorkspacePickerVM.swift */; };
@@ -160,6 +161,7 @@
 		AA000000000000000000FR57 /* CardPaymentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardPaymentsView.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR58 /* CardPaymentFortnight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardPaymentFortnight.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR11 /* DashboardSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardSummary.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR95 /* DashboardMonthState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMonthState.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR12 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR13 /* AuthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR14 /* WorkspacePickerVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspacePickerVM.swift; sourceTree = "<group>"; };
@@ -312,6 +314,7 @@
 				AA000000000000000000FR69 /* Recurrence.swift */,
 				AA000000000000000000FR10 /* Category.swift */,
 				AA000000000000000000FR11 /* DashboardSummary.swift */,
+				AA000000000000000000FR95 /* DashboardMonthState.swift */,
 				AA000000000000000000FR35 /* CreditCard.swift */,
 				AA000000000000000000FR43 /* Telegram.swift */,
 				AA000000000000000000FR51 /* AnnualSummary.swift */,
@@ -665,6 +668,7 @@
 				AA000000000000000000BB09 /* Income.swift in Sources */,
 				AA000000000000000000BB10 /* Category.swift in Sources */,
 				AA000000000000000000BB11 /* DashboardSummary.swift in Sources */,
+				AA000000000000000000BB95 /* DashboardMonthState.swift in Sources */,
 				AA000000000000000000BB35 /* CreditCard.swift in Sources */,
 				AA000000000000000000BB12 /* AppState.swift in Sources */,
 				AA000000000000000000BB13 /* AuthViewModel.swift in Sources */,

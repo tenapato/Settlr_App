@@ -56,7 +56,8 @@ struct DashboardView: View {
             await vm.load(workspaceId: workspaceId)
             await annualVM.load(workspaceId: workspaceId, year: selectedYear)
         }
-        .onChange(of: vm.selectedMonth) { _, _ in
+        .onChange(of: vm.selectedMonth) { _, month in
+            guard !vm.consumeMonthChangeReloadSuppression(for: month) else { return }
             Task {
                 await vm.load(workspaceId: workspaceId)
                 annualVM.invalidate()

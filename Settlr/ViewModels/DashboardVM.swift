@@ -18,6 +18,17 @@ final class DashboardVM {
 
     private let api = APIClient.shared
     private var loadGeneration = 0
+    private var lastSuccessfulMonth: String?
+    private var suppressedMonthReload: String?
+
+    func consumeMonthChangeReloadSuppression(for month: String) -> Bool {
+        guard suppressedMonthReload == month else {
+            suppressedMonthReload = nil
+            return false
+        }
+        suppressedMonthReload = nil
+        return true
+    }
 
     @MainActor
     func load(workspaceId: String) async {
@@ -47,6 +58,7 @@ final class DashboardVM {
             // a previous-month response from a different selection.
             summary = freshSummary
             previousSummary = freshPreviousSummary
+            lastSuccessfulMonth = month
             lastUpdated = Date()
             errorMessage = nil
         } catch {
@@ -55,6 +67,18 @@ final class DashboardVM {
             // Keep the last valid summary visible while a refresh fails. The
             // view presents the error inline so a transient network failure
             // cannot erase the user's financial context.
+            let restoredMonth = DashboardMonthState.selectedMonthAfterFailedLoad(
+                requestedMonth: month,
+                selectedMonth: selectedMonth,
+                lastSuccessfulMonth: lastSuccessfulMonth,
+                hasCachedSummary: summary != nil,
+                requestGeneration: generation,
+                currentGeneration: loadGeneration
+            )
+            if restoredMonth != selectedMonth {
+                suppressedMonthReload = restoredMonth
+                selectedMonth = restoredMonth
+            }
             errorMessage = error.localizedDescription
         }
     }
