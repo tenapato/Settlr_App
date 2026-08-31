@@ -117,6 +117,16 @@ grep -Fq 'struct ActivityEvent' Settlr/Models/ActivityEvent.swift
 grep -Fq 'final class ActivityVM' Settlr/ViewModels/ActivityVM.swift
 grep -Fq 'struct SignalTimelineRow' Settlr/Views/Main/Activity/ActivityView.swift
 grep -Fq 'attentionEvents' Settlr/ViewModels/ActivityVM.swift
+activity_view=Settlr/Views/Main/Activity/ActivityView.swift
+grep -Fq 'private var activityFilters: some View' "$activity_view"
+grep -Fq 'SectionEyebrow("ACTIVITY TYPE")' "$activity_view"
+grep -Fq 'private var activityPeriodMenu: some View' "$activity_view"
+grep -Fq 'Image(systemName: "calendar")' "$activity_view"
+grep -Fq 'Text("Time range")' "$activity_view"
+if grep -Fq 'ForEach(ActivityPeriodFilter.allCases) { period in chip' "$activity_view"; then
+    echo "Activity type and period controls must not share one chip row." >&2
+    exit 1
+fi
 
 # Task 5 fix round 1: leaf form ownership, gate revocation, card-source
 # semantics, and workspace-safe reloads.

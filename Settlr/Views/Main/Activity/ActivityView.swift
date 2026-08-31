@@ -330,7 +330,7 @@ struct ActivityView: View {
 
     @ViewBuilder private var content: some View {
         VStack(spacing: 0) {
-            filterChips.padding(.bottom, 8)
+            activityFilters.padding(.bottom, 12)
             if vm.isLoading && !vm.hasLoaded && vm.timeline.isEmpty {
                 ActivityShapeLoadingView()
             } else if let error = vm.errorMessage, vm.timeline.isEmpty && vm.attentionEvents.isEmpty {
@@ -343,16 +343,78 @@ struct ActivityView: View {
         }
     }
 
-    private var filterChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(availableTypeFilters) { filter in chip(filter.title, selected: vm.selectedFilter == filter) { vm.selectedFilter = filter } }
-                ForEach(ActivityPeriodFilter.allCases) { period in chip(period.title, selected: vm.selectedPeriod == period) { vm.selectedPeriod = period } }
+    private var activityFilters: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                SectionEyebrow("ACTIVITY TYPE")
+                Spacer()
                 if vm.hasActiveFilter {
-                    Button("Reset") { vm.clearFilters() }.font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.accentText).frame(minHeight: 44)
+                    Button("Reset") { vm.clearFilters() }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Theme.accentText)
+                        .frame(minHeight: 44)
                 }
-            }.padding(.horizontal, 24)
+            }
+            .padding(.horizontal, 24)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(availableTypeFilters) { filter in
+                        chip(filter.title, selected: vm.selectedFilter == filter) {
+                            vm.selectedFilter = filter
+                        }
+                    }
+                }
+                .padding(.horizontal, 24)
+            }
+
+            activityPeriodMenu
+                .padding(.horizontal, 24)
         }
+    }
+
+    private var activityPeriodMenu: some View {
+        Menu {
+            ForEach(ActivityPeriodFilter.allCases) { period in
+                Button {
+                    vm.selectedPeriod = period
+                } label: {
+                    if vm.selectedPeriod == period {
+                        Label(period.title, systemImage: "checkmark")
+                    } else {
+                        Text(period.title)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "calendar")
+                    .foregroundStyle(Theme.accentText)
+                Text("Time range")
+                    .foregroundStyle(Theme.ink)
+                Spacer()
+                Text(vm.selectedPeriod.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.ink)
+                Image(systemName: "chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.muted)
+            }
+            .font(.subheadline)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Theme.surface2)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(Theme.line, lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Time range")
+        .accessibilityValue(vm.selectedPeriod.title)
     }
 
     private func chip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
