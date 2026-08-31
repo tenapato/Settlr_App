@@ -154,7 +154,7 @@ The visible control is a 52 pt lime circle with a standard plus. Keep its outer 
 
 ### Signature Scanner menu
 
-The first action is a lime `Scan and split` hero. Expense, Income, and Savings appear as compact neutral rows. Hide actions whose feature is unavailable.
+Every action uses the same row and column geometry: one 30 pt icon column and one shared text column. `Scan and split` remains the signature action through its filled lime icon and stronger title weight, not a wider or taller row. Expense, Income, and Savings use neutral icon circles. Hide actions whose feature is unavailable.
 
 ### Segmented control
 

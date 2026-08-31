@@ -24,6 +24,7 @@ struct QuickActionLauncher: View {
     let onSetOpen: (Bool) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
     @AccessibilityFocusState private var menuFocused: Bool
 
     private var signatureItem: QuickActionItem? {
@@ -50,7 +51,6 @@ struct QuickActionLauncher: View {
 
             if isOpen {
                 satelliteMenu
-                    .padding(.trailing, 8)
                     .padding(.bottom, 76)
                     .transition(transition)
             }
@@ -90,7 +90,7 @@ struct QuickActionLauncher: View {
     }
 
     private var satelliteMenu: some View {
-        VStack(alignment: .trailing, spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
             if let signatureItem {
                 actionButton(signatureItem, isSignature: true)
             }
@@ -103,7 +103,11 @@ struct QuickActionLauncher: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(Theme.surface)
                 .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.line, lineWidth: 1))
-                .shadow(color: .black.opacity(0.55), radius: 24, y: 10)
+                .shadow(
+                    color: .black.opacity(colorScheme == .dark ? 0.55 : 0.12),
+                    radius: 24,
+                    y: 10
+                )
         )
         .accessibilityFocused($menuFocused)
         .accessibilityElement(children: .contain)
@@ -121,24 +125,24 @@ struct QuickActionLauncher: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: item.systemImage)
-                    .font(.system(size: isSignature ? 16 : 14, weight: .semibold))
+                    .font(isSignature ? .headline.weight(.semibold) : .subheadline.weight(.semibold))
                     .foregroundStyle(isSignature ? Theme.buttonInk : Theme.accentText)
-                    .frame(width: isSignature ? 30 : 26, height: isSignature ? 30 : 26)
+                    .frame(width: 30, height: 30)
                     .background(Circle().fill(isSignature ? Theme.accent : Theme.accent.opacity(0.14)))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.title)
-                        .font(.system(size: isSignature ? 15 : 14, weight: .semibold))
+                        .font(isSignature ? .headline.weight(.semibold) : .subheadline.weight(.semibold))
                         .foregroundStyle(Theme.ink)
                     if let subtitle = item.subtitle {
                         Text(subtitle)
-                            .font(.system(size: 11))
+                            .font(.caption)
                             .foregroundStyle(Theme.muted)
                     }
                 }
                 .lineLimit(1)
             }
-            .frame(minWidth: isSignature ? 170 : 132, minHeight: 44, alignment: .leading)
+            .frame(width: 200, minHeight: 44, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

@@ -15,6 +15,29 @@ grep -Fq 'presentation.isSelected ? Theme.accentText' Settlr/Views/Components/De
 grep -Fq 'case home, activity, savings, cards' Settlr/Views/Components/FloatingTabBar.swift
 grep -Fq 'struct QuickActionLauncher' Settlr/Views/Components/QuickActionLauncher.swift
 grep -Fq 'Scan and split' Settlr/Views/Components/QuickActionLauncher.swift
+launcher=Settlr/Views/Components/QuickActionLauncher.swift
+grep -Fq 'VStack(alignment: .leading, spacing: 8)' "$launcher"
+grep -Fq '.frame(width: 30, height: 30)' "$launcher"
+grep -Fq '.frame(width: 200, minHeight:' "$launcher"
+grep -Fq '.padding(10)' "$launcher"
+grep -Fq 'colorScheme == .dark ? 0.55 : 0.12' "$launcher"
+grep -Fq '.font(.caption)' "$launcher"
+if grep -Fq '.padding(.trailing, 8)' "$launcher"; then
+    echo "Quick action menu must share the launcher right edge." >&2
+    exit 1
+fi
+if grep -Fq '.font(.system(size: isSignature' "$launcher"; then
+    echo "Quick action row typography must scale with Dynamic Type." >&2
+    exit 1
+fi
+if grep -Fq 'minWidth: isSignature ?' "$launcher"; then
+    echo "Quick action rows must share one symmetric width." >&2
+    exit 1
+fi
+grep -Fq 'same row and column geometry' docs/design-system/SETTLR_SIGNAL.md
+grep -Fq 'class="sat-ico"' docs/design-system/settlr-signal-components.html
+grep -Fq '.satellite{border-radius:16px;padding:10px}' docs/design-system/settlr-signal-components.html
+grep -Fq '.sat-action.heroaction{height:45px;background:transparent' docs/design-system/settlr-signal-components.html
 grep -Fq '@State private var showCategories = false' Settlr/Views/Main/MainTabView.swift
 grep -Fq '.sheet(isPresented: categoriesPresentation)' Settlr/Views/Main/MainTabView.swift
 grep -Fq 'CategoriesView(workspaceId: appState.activeWorkspace?.id ?? "")' Settlr/Views/Main/MainTabView.swift
