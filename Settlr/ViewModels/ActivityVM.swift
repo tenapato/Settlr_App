@@ -124,7 +124,7 @@ final class ActivityVM {
     func load(
         workspaceId: String,
         user: MeUser?,
-        refreshSession: (() async -> Void)? = nil
+        refreshSession: (() async -> Bool)? = nil
     ) async {
         let canLoadExpenses = user?.has(.expenses) == true
         let canLoadIncome = user?.has(.income) == true
@@ -203,15 +203,19 @@ final class ActivityVM {
             results.5.failure,
             results.6.failure
         ].compactMap { $0 }
-        if failures.contains(where: { error in
+        if let featureFailure = failures.first(where: { error in
             guard let server = error as? APIServerError else { return false }
             return server.status == 403 && server.feature != nil
         }) {
-            await refreshSession?()
+            let sessionRefreshSucceeded = await refreshSession?() ?? false
+            guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }
+            if !sessionRefreshSucceeded {
+                errorMessage = featureFailure.localizedDescription
+            }
             // The feature set may have changed while these concurrent requests
             // were in flight. Keep the already-reconciled cache and let the
-            // refreshed session drive the next load; never apply stale gated
-            // result tuples after a feature-bearing refusal.
+            // refreshed session drive the next load; never apply the stale
+            // gated result tuple after a feature-bearing refusal.
             return
         }
 

@@ -86,6 +86,10 @@ final class CardPaymentsVM {
         guard presentationToken.map({ recordPresentation.owns($0) }) ?? true else { return .stale }
         loadGeneration &+= 1
         let generation = loadGeneration
+        let requestedSelection = CardPaymentLoadSnapshot(
+            month: month,
+            fortnight: fortnight.rawValue
+        )
         // Keep the existing rows visible while a refresh is in flight; roots
         // render the inline Signal trace alongside that retained content.
         isLoading = true
@@ -120,6 +124,7 @@ final class CardPaymentsVM {
                 )
             }
             guard presentationToken.map({ recordPresentation.owns($0) }) ?? true else { return .stale }
+            guard requestedSelection.matches(month: month, fortnight: fortnight.rawValue) else { return .stale }
             guard generation == loadGeneration else {
                 return presentationToken == nil
                     ? .stale
@@ -132,6 +137,7 @@ final class CardPaymentsVM {
             return .refreshed
         } catch {
             guard presentationToken.map({ recordPresentation.owns($0) }) ?? true else { return .stale }
+            guard requestedSelection.matches(month: month, fortnight: fortnight.rawValue) else { return .stale }
             guard generation == loadGeneration else {
                 return presentationToken == nil
                     ? .stale

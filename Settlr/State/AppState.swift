@@ -110,15 +110,17 @@ final class AppState {
     }
 
     /// Re-reads the session so an admin's change to this user's features or
-    /// status takes effect without waiting for a cold launch. Silent on
-    /// failure — a refresh that couldn't reach the server says nothing about
-    /// whether the session is still good.
+    /// status takes effect without waiting for a cold launch. The result lets
+    /// feature-aware screens distinguish a refreshed session from a failed
+    /// attempt while retaining their cached content.
     @MainActor
-    func refreshSession() async {
-        guard TokenStore.get() != nil, currentUser != nil else { return }
-        guard let me: MeResponse = try? await api.fetch(Endpoints.me) else { return }
+    @discardableResult
+    func refreshSession() async -> Bool {
+        guard TokenStore.get() != nil, currentUser != nil else { return false }
+        guard let me: MeResponse = try? await api.fetch(Endpoints.me) else { return false }
         currentUser = me.user
         OfflineSessionCache.saveUser(me.user)
+        return true
     }
 
     @MainActor

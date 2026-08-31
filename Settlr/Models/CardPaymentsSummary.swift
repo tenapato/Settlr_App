@@ -33,6 +33,17 @@ struct CardPaymentsSummaryResponse: Decodable {
     let totals: CardPaymentsTotals
 }
 
+/// Selection context captured when a card-payment summary request starts.
+/// A response must never be committed after the user changes either filter.
+struct CardPaymentLoadSnapshot: Equatable {
+    let month: String
+    let fortnight: String
+
+    func matches(month: String, fortnight: String) -> Bool {
+        self.month == month && self.fortnight == fortnight
+    }
+}
+
 struct MarkCardPaidBody: Encodable {
     let month: String
 }

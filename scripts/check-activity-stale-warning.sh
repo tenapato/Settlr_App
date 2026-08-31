@@ -5,6 +5,8 @@ set -eu
 # SwiftUI target cannot run in this environment without Xcode/XCTest, so keep
 # the exact retained-data warning contract executable at the source boundary.
 activity="Settlr/Views/Main/Activity/ActivityView.swift"
+activity_vm="Settlr/ViewModels/ActivityVM.swift"
+app_state="Settlr/State/AppState.swift"
 
 timeline_content=$(sed -n '/private var timelineContent: some View {/,/^    private var attentionSection:/p' "$activity")
 
@@ -35,6 +37,23 @@ fi
 
 if ! grep -Fq '.accessibilityLabel(message)' Settlr/Views/Main/CardsRootView.swift; then
   echo "SignalRefreshWarning must expose its full message accessibly." >&2
+  exit 1
+fi
+
+if ! grep -Fq 'refreshSession: (() async -> Bool)? = nil' "$activity_vm"; then
+  echo "ActivityVM must be able to distinguish a successful session refresh from a failed one." >&2
+  exit 1
+fi
+
+if ! grep -Fq 'let sessionRefreshSucceeded = await refreshSession?() ?? false' "$activity_vm" ||
+   ! grep -Fq 'if !sessionRefreshSucceeded {' "$activity_vm" ||
+   ! grep -Fq 'errorMessage = featureFailure.localizedDescription' "$activity_vm"; then
+  echo "ActivityVM must report a failed feature-gated session refresh while retaining content." >&2
+  exit 1
+fi
+
+if ! grep -Fq 'func refreshSession() async -> Bool' "$app_state"; then
+  echo "AppState.refreshSession must report whether the session was refreshed." >&2
   exit 1
 fi
 
