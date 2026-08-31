@@ -108,6 +108,18 @@ final class CardPaymentsVM {
             errorMessage = error.localizedDescription
         }
     }
+
+    @MainActor
+    func recordPayment(_ body: MonthlyCardPaymentBody, workspaceId: String) async throws {
+        busyCardId = body.creditCardId
+        defer { busyCardId = nil }
+        try await api.send(
+            Endpoints.monthlyCardPayments(workspaceId),
+            method: "POST",
+            body: body
+        )
+        await load(workspaceId: workspaceId)
+    }
 }
 
 // MARK: - View
@@ -394,6 +406,7 @@ struct CardPaymentTile: View {
     let busy: Bool
     let anyBusy: Bool
     let onSetPaid: (Bool) -> Void
+    var onRecordPayment: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -455,29 +468,7 @@ struct CardPaymentTile: View {
                 Spacer()
             }
 
-            Button {
-                onSetPaid(!row.paidInFull)
-            } label: {
-                Group {
-                    if busy {
-                        ProgressView()
-                            .tint(row.paidInFull ? Theme.ink : Theme.buttonInk)
-                    } else {
-                        Text(row.paidInFull ? "Undo paid status" : "Mark as paid")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(row.paidInFull ? Theme.muted : Theme.buttonInk)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 44)
-                .background(
-                    RoundedRectangle(cornerRadius: 11)
-                        .fill(row.paidInFull ? Theme.surface2 : Theme.accent)
-                )
-            }
-            .buttonStyle(.plain)
-            .disabled(anyBusy)
-            .opacity(anyBusy && !busy ? 0.5 : 1)
+            paymentActions
         }
         .padding(16)
         .background(
@@ -496,6 +487,56 @@ struct CardPaymentTile: View {
     private var maskedNumber: String {
         guard let four = row.lastFour, !four.isEmpty else { return "•••• ····" }
         return "•••• \(four)"
+    }
+
+    @ViewBuilder
+    private var paymentActions: some View {
+        if let onRecordPayment, !row.paidInFull {
+            Button(action: onRecordPayment) {
+                Text("Record payment")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.buttonInk)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .background(RoundedRectangle(cornerRadius: 11).fill(Theme.accent))
+            }
+            .buttonStyle(.plain)
+            .disabled(anyBusy)
+
+            Button { onSetPaid(true) } label: {
+                statusActionLabel("Mark as paid", busy: busy, ink: Theme.muted)
+                    .background(RoundedRectangle(cornerRadius: 11).fill(Theme.surface2))
+            }
+            .buttonStyle(.plain)
+            .disabled(anyBusy)
+        } else {
+            Button { onSetPaid(!row.paidInFull) } label: {
+                statusActionLabel(
+                    row.paidInFull ? "Undo paid status" : "Mark as paid",
+                    busy: busy,
+                    ink: row.paidInFull ? Theme.muted : Theme.buttonInk
+                )
+                .background(
+                    RoundedRectangle(cornerRadius: 11)
+                        .fill(row.paidInFull ? Theme.surface2 : Theme.accent)
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(anyBusy)
+        }
+    }
+
+    @ViewBuilder
+    private func statusActionLabel(_ title: String, busy: Bool, ink: Color) -> some View {
+        Group {
+            if busy {
+                ProgressView().tint(ink)
+            } else {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ink)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 44)
     }
 
     private var statusTag: some View {
@@ -566,6 +607,172 @@ struct CardPaymentTile: View {
         formatter.minimumFractionDigits = 2
         formatter.maximumFractionDigits = 2
         return "$" + (formatter.string(from: NSNumber(value: value)) ?? "\(value)")
+    }
+}
+
+// MARK: - Record payment sheet
+
+struct CardPaymentRecordSheet: View {
+    let card: FortnightCard
+    let onSave: (MonthlyCardPaymentBody) async throws -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var amountText: String
+    @State private var paidAt = Date()
+    @State private var note = ""
+    @State private var errorMessage: String?
+    @State private var isSaving = false
+    @FocusState private var amountFocused: Bool
+    @FocusState private var noteFocused: Bool
+
+    init(card: FortnightCard, onSave: @escaping (MonthlyCardPaymentBody) async throws -> Void) {
+        self.card = card
+        self.onSave = onSave
+        _amountText = State(initialValue: CardPaymentDraft.formattedAmount(cents: card.row.outstandingCents))
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Theme.bg.ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: 20) {
+                        cardContext
+
+                        HeroAmountField(
+                            amountText: $amountText,
+                            tint: Theme.accentText,
+                            focus: $amountFocused,
+                            errorMessage: errorMessage
+                        )
+
+                        FormCard {
+                            SignalNativeFormRow {
+                                DatePicker("Payment date", selection: $paidAt, displayedComponents: .date)
+                                    .datePickerStyle(.compact)
+                                    .tint(Theme.accent)
+                                    .padding(.horizontal, 16)
+                            }
+                            SignalFormRow(label: "Note") {
+                                TextField("Optional", text: $note)
+                                    .focused($noteFocused)
+                                    .autocorrectionDisabled()
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(Theme.ink)
+                                    .multilineTextAlignment(.trailing)
+                            }
+                        }
+
+                        Button(action: save) {
+                            Group {
+                                if isSaving {
+                                    ProgressView().tint(Theme.buttonInk)
+                                } else {
+                                    Text("Record payment")
+                                }
+                            }
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+                        .disabled(isSaving)
+                        .accessibilityHint("Records this payment against the selected statement month")
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                    .padding(.bottom, 40)
+                    .disabled(isSaving)
+                }
+                .scrollDismissesKeyboard(.interactively)
+            }
+            .navigationTitle("Record payment")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundStyle(Theme.muted)
+                        .disabled(isSaving)
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        amountFocused = false
+                        noteFocused = false
+                    }
+                    .foregroundStyle(Theme.accentText)
+                    .fontWeight(.semibold)
+                    .disabled(isSaving)
+                }
+            }
+        }
+        .interactiveDismissDisabled(isSaving)
+        .onAppear { amountFocused = true }
+    }
+
+    private var cardContext: some View {
+        VStack(spacing: 4) {
+            Text(card.row.label)
+                .font(.headline)
+                .foregroundStyle(Theme.ink)
+            Text("Statement month · \(monthLabel(card.resolvedDueMonthKey))")
+                .font(.subheadline)
+                .foregroundStyle(Theme.muted)
+            Text("Outstanding · \(moneyString(card.row.outstandingCents))")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Theme.faint)
+        }
+        .frame(maxWidth: .infinity)
+        .multilineTextAlignment(.center)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func save() {
+        guard let body = CardPaymentDraft.makeBody(
+            month: card.resolvedDueMonthKey,
+            cardId: card.row.creditCardId,
+            amountText: amountText,
+            note: note,
+            paidAt: paidAt
+        ) else {
+            errorMessage = "Enter an amount greater than zero."
+            amountFocused = true
+            return
+        }
+
+        isSaving = true
+        errorMessage = nil
+        Task {
+            defer { isSaving = false }
+            do {
+                try await onSave(body)
+                guard !Task.isCancelled else { return }
+                dismiss()
+            } catch is CancellationError {
+                // Workspace changes close the source sheet; do not attach an
+                // error to a card that is no longer current.
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func monthLabel(_ monthKey: String) -> String {
+        let parts = monthKey.split(separator: "-")
+        guard parts.count == 2, let year = Int(parts[0]), let month = Int(parts[1]) else { return monthKey }
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = 1
+        guard let date = Calendar.current.date(from: components) else { return monthKey }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy"
+        return formatter.string(from: date)
+    }
+
+    private func moneyString(_ cents: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "MXN"
+        return formatter.string(from: NSNumber(value: Double(cents) / 100)) ?? "$\(cents / 100)"
     }
 }
 

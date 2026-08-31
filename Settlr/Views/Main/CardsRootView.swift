@@ -13,6 +13,7 @@ struct CardsRootView: View {
     @State private var navigatorMode: FortnightNavigatorMode = .current
     @State private var showCardManagement = false
     @State private var selectedCard: CreditCard?
+    @State private var recordPaymentCard: FortnightCard?
 
     private var referenceDate: Date { Date() }
 
@@ -69,9 +70,15 @@ struct CardsRootView: View {
             guard enabled else {
                 paymentVM = nil
                 navigatorMode = .current
+                recordPaymentCard = nil
                 return
             }
             Task { await loadPayments() }
+        }
+        .onChange(of: workspaceId) { _, _ in
+            paymentVM = nil
+            navigatorMode = .current
+            recordPaymentCard = nil
         }
         .sheet(isPresented: $showCardManagement) {
             CardsView(workspaceId: workspaceId, vm: cardsVM) {
@@ -85,6 +92,17 @@ struct CardsRootView: View {
                 guard isCurrentWorkspace else { return updated }
                 await refreshAfterCardMutation()
                 return updated
+            }
+        }
+        .sheet(item: $recordPaymentCard) { card in
+            CardPaymentRecordSheet(card: card) { body in
+                guard isCurrentWorkspace, canUsePayments, let paymentVM else {
+                    throw CancellationError()
+                }
+                try await paymentVM.recordPayment(body, workspaceId: workspaceId)
+                guard isCurrentWorkspace, canUsePayments else {
+                    throw CancellationError()
+                }
             }
         }
     }
@@ -202,6 +220,9 @@ struct CardsRootView: View {
                                     cardId: card.row.creditCardId
                                 )
                             }
+                        } onRecordPayment: {
+                            guard canUsePayments, isCurrentWorkspace else { return }
+                            recordPaymentCard = card
                         }
                         .padding(.horizontal, 20)
                     }
