@@ -372,6 +372,20 @@ struct ActivityView: View {
     private var timelineContent: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
+                if let error = vm.errorMessage {
+                    SignalRefreshWarning(
+                        message: "Saved Activity data remains visible but may be out of date. Refresh failed: \(error)"
+                    ) {
+                        Task {
+                            await vm.load(
+                                workspaceId: workspaceId,
+                                user: user,
+                                refreshSession: { await appState.refreshSession() }
+                            )
+                        }
+                    }
+                    .padding(.bottom, 8)
+                }
                 if vm.isLoading, !vm.timeline.isEmpty { SignalTraceLoadingView(lastUpdated: nil).padding(.horizontal, 24) }
                 if !vm.attentionEvents.isEmpty { attentionSection }
                 ForEach(groupedEvents, id: \.day) { group in
