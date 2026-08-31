@@ -84,9 +84,13 @@ final class ExpensesVM {
     }
 
     @MainActor
-    func loadCategories(workspaceId: String) async {
+    func loadCategories(workspaceId: String, categoriesEnabled: Bool) async {
         if categoryWorkspaceID != workspaceId {
             resetCategoriesForWorkspace(workspaceId)
+        }
+        guard categoriesEnabled else {
+            categories = []
+            return
         }
         let generation = categoryLoadGeneration
         do {

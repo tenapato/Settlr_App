@@ -181,7 +181,9 @@ struct ActivityView: View {
             .sheet(isPresented: $showExpenseForm) {
                 ExpenseFormSheet(
                     workspaceId: workspaceId,
-                    categories: vm.categories.isEmpty ? expensesVM.categories : vm.categories
+                    categories: user?.has(.categories) == true
+                        ? (vm.categories.isEmpty ? expensesVM.categories : vm.categories)
+                        : []
                 ) { body in
                     Task {
                         let generation = await expensesVM.workspaceMutationGeneration(for: workspaceId)
@@ -197,7 +199,9 @@ struct ActivityView: View {
             .sheet(isPresented: $showIncomeForm) {
                 IncomeFormSheet(
                     workspaceId: workspaceId,
-                    categories: vm.categories.isEmpty ? incomeVM.categories : vm.categories
+                    categories: user?.has(.categories) == true
+                        ? (vm.categories.isEmpty ? incomeVM.categories : vm.categories)
+                        : []
                 ) { body, repeatEvery in
                     Task {
                         let generation = await incomeVM.workspaceMutationGeneration(for: workspaceId)
@@ -267,11 +271,19 @@ struct ActivityView: View {
         }
         .onChange(of: showExpenseForm) { _, open in
             guard open else { return }
-            Task { await expensesVM.loadCategories(workspaceId: workspaceId) }
+            Task {
+                guard appState.activeWorkspace?.id == workspaceId,
+                      appState.currentUser?.has(.categories) == true else { return }
+                await expensesVM.loadCategories(workspaceId: workspaceId, categoriesEnabled: true)
+            }
         }
         .onChange(of: showIncomeForm) { _, open in
             guard open else { return }
-            Task { await incomeVM.loadCategories(workspaceId: workspaceId) }
+            Task {
+                guard appState.activeWorkspace?.id == workspaceId,
+                      appState.currentUser?.has(.categories) == true else { return }
+                await incomeVM.loadCategories(workspaceId: workspaceId, categoriesEnabled: true)
+            }
         }
         .onChange(of: showSavingsForm) { _, open in
             guard open else { return }

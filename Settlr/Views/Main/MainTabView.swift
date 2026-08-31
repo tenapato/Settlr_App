@@ -71,12 +71,18 @@ struct MainTabView: View {
         // Activity's leaf views own these sheets while Activity is visible. The
         // root presenters cover global quick actions opened from another tab.
         .sheet(isPresented: rootExpenseFormPresentation) {
-            ExpenseFormSheet(workspaceId: appState.activeWorkspace?.id ?? "", categories: expensesVM.categories) { body in
+            ExpenseFormSheet(
+                workspaceId: appState.activeWorkspace?.id ?? "",
+                categories: appState.currentUser?.has(.categories) == true ? expensesVM.categories : []
+            ) { body in
                 Task { await expensesVM.create(workspaceId: appState.activeWorkspace?.id ?? "", body: body) }
             }
         }
         .sheet(isPresented: rootIncomeFormPresentation) {
-            IncomeFormSheet(workspaceId: appState.activeWorkspace?.id ?? "", categories: incomeVM.categories) { body, repeatEvery in
+            IncomeFormSheet(
+                workspaceId: appState.activeWorkspace?.id ?? "",
+                categories: appState.currentUser?.has(.categories) == true ? incomeVM.categories : []
+            ) { body, repeatEvery in
                 Task {
                     if let repeatEvery {
                         _ = await incomeVM.createRecurring(
@@ -339,7 +345,9 @@ struct MainTabView: View {
             actions.append(
                 QuickActionItem(id: "expense", title: "Expense", subtitle: "Add an expense", systemImage: "arrow.up", role: .standard) {
                     openLedgerForm(.expenses, requiredFeature: .expenses) { workspaceId, userId in
-                        await expensesVM.loadCategories(workspaceId: workspaceId)
+                        if launcherContextIsValid(workspaceId: workspaceId, userId: userId, feature: .categories) {
+                            await expensesVM.loadCategories(workspaceId: workspaceId, categoriesEnabled: true)
+                        }
                         guard launcherContextIsValid(workspaceId: workspaceId, userId: userId, feature: .expenses) else { return }
                         showExpenseForm = true
                     }
@@ -350,7 +358,9 @@ struct MainTabView: View {
             actions.append(
                 QuickActionItem(id: "income", title: "Income", subtitle: "Add income", systemImage: "arrow.down", role: .standard) {
                     openLedgerForm(.income, requiredFeature: .income) { workspaceId, userId in
-                        await incomeVM.loadCategories(workspaceId: workspaceId)
+                        if launcherContextIsValid(workspaceId: workspaceId, userId: userId, feature: .categories) {
+                            await incomeVM.loadCategories(workspaceId: workspaceId, categoriesEnabled: true)
+                        }
                         guard launcherContextIsValid(workspaceId: workspaceId, userId: userId, feature: .income) else { return }
                         showIncomeForm = true
                     }
