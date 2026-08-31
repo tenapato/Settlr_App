@@ -18,6 +18,8 @@ final class CardPaymentsVM {
     var busyCardId: String?
 
     private let api = APIClient.shared
+    private var loadGeneration: UInt64 = 0
+    private var recordPresentation = CardPaymentSaveLifecycle()
 
     var activeWindow: FortnightWindow? {
         guard fortnight != .all else { return nil }
@@ -59,12 +61,43 @@ final class CardPaymentsVM {
 
     @MainActor
     func load(workspaceId: String) async {
+        _ = await refreshSummary(workspaceId: workspaceId, presentationToken: nil)
+    }
+
+    func beginRecordPresentation() -> UInt64 {
+        recordPresentation.beginPresentation()
+    }
+
+    func invalidateRecordPresentation() {
+        recordPresentation.invalidate()
+        loadGeneration &+= 1
+        busyCardId = nil
+        isLoading = false
+    }
+
+    func ownsRecordPresentation(_ token: UInt64) -> Bool {
+        recordPresentation.owns(token)
+    }
+
+    private func refreshSummary(
+        workspaceId: String,
+        presentationToken: UInt64?
+    ) async -> CardPaymentRecordResult {
+        guard presentationToken.map({ recordPresentation.owns($0) }) ?? true else { return .stale }
+        loadGeneration &+= 1
+        let generation = loadGeneration
         // Keep the existing rows visible while a refresh is in flight; roots
         // render the inline Signal trace alongside that retained content.
         isLoading = true
         errorMessage = nil
-        defer { isLoading = false }
+        defer {
+            if generation == loadGeneration {
+                isLoading = false
+            }
+        }
         do {
+            let nextSummary: CardPaymentsSummaryResponse?
+            let nextFortnightCards: [FortnightCard]?
             if let window = activeWindow {
                 let prevMonth = CardPaymentFortnight.shiftMonth(window.monthKey, by: -1)
                 async let currentResp: CardPaymentsSummaryResponse = api.fetch(
@@ -74,19 +107,38 @@ final class CardPaymentsVM {
                     Endpoints.cardPaymentsSummary(workspaceId) + MonthRangeQuery.summaryQuery(month: prevMonth)
                 )
                 let (current, previous) = try await (currentResp, previousResp)
-                fortnightCards = CardPaymentFortnight.mergeCards(
+                nextFortnightCards = CardPaymentFortnight.mergeCards(
                     window: window,
                     currentMonthCards: current.creditCards,
                     previousMonthCards: previous.creditCards
                 )
+                nextSummary = nil
             } else {
-                fortnightCards = nil
-                summary = try await api.fetch(
+                nextFortnightCards = nil
+                nextSummary = try await api.fetch(
                     Endpoints.cardPaymentsSummary(workspaceId) + MonthRangeQuery.summaryQuery(month: month)
                 )
             }
+            guard presentationToken.map({ recordPresentation.owns($0) }) ?? true else { return .stale }
+            guard generation == loadGeneration else {
+                return presentationToken == nil
+                    ? .stale
+                    : .recordPaymentRefreshFailed("Payment status is still refreshing. Try again in a moment.")
+            }
+            fortnightCards = nextFortnightCards
+            if let nextSummary {
+                summary = nextSummary
+            }
+            return .refreshed
         } catch {
+            guard presentationToken.map({ recordPresentation.owns($0) }) ?? true else { return .stale }
+            guard generation == loadGeneration else {
+                return presentationToken == nil
+                    ? .stale
+                    : .recordPaymentRefreshFailed("Payment status is still refreshing. Try again in a moment.")
+            }
             errorMessage = error.localizedDescription
+            return .recordPaymentRefreshFailed(error.localizedDescription)
         }
     }
 
@@ -110,15 +162,36 @@ final class CardPaymentsVM {
     }
 
     @MainActor
-    func recordPayment(_ body: MonthlyCardPaymentBody, workspaceId: String) async throws {
+    func recordPayment(
+        _ body: MonthlyCardPaymentBody,
+        workspaceId: String,
+        presentationToken: UInt64
+    ) async throws -> CardPaymentRecordResult {
+        guard ownsRecordPresentation(presentationToken) else { return .stale }
         busyCardId = body.creditCardId
-        defer { busyCardId = nil }
-        try await api.send(
-            Endpoints.monthlyCardPayments(workspaceId),
-            method: "POST",
-            body: body
-        )
-        await load(workspaceId: workspaceId)
+        defer {
+            if ownsRecordPresentation(presentationToken) {
+                busyCardId = nil
+            }
+        }
+        do {
+            try await api.send(
+                Endpoints.monthlyCardPayments(workspaceId),
+                method: "POST",
+                body: body
+            )
+        } catch {
+            guard ownsRecordPresentation(presentationToken) else { return .stale }
+            throw error
+        }
+        return await refreshSummary(workspaceId: workspaceId, presentationToken: presentationToken)
+    }
+
+    func refreshRecordedPayment(
+        workspaceId: String,
+        presentationToken: UInt64
+    ) async -> CardPaymentRecordResult {
+        await refreshSummary(workspaceId: workspaceId, presentationToken: presentationToken)
     }
 }
 
@@ -614,7 +687,8 @@ struct CardPaymentTile: View {
 
 struct CardPaymentRecordSheet: View {
     let card: FortnightCard
-    let onSave: (MonthlyCardPaymentBody) async throws -> Void
+    let onRecord: (MonthlyCardPaymentBody) async throws -> CardPaymentRecordResult
+    let onRefresh: () async -> CardPaymentRecordResult
 
     @Environment(\.dismiss) private var dismiss
     @State private var amountText: String
@@ -622,12 +696,18 @@ struct CardPaymentRecordSheet: View {
     @State private var note = ""
     @State private var errorMessage: String?
     @State private var isSaving = false
+    @State private var recovery = CardPaymentRecordRecovery()
     @FocusState private var amountFocused: Bool
     @FocusState private var noteFocused: Bool
 
-    init(card: FortnightCard, onSave: @escaping (MonthlyCardPaymentBody) async throws -> Void) {
+    init(
+        card: FortnightCard,
+        onRecord: @escaping (MonthlyCardPaymentBody) async throws -> CardPaymentRecordResult,
+        onRefresh: @escaping () async -> CardPaymentRecordResult
+    ) {
         self.card = card
-        self.onSave = onSave
+        self.onRecord = onRecord
+        self.onRefresh = onRefresh
         _amountText = State(initialValue: CardPaymentDraft.formattedAmount(cents: card.row.outstandingCents))
     }
 
@@ -647,7 +727,7 @@ struct CardPaymentRecordSheet: View {
                             errorMessage: errorMessage
                         )
 
-                        FormCard {
+                        VStack(spacing: 0) {
                             SignalNativeFormRow {
                                 DatePicker("Payment date", selection: $paidAt, displayedComponents: .date)
                                     .datePickerStyle(.compact)
@@ -664,12 +744,12 @@ struct CardPaymentRecordSheet: View {
                             }
                         }
 
-                        Button(action: save) {
+                        Button(action: saveOrRefresh) {
                             Group {
                                 if isSaving {
                                     ProgressView().tint(Theme.buttonInk)
                                 } else {
-                                    Text("Record payment")
+                                    Text(recovery.nextAction == .refresh ? "Retry refresh" : "Record payment")
                                 }
                             }
                         }
@@ -725,7 +805,15 @@ struct CardPaymentRecordSheet: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func save() {
+    private func saveOrRefresh() {
+        if recovery.nextAction == .refresh {
+            refreshOnly()
+        } else {
+            recordPayment()
+        }
+    }
+
+    private func recordPayment() {
         guard let body = CardPaymentDraft.makeBody(
             month: card.resolvedDueMonthKey,
             cardId: card.row.creditCardId,
@@ -743,15 +831,34 @@ struct CardPaymentRecordSheet: View {
         Task {
             defer { isSaving = false }
             do {
-                try await onSave(body)
-                guard !Task.isCancelled else { return }
-                dismiss()
+                handle(await onRecord(body))
             } catch is CancellationError {
                 // Workspace changes close the source sheet; do not attach an
                 // error to a card that is no longer current.
             } catch {
                 errorMessage = error.localizedDescription
             }
+        }
+    }
+
+    private func refreshOnly() {
+        isSaving = true
+        errorMessage = nil
+        Task {
+            defer { isSaving = false }
+            handle(await onRefresh())
+        }
+    }
+
+    private func handle(_ result: CardPaymentRecordResult) {
+        guard !Task.isCancelled else { return }
+        switch recovery.receive(result) {
+        case .dismiss:
+            dismiss()
+        case .showRefreshError(let message):
+            errorMessage = "Payment was recorded, but status could not refresh. \(message)"
+        case .ignore:
+            break
         }
     }
 

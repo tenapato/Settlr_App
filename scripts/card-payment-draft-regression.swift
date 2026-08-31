@@ -40,6 +40,26 @@ enum CardPaymentDraftRegression {
             paidAt: paidAt
         )
         expect(noNote?.note == nil, "omits a blank optional note")
+        expect(CardPaymentDraft.amountCents(from: ".50") == 50, "accepts a fractional amount without a leading zero")
+        expect(CardPaymentDraft.amountCents(from: "1..20") == nil, "rejects repeated decimal separators")
+        expect(CardPaymentDraft.amountCents(from: "1,23,4") == nil, "rejects malformed grouped separators")
+
+        var lifecycle = CardPaymentSaveLifecycle()
+        let firstPresentation = lifecycle.beginPresentation()
+        expect(lifecycle.owns(firstPresentation), "owns the active presentation")
+        let secondPresentation = lifecycle.beginPresentation()
+        expect(!lifecycle.owns(firstPresentation), "invalidates an older sheet when a new one opens")
+        expect(lifecycle.owns(secondPresentation), "keeps the latest sheet active")
+        lifecycle.invalidate()
+        expect(!lifecycle.owns(secondPresentation), "invalidates an in-flight save on context revocation")
+
+        var recovery = CardPaymentRecordRecovery()
+        expect(recovery.nextAction == .record, "starts by allowing one payment POST")
+        expect(
+            recovery.receive(.recordPaymentRefreshFailed("offline")) == .showRefreshError("offline"),
+            "keeps a recorded payment open when its refresh fails"
+        )
+        expect(recovery.nextAction == .refresh, "retries only the summary refresh after a recorded payment")
     }
 
     private static func date(_ value: String) -> Date {

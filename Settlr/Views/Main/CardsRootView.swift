@@ -1,6 +1,13 @@
 import SwiftUI
 import UIKit
 
+private struct CardPaymentRecordPresentation: Identifiable {
+    let card: FortnightCard
+    let generation: UInt64
+
+    var id: String { "\(card.id)-\(generation)" }
+}
+
 /// The public Cards destination. Card management and payment tracking remain
 /// separate endpoints, but share one quiet, feature-aware root.
 struct CardsRootView: View {
@@ -13,7 +20,7 @@ struct CardsRootView: View {
     @State private var navigatorMode: FortnightNavigatorMode = .current
     @State private var showCardManagement = false
     @State private var selectedCard: CreditCard?
-    @State private var recordPaymentCard: FortnightCard?
+    @State private var recordPaymentPresentation: CardPaymentRecordPresentation?
 
     private var referenceDate: Date { Date() }
 
@@ -68,17 +75,17 @@ struct CardsRootView: View {
         .task(id: workspaceId) { await load() }
         .onChange(of: canUsePayments) { _, enabled in
             guard enabled else {
+                invalidateRecordPresentation()
                 paymentVM = nil
                 navigatorMode = .current
-                recordPaymentCard = nil
                 return
             }
             Task { await loadPayments() }
         }
         .onChange(of: workspaceId) { _, _ in
+            invalidateRecordPresentation()
             paymentVM = nil
             navigatorMode = .current
-            recordPaymentCard = nil
         }
         .sheet(isPresented: $showCardManagement) {
             CardsView(workspaceId: workspaceId, vm: cardsVM) {
@@ -94,16 +101,29 @@ struct CardsRootView: View {
                 return updated
             }
         }
-        .sheet(item: $recordPaymentCard) { card in
-            CardPaymentRecordSheet(card: card) { body in
-                guard isCurrentWorkspace, canUsePayments, let paymentVM else {
-                    throw CancellationError()
+        .sheet(item: $recordPaymentPresentation) { presentation in
+            CardPaymentRecordSheet(
+                card: presentation.card,
+                onRecord: { body in
+                    guard isCurrentRecordPresentation(presentation.generation), let paymentVM else {
+                        return .stale
+                    }
+                    return try await paymentVM.recordPayment(
+                        body,
+                        workspaceId: workspaceId,
+                        presentationToken: presentation.generation
+                    )
+                },
+                onRefresh: {
+                    guard isCurrentRecordPresentation(presentation.generation), let paymentVM else {
+                        return .stale
+                    }
+                    return await paymentVM.refreshRecordedPayment(
+                        workspaceId: workspaceId,
+                        presentationToken: presentation.generation
+                    )
                 }
-                try await paymentVM.recordPayment(body, workspaceId: workspaceId)
-                guard isCurrentWorkspace, canUsePayments else {
-                    throw CancellationError()
-                }
-            }
+            )
         }
     }
 
@@ -221,8 +241,11 @@ struct CardsRootView: View {
                                 )
                             }
                         } onRecordPayment: {
-                            guard canUsePayments, isCurrentWorkspace else { return }
-                            recordPaymentCard = card
+                            guard canUsePayments, isCurrentWorkspace, let paymentVM else { return }
+                            recordPaymentPresentation = CardPaymentRecordPresentation(
+                                card: card,
+                                generation: paymentVM.beginRecordPresentation()
+                            )
                         }
                         .padding(.horizontal, 20)
                     }
@@ -239,6 +262,15 @@ struct CardsRootView: View {
 
     private var isCurrentWorkspace: Bool {
         appState.activeWorkspace?.id == workspaceId
+    }
+
+    private func invalidateRecordPresentation() {
+        paymentVM?.invalidateRecordPresentation()
+        recordPaymentPresentation = nil
+    }
+
+    private func isCurrentRecordPresentation(_ generation: UInt64) -> Bool {
+        isCurrentWorkspace && canUsePayments && paymentVM?.ownsRecordPresentation(generation) == true
     }
 
     private func refreshAfterCardMutation() async {

@@ -58,3 +58,65 @@ The app posts `MonthlyCardPaymentBody` with `month` from `FortnightCard.resolved
 ## Concern
 
 Simulator and Xcode/XCTest verification were intentionally omitted by the no-Xcode/no-XCTest task constraint; the executable Foundation and source-level checks cover the changed contract and wiring.
+
+## Fix round 1 — stale saves, refresh recovery, and amount grammar
+
+### Fix summary
+
+- Added a presentation lifecycle token to `CardPaymentsVM`; beginning a new record sheet or invalidating on workspace/feature changes retires all older save completions and in-flight loads.
+- Record payment now distinguishes a successful POST from a successful summary refresh. A refresh failure keeps the sheet open with a clear recorded-but-not-refreshed error, and the only retry path is `Retry refresh`—never a second POST.
+- Added a Foundation-only recovery state machine regression to prove that transition, and tightened the amount grammar for `.50` plus malformed separator rejection.
+- Removed the generic `FormCard` wrapper below `HeroAmountField`; the native date and Note Signal rows are now borderless rows separated only by their hairlines.
+
+### RED evidence
+
+Parser behavior before the grammar correction:
+
+```text
+main/card-payment-draft-regression.swift:57: Fatal error: Regression failed: accepts a fractional amount without a leading zero
+./scripts/check-card-payment-draft.sh: line 13: 63136 Trace/BPT trap: 5       "$binary"
+```
+
+Lifecycle state regression before its implementation:
+
+```text
+scripts/card-payment-draft-regression.swift:47:25: error: cannot find 'CardPaymentSaveLifecycle' in scope
+```
+
+No-duplicate-retry recovery regression before its implementation:
+
+```text
+scripts/card-payment-draft-regression.swift:56:24: error: cannot find 'CardPaymentRecordRecovery' in scope
+```
+
+Source guard before lifecycle wiring:
+
+```text
+Cards root must gate and present the record-payment sheet.
+```
+
+### GREEN evidence
+
+```sh
+find Settlr -name '*.swift' -print0 | xargs -0 swiftc -parse && ./scripts/check-card-payment-draft.sh && ./scripts/check-card-payment-sheet.sh && ./scripts/check-category-feature-gate.sh && sh ./scripts/check-dashboard-month-state.sh && sh ./scripts/check-activity-stale-warning.sh && sh ./scripts/check-scanner-result-settlement.sh && sh ./scripts/check-signal-redesign.sh && sh ./scripts/check-app-source-regressions.sh && git diff --check
+```
+
+Exact output:
+
+```text
+Card payment sheet source checks passed.
+Category feature-gate regression check passed.
+Dashboard month state regression passed.
+Activity retained-data warning regression check passed.
+Scanner result settlement regression check passed.
+App source regression checks passed.
+```
+
+The complete Swift parse, Foundation regression, Signal redesign guard, and diff check completed silently with exit status 0. No Xcode build or XCTest command was run.
+
+### Round-1 self-review
+
+- A save can mutate or dismiss only if its presentation token still belongs to the active sheet. Context revocation increments the token and invalidates pending loads before the view model is discarded.
+- After POST success, a stale or failed refresh becomes refresh-only recovery; the sheet cannot send the append-only endpoint again.
+- A successful refresh dismisses; a refresh failure remains inline with `Retry refresh`; a stale completion does neither.
+- Signal Date and Note rows have no outer generic card/background, retain 44pt native hit targets, and keep their own hairline separators.
