@@ -995,6 +995,29 @@ struct ScannedReceipt: Decodable {
     }
 }
 
+/// The scan-derived facts shown at the Review checkpoint. Setup-only fields
+/// such as date, category, and payment method intentionally do not belong here.
+struct ReceiptReviewPresentation {
+    let merchantName: String
+    let totalCents: Int
+    let statusText: String
+    let needsAttention: Bool
+    let merchantNeedsAttention: Bool
+
+    init(receipt: ScannedReceipt) {
+        let trimmedMerchant = receipt.merchant?.trimmingCharacters(in: .whitespacesAndNewlines)
+        merchantName = trimmedMerchant.flatMap { $0.isEmpty ? nil : $0 } ?? "Merchant not found"
+        totalCents = receipt.totalCents
+        merchantNeedsAttention = trimmedMerchant?.isEmpty != false
+        needsAttention = merchantNeedsAttention
+            || receipt.totalCents <= 0
+            || receipt.items.isEmpty
+            || receipt.items.contains { $0.verification == .unverified }
+            || !receipt.warnings.isEmpty
+        statusText = needsAttention ? "Review highlighted details" : "Scan looks ready"
+    }
+}
+
 // MARK: - Public share-link models (used by the deep-link claim screen)
 
 struct PublicSplitParticipant: Codable, Identifiable {

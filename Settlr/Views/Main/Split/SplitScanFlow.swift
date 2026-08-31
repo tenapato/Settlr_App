@@ -292,36 +292,29 @@ private struct ReceiptReviewView: View {
 
     @Environment(\.dismiss) private var dismiss
 
-    private var confidence: String {
-        receipt.items.contains { $0.verification == .unverified } || !receipt.warnings.isEmpty
-            ? "Needs attention"
-            : "High confidence"
+    private var presentation: ReceiptReviewPresentation {
+        ReceiptReviewPresentation(receipt: receipt)
     }
 
     var body: some View {
         ZStack {
             Theme.bg.ignoresSafeArea()
             ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Review")
-                        .font(.system(size: 30, weight: .bold))
-                        .foregroundStyle(Theme.ink)
-                    Text("Check the scan before choosing how to split it.")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Theme.muted)
-
-                    reviewCard
-                    itemsCard
-                    if !receipt.warnings.isEmpty { warningsCard }
+                VStack(alignment: .leading, spacing: 24) {
+                    progressHeader
+                    amountHero
+                    if !receipt.warnings.isEmpty { receiptWarnings }
+                    itemsSection
                 }
                 .padding(16)
                 .padding(.bottom, 168)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             VStack {
                 Spacer()
                 VStack(spacing: 10) {
                     Button(action: onContinue) {
-                        Text("Continue to split")
+                        Text("Set up the split")
                             .font(.headline)
                             .foregroundStyle(Theme.buttonInk)
                             .frame(maxWidth: .infinity, minHeight: 52)
@@ -353,6 +346,8 @@ private struct ReceiptReviewView: View {
                 .background(.ultraThinMaterial)
             }
         }
+        .navigationTitle("Review scan")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button("Back", action: onBack)
@@ -363,67 +358,155 @@ private struct ReceiptReviewView: View {
         }
     }
 
-    private var reviewCard: some View {
-        VStack(spacing: 0) {
-            reviewRow("Merchant", receipt.merchant ?? "Not found", attention: receipt.merchant == nil)
-            Divider().overlay(Theme.line)
-            reviewRow("Printed total", formatSplitMoney(receipt.totalCents), attention: receipt.totalCents <= 0)
-            Divider().overlay(Theme.line)
-            reviewRow("Date", Date().formatted(date: .abbreviated, time: .omitted))
-            Divider().overlay(Theme.line)
-            reviewRow("Payment method", "Choose in Split")
-            Divider().overlay(Theme.line)
-            reviewRow("Category", "Choose in Split")
-            Divider().overlay(Theme.line)
-            reviewRow("Parser confidence", confidence, attention: confidence != "High confidence")
+    private var progressHeader: some View {
+        HStack(spacing: 8) {
+            progressStep("Scan", state: .complete)
+            progressConnector(active: true)
+            progressStep("Review", state: .current)
+            progressConnector(active: false)
+            progressStep("Set up split", state: .upcoming)
         }
-        .background(Theme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Step 2 of 3, Review")
     }
 
-    private var itemsCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Items")
-                .font(.system(size: 13, weight: .semibold))
+    private enum ProgressState: Equatable {
+        case complete, current, upcoming
+    }
+
+    private func progressStep(_ title: String, state: ProgressState) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: state == .complete ? "checkmark.circle.fill" : "circle.fill")
+                .font(.system(size: state == .current ? 8 : 12, weight: .semibold))
+            Text(title)
+                .font(.system(size: 11, weight: state == .current ? .bold : .medium))
+                .lineLimit(1)
+        }
+        .foregroundStyle(state == .upcoming ? Theme.faint : Theme.accentText)
+    }
+
+    private func progressConnector(active: Bool) -> some View {
+        Rectangle()
+            .fill(active ? Theme.accentText : Theme.line)
+            .frame(maxWidth: .infinity, maxHeight: 1)
+    }
+
+    private var amountHero: some View {
+        VStack(spacing: 10) {
+            Text("SCANNED TOTAL")
+                .font(.system(size: 11, weight: .semibold))
+                .tracking(1.5)
                 .foregroundStyle(Theme.muted)
-            ForEach(Array(receipt.items.enumerated()), id: \.offset) { _, item in
-                HStack {
-                    Text(item.name.isEmpty ? "Unnamed item" : item.name)
-                        .foregroundStyle(Theme.ink)
-                    Spacer()
-                    Text(formatSplitMoney(item.quantity * item.unitPriceCents))
-                        .font(.system(size: 14, design: .monospaced))
-                        .foregroundStyle(item.verification == .unverified ? Theme.warning : Theme.ink)
+
+            Text("MXN")
+                .font(.system(size: 13, weight: .semibold))
+                .tracking(2)
+                .foregroundStyle(Theme.faint)
+
+            Text(formatSplitMoney(presentation.totalCents))
+                .font(.system(size: 44, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .minimumScaleFactor(0.65)
+                .lineLimit(1)
+                .foregroundStyle(presentation.totalCents > 0 ? Theme.ink : Theme.warning)
+                .accessibilityLabel("Scanned total, \(formatSplitMoney(presentation.totalCents))")
+
+            Rectangle()
+                .fill(presentation.totalCents > 0 ? Theme.line : Theme.warning)
+                .frame(height: 1)
+
+            Text(presentation.merchantName)
+                .font(.system(size: 19, weight: .semibold))
+                .foregroundStyle(presentation.merchantNeedsAttention ? Theme.warning : Theme.ink)
+
+            Label(
+                presentation.statusText,
+                systemImage: presentation.needsAttention ? "exclamationmark.circle.fill" : "checkmark.circle.fill"
+            )
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(presentation.needsAttention ? Theme.warning : Theme.accentText)
+        }
+        .frame(maxWidth: .infinity)
+        .multilineTextAlignment(.center)
+        .padding(.top, 4)
+    }
+
+    private var itemsSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("SCANNED ITEMS")
+                .font(.system(size: 11, weight: .semibold))
+                .tracking(1.5)
+                .foregroundStyle(Theme.muted)
+                .padding(.bottom, 8)
+
+            if receipt.items.isEmpty {
+                HStack(spacing: 10) {
+                    Image(systemName: "text.badge.xmark")
+                        .foregroundStyle(Theme.warning)
+                    Text("No items were found. You can add them during split setup.")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Theme.muted)
                 }
-                .padding(.vertical, 5)
+                .padding(.vertical, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .overlay(alignment: .top) { Divider().overlay(Theme.line) }
+                .overlay(alignment: .bottom) { Divider().overlay(Theme.line) }
+            } else {
+                ForEach(Array(receipt.items.enumerated()), id: \.offset) { index, item in
+                    itemRow(item)
+                    if index < receipt.items.count - 1 {
+                        Divider().overlay(Theme.line)
+                    }
+                }
             }
         }
-        .padding(14)
-        .background(Theme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    private var warningsCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label("Check the scan", systemImage: "exclamationmark.triangle.fill")
-                .font(.system(size: 13, weight: .semibold))
+    private func itemRow(_ item: ScannedReceiptItem) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(item.name.isEmpty ? "Unnamed item" : item.name)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(item.verification == .unverified ? Theme.warning : Theme.ink)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(formatSplitMoney(item.quantity * item.unitPriceCents))
+                    .font(.system(size: 15, weight: .semibold, design: .monospaced))
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.ink)
+            }
+            HStack(spacing: 6) {
+                Text("\(item.quantity) × \(formatSplitMoney(item.unitPriceCents))")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.muted)
+                if item.verification == .unverified {
+                    Label("Check this item", systemImage: "exclamationmark.circle.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.warning)
+                }
+            }
+        }
+        .padding(.vertical, 13)
+        .contentShape(Rectangle())
+    }
+
+    private var receiptWarnings: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("CHECK THE TOTAL", systemImage: "exclamationmark.triangle.fill")
+                .font(.system(size: 11, weight: .bold))
+                .tracking(1.2)
                 .foregroundStyle(Theme.warning)
             ForEach(receipt.warnings, id: \.self) { warning in
-                Text(warning).font(.system(size: 12)).foregroundStyle(Theme.muted)
+                Text(warning)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.ink)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(14)
-        .background(Theme.warning.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    private func reviewRow(_ label: String, _ value: String, attention: Bool = false) -> some View {
-        HStack {
-            Text(label).font(.system(size: 13)).foregroundStyle(Theme.muted)
-            Spacer(minLength: 10)
-            Text(value).font(.system(size: 14, weight: .medium)).foregroundStyle(attention ? Theme.warning : Theme.ink)
+        .padding(.leading, 12)
+        .padding(.vertical, 4)
+        .overlay(alignment: .leading) {
+            Rectangle().fill(Theme.warning).frame(width: 2)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
     }
 }

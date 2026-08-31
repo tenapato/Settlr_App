@@ -45,7 +45,7 @@ if ! rg -U -q 'else if queuedResult \{\n[[:space:]]+queuedResultView' "$scan_flo
   exit 1
 fi
 
-if ! rg -U -q 'VStack\(spacing: 10\) \{(?s).*Text\("Continue to split"\)(?s).*foregroundStyle\(Theme\.buttonInk\)(?s).*Label\("Retake photo", systemImage: "camera\.rotate"\)(?s).*foregroundStyle\(Theme\.ink\)(?s).*strokeBorder\(Theme\.line, lineWidth: 1\)' "$scan_flow"; then
+if ! rg -U -q 'VStack\(spacing: 10\) \{(?s).*Text\("Set up the split"\)(?s).*foregroundStyle\(Theme\.buttonInk\)(?s).*Label\("Retake photo", systemImage: "camera\.rotate"\)(?s).*foregroundStyle\(Theme\.ink\)(?s).*strokeBorder\(Theme\.line, lineWidth: 1\)' "$scan_flow"; then
   echo "Scanner review actions must use the approved stacked, high-contrast hierarchy." >&2
   exit 1
 fi
