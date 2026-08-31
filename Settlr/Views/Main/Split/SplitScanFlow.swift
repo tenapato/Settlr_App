@@ -315,19 +315,39 @@ private struct ReceiptReviewView: View {
                     if !receipt.warnings.isEmpty { warningsCard }
                 }
                 .padding(16)
-                .padding(.bottom, 96)
+                .padding(.bottom, 168)
             }
             VStack {
                 Spacer()
-                HStack(spacing: 10) {
-                    Button("Retake", action: onRetake)
-                        .buttonStyle(.bordered)
-                        .tint(Theme.accent)
-                    Button("Continue to split", action: onContinue)
-                        .buttonStyle(.borderedProminent)
-                        .tint(Theme.accent)
+                VStack(spacing: 10) {
+                    Button(action: onContinue) {
+                        Text("Continue to split")
+                            .font(.headline)
+                            .foregroundStyle(Theme.buttonInk)
+                            .frame(maxWidth: .infinity, minHeight: 52)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(Theme.accent)
+                            )
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: onRetake) {
+                        Label("Retake photo", systemImage: "camera.rotate")
+                            .font(.headline)
+                            .foregroundStyle(Theme.ink)
+                            .frame(maxWidth: .infinity, minHeight: 52)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(Theme.surface2)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .strokeBorder(Theme.line, lineWidth: 1)
+                                    )
+                            )
+                    }
+                    .buttonStyle(.plain)
                 }
-                .font(.system(size: 14, weight: .semibold))
                 .frame(maxWidth: .infinity)
                 .padding(16)
                 .background(.ultraThinMaterial)
