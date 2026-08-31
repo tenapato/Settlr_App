@@ -21,7 +21,10 @@ struct ContentView: View {
                 LoginView()
             } else if appState.activeWorkspace == nil {
                 if appState.isRestoringWorkspace {
-                    SettlrPulseLoadingView(message: "Getting your workspace")
+                    SettlrPulseLoadingView(
+                        message: "Getting your workspace",
+                        detail: "Loading balances and account access."
+                    )
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(Theme.bg.ignoresSafeArea())
                 } else {
@@ -82,13 +85,10 @@ private struct SplashView: View {
     var body: some View {
         ZStack {
             Theme.bg.ignoresSafeArea()
-            VStack(spacing: 18) {
-                Image("SettlrLogo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 72, height: 72)
-                SettlrPulseLoadingView(message: message)
-            }
+            SettlrPulseLoadingView(
+                message: message,
+                detail: "Checking your session and account access."
+            )
         }
     }
 }

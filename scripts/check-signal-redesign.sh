@@ -248,7 +248,34 @@ for signal_root in \
   fi
 done
 
-grep -Fq 'SettlrPulseLoadingView(message: "Getting your workspace")' Settlr/ContentView.swift
+grep -Fq 'message: "Getting your workspace"' Settlr/ContentView.swift
+
+# The production cold-start loader and bottom navigation must retain the
+# approved Signal preview geometry. These are wiring guards only; the user-run
+# simulator pass remains the visual proof.
+loading_view=Settlr/Views/Components/SignalLoadingViews.swift
+grep -Fq '.frame(width: 65, height: 65)' "$loading_view"
+grep -Fq '.frame(width: 31, height: 5)' "$loading_view"
+grep -Fq '.offset(x: index == 1 ? 5 : 0)' "$loading_view"
+grep -Fq 'Theme.muted.opacity(0.38)' "$loading_view"
+grep -Fq 'Loading balances and account access.' Settlr/ContentView.swift
+grep -Fq 'Loading balances and account access.' Settlr/Views/Main/Dashboard/DashboardView.swift
+if grep -Fq 'Image("SettlrLogo")' Settlr/ContentView.swift; then
+    echo "Cold-start loader must not render a duplicate logo above the pulse mark." >&2
+    exit 1
+fi
+
+tab_bar=Settlr/Views/Components/FloatingTabBar.swift
+grep -Fq 'VStack(spacing: 3)' "$tab_bar"
+grep -Fq 'Text(tab.title)' "$tab_bar"
+grep -Fq '.frame(maxWidth: .infinity, minHeight: 49)' "$tab_bar"
+if grep -Fq 'matchedGeometryEffect' "$tab_bar"; then
+    echo "Signal tabs must not expand into a selected pill." >&2
+    exit 1
+fi
+grep -Fq '.padding(.trailing, quickActionItems.isEmpty ? 0 : 64)' Settlr/Views/Main/MainTabView.swift
+grep -Fq 'colorScheme == .dark ? 0.48 : 0.12' Settlr/Views/Main/MainTabView.swift
+
 grep -Fq 'ForEach(SettlrAppearance.allCases)' Settlr/Views/Main/Settings/SettingsView.swift
 grep -Fq 'case dark' Settlr/Models/AppearancePreference.swift
 grep -Fq 'case light' Settlr/Models/AppearancePreference.swift

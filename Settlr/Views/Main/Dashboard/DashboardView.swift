@@ -93,7 +93,10 @@ struct DashboardView: View {
                 }
             }
         } else if vm.isLoading {
-            SettlrPulseLoadingView(message: "Getting your workspace")
+            SettlrPulseLoadingView(
+                message: "Getting your workspace",
+                detail: "Loading balances and account access."
+            )
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 56)
         } else if let errorMessage = vm.errorMessage {

@@ -146,7 +146,7 @@ Use semantic red text on a neutral background or native destructive role. Do not
 
 ### Floating tab bar
 
-Show the feature-aware subset of Home, Activity, Savings, and Cards. Use an SF Symbol above or beside its short label. The current item is lime. Do not use a moving blob or oversized selected background.
+Show the feature-aware subset of Home, Activity, Savings, and Cards. Every destination keeps its SF Symbol and short label visible in a stable vertical stack. The current item is lime; selection never changes item width or adds a pill. Reserve clear space between the capsule and the separate C6 launcher.
 
 ### C6 launcher
 
@@ -191,7 +191,7 @@ Use one compact glyph, a direct title, one short explanation, and one action tha
 Choose the loader by context:
 
 - Signal trace for background refresh. Keep cached content visible and show its last update time when useful.
-- Settlr pulse for a cold start or workspace change with no content to show. Light the existing three bars in sequence and use specific copy such as `Getting your workspace`.
+- Settlr pulse for a cold start or workspace change with no content to show. Stack three 31 × 5 pt horizontal bars inside a 65 pt raised tile, offset the middle bar by 5 pt, and light them in sequence. Pair a specific headline such as `Getting your workspace` with one short detail line. Do not place a second logo above the pulse mark.
 - Screen-shaped skeleton only when the incoming geometry helps orientation, such as the first Activity timeline load.
 
 After a delay, expose Retry or a specific recovery path. Reduce Motion holds one signal bar or the mark static. Do not shimmer every screen by default.

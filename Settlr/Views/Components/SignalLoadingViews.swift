@@ -44,32 +44,60 @@ struct SignalTraceLoadingView: View {
 /// sequence only when the user has not requested reduced motion.
 struct SettlrPulseLoadingView: View {
     let message: String
+    let detail: String?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isAnimating = false
 
+    init(message: String, detail: String? = nil) {
+        self.message = message
+        self.detail = detail
+    }
+
     var body: some View {
-        VStack(spacing: 10) {
-            HStack(alignment: .bottom, spacing: 4) {
+        VStack(spacing: 14) {
+            VStack(spacing: 5) {
                 ForEach(0..<3, id: \.self) { index in
                     RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .fill(Theme.accent)
-                        .frame(width: 7, height: CGFloat(12 + index * 7))
-                        .opacity(reduceMotion ? 1 : (isAnimating ? 1 : 0.35))
+                        .fill(
+                            reduceMotion
+                                ? (index == 0 ? Theme.accent : Theme.muted.opacity(0.38))
+                                : (isAnimating ? Theme.accent : Theme.muted.opacity(0.38))
+                        )
+                        .frame(width: 31, height: 5)
+                        .offset(x: index == 1 ? 5 : 0)
                         .animation(
                             reduceMotion
                                 ? nil
-                                : .easeInOut(duration: 0.65)
+                                : .easeInOut(duration: 0.62)
                                     .repeatForever(autoreverses: true)
-                                    .delay(Double(index) * 0.14),
+                                    .delay(Double(index) * 0.16),
                             value: isAnimating
                         )
                 }
             }
+            .frame(width: 65, height: 65)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Theme.surface2)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(Theme.line, lineWidth: 1)
+                    )
+            )
 
-            Text(message)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(Theme.muted)
+            VStack(spacing: 4) {
+                Text(message)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(Theme.ink)
+
+                if let detail {
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(Theme.muted)
+                        .multilineTextAlignment(.center)
+                }
+            }
         }
         .onAppear {
             guard !reduceMotion else { return }
@@ -77,6 +105,7 @@ struct SettlrPulseLoadingView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(message)
+        .accessibilityValue(detail ?? "")
     }
 }
 

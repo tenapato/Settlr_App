@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainTabView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.colorScheme) private var colorScheme
     @State private var selectedTab: Tab = .home
     @State private var activitySegment: ActivitySegment = .expenses
     // Held here, not in the leaf views, so the selected month survives navigation.
@@ -25,6 +26,7 @@ struct MainTabView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             bottomBar
+                .padding(.trailing, quickActionItems.isEmpty ? 0 : 64)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
 
@@ -408,35 +410,18 @@ struct MainTabView: View {
 
     @ViewBuilder
     private var bottomBar: some View {
-        if #available(iOS 26, *) {
-            glassBottomBar
-        } else {
-            legacyBottomBar
-        }
-    }
-
-    @available(iOS 26, *)
-    private var glassBottomBar: some View {
-        HStack(spacing: 12) {
-            FloatingTabBar(selected: $selectedTab, tabs: availableTabs)
-                .frame(maxWidth: .infinity)
-                .glassEffect(.regular.interactive(), in: Capsule())
-
-            // Nothing left to create — the palette would open onto an empty card.
-        }
-    }
-
-    private var legacyBottomBar: some View {
-        HStack(spacing: 12) {
-            FloatingTabBar(selected: $selectedTab, tabs: availableTabs)
-                .frame(maxWidth: .infinity)
-                .background(
-                    Capsule()
-                    .fill(Theme.surface2)
-                        .shadow(color: .black.opacity(0.4), radius: 20, y: 8)
-                )
-
-        }
+        FloatingTabBar(selected: $selectedTab, tabs: availableTabs)
+            .frame(maxWidth: .infinity)
+            .background(
+                Capsule()
+                    .fill(Theme.surface)
+                    .overlay(Capsule().strokeBorder(Theme.line, lineWidth: 1))
+                    .shadow(
+                        color: .black.opacity(colorScheme == .dark ? 0.48 : 0.12),
+                        radius: 20,
+                        y: 8
+                    )
+            )
     }
 
     // MARK: - Tab content
