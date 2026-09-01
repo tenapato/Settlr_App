@@ -55,4 +55,29 @@ final class GuidedSplitFlowStateTests: XCTestCase {
             .payer
         )
     }
+
+    func testChangingDivisionModePreservesTheDraft() {
+        var draft = SplitDraft()
+        draft.merchant = "Cafe"
+        draft.participants.append(.init(id: nil, name: "Ana", isOrganizer: false))
+        draft.items = [.init(name: "Lunch", quantity: 2, unitPriceCents: 1_250)]
+        draft.selectedTotalCents = 2_500
+        let originalItems = draft.items
+        let originalParticipants = draft.participants
+
+        draft.splitMode = "even"
+        XCTAssertEqual(GuidedSplitFlowPolicy.nextStep(splitMode: draft.splitMode), .confirm)
+        draft.splitMode = "by_item"
+
+        XCTAssertEqual(GuidedSplitFlowPolicy.nextStep(splitMode: draft.splitMode), .items)
+        XCTAssertEqual(draft.items, originalItems)
+        XCTAssertEqual(draft.participants, originalParticipants)
+        XCTAssertEqual(draft.selectedTotalCents, 2_500)
+    }
+
+    func testEveryGuidedStepHasTheCorrectBackTarget() {
+        XCTAssertEqual(GuidedSplitFlowPolicy.backStep(from: .items, splitMode: "by_item"), .setup)
+        XCTAssertEqual(GuidedSplitFlowPolicy.backStep(from: .confirm, splitMode: "by_item"), .items)
+        XCTAssertEqual(GuidedSplitFlowPolicy.backStep(from: .confirm, splitMode: "even"), .setup)
+    }
 }

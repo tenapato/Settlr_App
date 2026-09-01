@@ -53,7 +53,7 @@ struct SplitReceiptHeader: View {
                     Image(systemName: "ellipsis.circle")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(Theme.muted)
-                        .frame(width: 44, height: 30, alignment: .trailing)
+                        .frame(width: 44, height: 44, alignment: .trailing)
                 }
                 Text(formatSplitMoney(presentation.totalCents))
                     .font(.system(size: 20, weight: .bold, design: .monospaced))

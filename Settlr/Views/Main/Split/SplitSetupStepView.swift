@@ -132,6 +132,7 @@ struct SplitSetupStepView: View {
         }
         .buttonStyle(.plain)
         .accessibilityValue(draft.payer == value ? "Selected" : "Not selected")
+        .accessibilityAddTraits(draft.payer == value ? .isSelected : [])
     }
 
     private func cardLabel(_ card: CreditCard) -> String {

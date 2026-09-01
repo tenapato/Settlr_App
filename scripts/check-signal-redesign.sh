@@ -78,20 +78,33 @@ grep -Fq 'SignalNativeFormRow' Settlr/Views/Main/Savings/SavingsEntryFormSheet.s
 grep -Fq 'SignalNativeFormRow' Settlr/Views/Main/Income/IncomeRecurringSheet.swift
 grep -Fq 'SignalNativeFormRow' Settlr/Views/Main/Savings/SavingsRecurringSheet.swift
 grep -Fq 'canUseCreditCards' Settlr/Views/Main/Expenses/ExpenseFormSheet.swift
-grep -Fq 'canUseCreditCards' Settlr/Views/Main/Split/SplitCreateSheet.swift
-grep -Fq 'SignalNativeFormRow' Settlr/Views/Main/Split/SplitCreateSheet.swift
-grep -Fq 'DatePicker("Date"' Settlr/Views/Main/Split/SplitCreateSheet.swift
-grep -Fq 'HeroAmountField' Settlr/Views/Main/Split/SplitCreateSheet.swift
+split_editor=Settlr/Views/Main/Split/SplitCreateSheet.swift
+split_setup=Settlr/Views/Main/Split/SplitSetupStepView.swift
+split_items=Settlr/Views/Main/Split/SplitItemsStepView.swift
+split_confirm=Settlr/Views/Main/Split/SplitConfirmStepView.swift
+split_guided=Settlr/Views/Main/Split/SplitGuidedComponents.swift
+split_sheets=Settlr/Views/Main/Split/SplitEditorSheets.swift
+grep -Fq 'canUseCreditCards' "$split_editor"
+grep -Fq 'SignalFormRow' "$split_setup"
+grep -Fq 'DatePicker("Date"' "$split_sheets"
+grep -Fq 'private var heroAmount' "$split_confirm"
 grep -Fq 'Theme.accentText' Settlr/Views/Main/CardPaymentsView.swift
 
 # Task 3 fix round 2: normalize gated state before presenting/saving and keep
 # manual by-item totals editable.
 grep -Fq 'normalizeCardPaymentState()' Settlr/Views/Main/Expenses/ExpenseFormSheet.swift
-grep -Fq 'normalizeCardPaymentState()' Settlr/Views/Main/Split/SplitCreateSheet.swift
+grep -Fq 'normalizeCardPaymentState()' "$split_editor"
 grep -Fq 'paymentChannel: effectivePaymentChannel' Settlr/Views/Main/Expenses/ExpenseFormSheet.swift
 grep -Fq 'creditCardId: effectiveCreditCardId' Settlr/Views/Main/Expenses/ExpenseFormSheet.swift
-grep -Fq 'if !isEditing && !hasScanned' Settlr/Views/Main/Split/SplitCreateSheet.swift
-grep -Fq 'quantity > 1 ? Theme.accentText' Settlr/Views/Main/Split/SplitCreateSheet.swift
+grep -Fq 'I paid it all' "$split_setup"
+grep -Fq 'Each paid their own' "$split_setup"
+grep -Fq 'By item' "$split_setup"
+grep -Fq 'Evenly' "$split_setup"
+grep -Fq 'allocationLabel' "$split_items"
+grep -Fq 'Needs review' "$split_items"
+grep -Fq 'receipt warnings' "$split_guided"
+grep -Fq '.frame(width: 44, height: 44' "$split_guided"
+grep -Fq '.accessibilityAddTraits(draft.payer == value ? .isSelected : [])' "$split_setup"
 
 # Task 3 fix round 3: react to feature revocation and close the submit-time
 # normalization window opened by the claims confirmation dialog.
@@ -352,18 +365,27 @@ grep -Fq 'if (vm.errorMessage == nil || !vm.workspaces.isEmpty) && !vm.isLoading
 grep -Fq 'guard !isLoading else { return nil }' Settlr/ViewModels/WorkspacePickerVM.swift
 
 # Task 8: Signature Scanner capture, review, and payer/division ordering.
-grep -Fq 'How was it paid?' Settlr/Views/Main/Split/SplitCreateSheet.swift
-grep -Fq 'I paid it all' Settlr/Views/Main/Split/SplitCreateSheet.swift
-grep -Fq 'Each paid their own' Settlr/Views/Main/Split/SplitCreateSheet.swift
-grep -Fq 'By item' Settlr/Views/Main/Split/SplitCreateSheet.swift
-grep -Fq 'Evenly' Settlr/Views/Main/Split/SplitCreateSheet.swift
+grep -Fq 'Who paid?' "$split_setup"
+grep -Fq 'I paid it all' "$split_setup"
+grep -Fq 'Each paid their own' "$split_setup"
+grep -Fq 'By item' "$split_setup"
+grep -Fq 'Evenly' "$split_setup"
 grep -Fq 'enum SplitScanStage' Settlr/Views/Main/Split/SplitScanFlow.swift
 grep -Fq 'case capture, review, split, result' Settlr/Views/Main/Split/SplitScanFlow.swift
 grep -Fq 'accessibilityReduceMotion' Settlr/Views/Main/Split/ScanningOverlay.swift
-grep -Fq 'Review' Settlr/Views/Main/Split/SplitCreateSheet.swift
-grep -Fq 'Parser confidence' Settlr/Views/Main/Split/SplitCreateSheet.swift
-grep -Fq 'Unverified rows' Settlr/Views/Main/Split/SplitCreateSheet.swift
+grep -Fq 'SplitReceiptHeader' "$split_setup"
+grep -Fq 'warningCount' "$split_guided"
 grep -Fq 'SplitDraftTests.swift' Settlr.xcodeproj/project.pbxproj
+
+# Guided split coordinator: the parent owns one draft across native navigation,
+# and creation lives only in Confirm's sticky action.
+grep -Fq 'SplitSetupStepView' "$split_editor"
+grep -Fq 'SplitItemsStepView' "$split_editor"
+grep -Fq 'SplitConfirmStepView' "$split_editor"
+if rg -q 'ToolbarItem\(placement: \.confirmationAction\)' "$split_editor"; then
+    echo "Guided split must keep Create in the sticky Confirm action." >&2
+    exit 1
+fi
 
 # Task 8 fix round 1: safe flash, navigable scanner stages, and privacy-safe
 # acceptance of meaningful on-device rows.

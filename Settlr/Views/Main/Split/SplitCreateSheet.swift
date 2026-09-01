@@ -1,44 +1,60 @@
 import SwiftUI
 
-/// Turns a receipt into a split: scan it (or type it), correct the items, and
-/// confirm the total. Scanning is a shortcut, never a source of truth — every
-/// field it fills stays editable, because a misread price becomes real money
-/// somebody is asked to pay back.
+private enum SplitPresentedEditor: Identifiable {
+    case receipt
+    case people
+    case item(UUID)
+    case newItem(SplitDraft.Item)
+    case money(SplitMoneyField)
+
+    var id: String {
+        switch self {
+        case .receipt: "receipt"
+        case .people: "people"
+        case .item(let id): "item-\(id.uuidString)"
+        case .newItem(let item): "new-item-\(item.id.uuidString)"
+        case .money(let field): "money-\(field.id)"
+        }
+    }
+}
+
+private extension SplitMoneyField {
+    var id: String {
+        switch self {
+        case .total: "total"
+        case .tax: "tax"
+        case .tip: "tip"
+        case .fee: "fee"
+        }
+    }
+}
+
+/// Owns one split draft across Setup, Items, and Confirm while keeping receipt
+/// recovery, feature normalization, queueing, and editing at the coordinator boundary.
 struct SplitCreateSheet: View {
     let workspaceId: String
     let vm: BillSplitVM
-    /// Items already read off a receipt by the scan flow, if the user came that way.
     var prefill: ScannedReceipt?
-    /// Seeded by the caller when the scan couldn't run at all, so an empty form
-    /// arrives with an explanation rather than as a mystery.
     var notice: String?
-    /// Non-nil uses this same form as the complete, versioned split editor.
     var editingSplit: BillSplit? = nil
-    /// Restores a scanner draft when the user backs up to Review.
     var initialDraft: SplitDraft? = nil
     var initialTotalEdited: Bool? = nil
     var onBackToReview: ((SplitDraft, Bool) -> Void)? = nil
     var onCancelFlow: (() -> Void)? = nil
-    /// Scanner owns the full-screen stack. Standalone editor presentations keep
-    /// the historical dismiss-on-save behavior.
     var dismissOnSave: Bool = true
     let onSaved: (SplitSaveOutcome) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let queue = PendingSplitQueue.shared
     private let network = NetworkMonitor.shared
 
     @State private var draft = SplitDraft()
-    /// Set once the user edits the total by hand; until then it tracks the items.
     @State private var totalEdited = false
     @State private var creditCards: [CreditCard] = []
     @State private var showScanner = false
     @State private var isScanning = false
-    @State private var hasScanned = false
     @State private var scanNotice: String?
-    @State private var scanNeedsReview = false
     @State private var showReceiptSettings = false
     @State private var errorMessage: String?
     @State private var photoRecovery = ReceiptPhotoRecovery()
@@ -47,268 +63,455 @@ struct SplitCreateSheet: View {
     @State private var showClaimChangeConfirmation = false
     @State private var pendingClaimClearIDs: Set<String> = []
     @State private var hasInitialized = false
-    /// Captured when the editor opens. The detail view keeps refreshing behind
-    /// this sheet, but a newer DTO must not silently lend its version to an
-    /// older draft and bypass the server's stale-edit protection.
     @State private var openedEditVersion: Int?
-    /// Local rather than `vm.isSaving`: saving now means writing to disk and
-    /// then trying the network, which the view model doesn't run.
     @State private var isSubmitting = false
-    @FocusState private var merchantFocused: Bool
-    /// Every numeric field on the sheet. The decimal pad has no return key, so
-    /// tracking focus is the only way to give the user a way out of it.
-    @FocusState private var focusedField: Field?
-    @FocusState private var totalAmountFocused: Bool
 
-    /// Item rows come and go, so they key off the row's identity, not an index.
-    private enum Field: Hashable {
-        case itemName(UUID)
-        case itemPrice(UUID)
-        case guestName(Int)
-        case tax
-        case tip
-        case fee
-        case total
-    }
+    @State private var path: [GuidedSplitStep] = []
+    @State private var validationIssue: GuidedSplitValidationIssue?
+    @State private var itemFilter: SplitItemFilter = .all
+    @State private var presentedEditor: SplitPresentedEditor?
+    @State private var cardLoadState: SplitCardLoadState = .idle
+    @State private var initialSnapshot: GuidedSplitSubmissionSnapshot?
+    @State private var showDiscardConfirmation = false
 
-    private var filledItems: [SplitDraft.Item] { draft.filledItems }
-    private var subtotalCents: Int { draft.itemSubtotalCents }
-    private var derivedTotalCents: Int { draft.calculatedTotalCents }
-    private var effectiveTotalCents: Int {
-        totalEdited ? draft.selectedTotalCents : derivedTotalCents
-    }
-    private var isEvenSplit: Bool { draft.splitMode == "even" }
     private var isEditing: Bool { editingSplit != nil }
-    private var headcount: Int { draft.participants.count }
     private var canUseCreditCards: Bool { appState.currentUser?.has(.creditCards) == true }
-
+    private var effectiveTotalCents: Int {
+        totalEdited ? draft.selectedTotalCents : draft.calculatedTotalCents
+    }
     private var submissionDraft: SplitDraft {
         var result = draft
         if !totalEdited { result.selectedTotalCents = result.calculatedTotalCents }
         return result
     }
-
-    private var reconciliation: SplitDraft.Reconciliation { submissionDraft.reconciliation }
-
     private var canSave: Bool {
-        // An even split needs a total and a headcount, nothing else — itemising
-        // is the work it exists to skip. Every other mode needs priced lines,
-        // because there is nothing to claim without them.
-        let itemsOk = isEvenSplit || (!filledItems.isEmpty && filledItems.allSatisfy { $0.unitPriceCents > 0 })
-        return !draft.merchant.trimmingCharacters(in: .whitespaces).isEmpty
-            && itemsOk
-            && effectiveTotalCents > 0
-            && BillSplitPayerMode(persistedValue: draft.payer) != .unavailable
-            && (draft.paymentChannel != "credit_card" || draft.creditCardId != nil)
-            && !reconciliation.requiresDecision
-            && (!isEditing || network.isOnline)
-            && !isScanning
+        GuidedSplitFlowPolicy.firstIssue(
+            on: .confirm,
+            draft: submissionDraft,
+            totalEdited: totalEdited,
+            isEditing: isEditing,
+            isOnline: network.isOnline
+        ) == nil && !isScanning
     }
-
-    /// What one person pays on an even split, shown live so the table can settle
-    /// up before the form is even submitted.
-    private var evenShareCents: Int {
-        guard headcount > 0 else { return 0 }
-        return effectiveTotalCents / headcount
+    private var primaryAction: GuidedSplitPrimaryAction {
+        if isEditing { return .saveChanges }
+        return network.isOnline ? .create : .saveOnPhone
     }
+    private var scannerImportedReceipt: Bool { onBackToReview != nil }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Theme.bg.ignoresSafeArea()
-
-                ScrollView {
-                    VStack(spacing: 20) {
-                        scanBanner
-                        receiptReviewSection
-                        VStack(spacing: 0) {
-                            SignalFormRow(label: "Where") {
-                                TextField("Restaurant or store", text: $draft.merchant)
-                                    .focused($merchantFocused)
-                                    .autocorrectionDisabled()
-                                    .font(.system(size: 15, weight: .medium))
-                                    .foregroundStyle(Theme.ink)
-                                    .multilineTextAlignment(.trailing)
-                            }
-                            dateRow
-                        }
-                        splitModeSection
-                        if !isEvenSplit { itemsSection }
-                        extrasSection
-                        paymentSection
-
-                        if isEditing && !network.isOnline {
-                            Text("Editing needs an internet connection. Your existing split has not changed.")
-                                .font(.system(size: 13))
-                                .foregroundStyle(Theme.warning)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 4)
-                        }
-
-                        if let errorMessage {
-                            Text(errorMessage)
-                                .font(.system(size: 13))
-                                .foregroundStyle(Theme.expense)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 4)
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .padding(.bottom, 32)
+        NavigationStack(path: $path) {
+            guidedScreen(.setup)
+                .navigationDestination(for: GuidedSplitStep.self) { step in
+                    guidedScreen(step)
                 }
-                .scrollDismissesKeyboard(.interactively)
-                .disabled(isScanning || isSubmitting)
-            }
-            .navigationTitle(isEditing ? "Edit Bill Split" : "Split a Bill")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if onBackToReview != nil {
-                    ToolbarItemGroup(placement: .navigationBarLeading) {
-                        Button("Back") {
-                            onBackToReview?(draft, totalEdited)
-                        }
-                        .foregroundStyle(Theme.muted)
-                        Button("Cancel") {
-                            photoRecovery.clear()
-                            if let onCancelFlow { onCancelFlow() } else { dismiss() }
-                        }
-                        .foregroundStyle(Theme.muted)
-                    }
-                } else {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") {
-                            photoRecovery.clear()
-                            if let onCancelFlow { onCancelFlow() } else { dismiss() }
-                        }
-                        .foregroundStyle(Theme.muted)
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    // Says what will actually happen. Offline the split is saved
-                    // to the phone and uploads itself later, and promising
-                    // "Create" would be a promise this can't keep at a table.
-                    Button(saveButtonTitle) { save() }
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(canSave ? Theme.accentText : Theme.faint)
-                        .disabled(!canSave || isSubmitting)
-                }
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") { dismissKeyboard() }
-                        .foregroundStyle(Theme.accentText)
-                        .fontWeight(.semibold)
-                }
-            }
-            .fullScreenCover(isPresented: $showScanner) {
-                ReceiptCaptureView(
-                    onCapture: { image in
-                        showScanner = false
-                        handleCapture(image)
-                    },
-                    busyMessage: nil,
-                    errorMessage: nil
-                )
-            }
-            .confirmationDialog(
-                "Photo parsing failed",
-                isPresented: $showPhotoRecovery,
-                titleVisibility: .visible
-            ) {
-                Button("Retry photo") { runPhotoRecovery(preference: .serverPhoto) }
-                Button("On server (text only)") { runPhotoRecovery(preference: .server) }
-                Button("Manual entry") { continueWithManualEntry() }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("The captured photo is kept only in this editor session while you choose how to continue.")
-            }
-            .sheet(isPresented: $showReceiptSettings) {
-                SettingsView()
-            }
-            .alert("Keep the receipt total?", isPresented: $showKeepMismatchConfirmation) {
-                Button("Cancel", role: .cancel) {}
-                Button("Keep receipt total") { draft.confirmKeepReceiptTotal() }
-            } message: {
-                Text("The item lines and total differ materially. Keep this total only after checking the receipt for missing or duplicated rows.")
-            }
-            .alert("Clear existing claims?", isPresented: $showClaimChangeConfirmation) {
-                Button("Cancel", role: .cancel) {
-                    pendingClaimClearIDs = []
-                }
-                Button("Save and clear claims", role: .destructive) {
-                    let ids = pendingClaimClearIDs
-                    pendingClaimClearIDs = []
-                    submitEdit(clearClaimsFor: ids)
-                }
-            } message: {
-                Text(claimChangeMessage)
-            }
         }
-        .task {
-            if canUseCreditCards { await loadCards() }
+        .fullScreenCover(isPresented: $showScanner) {
+            ReceiptCaptureView(
+                onCapture: { image in
+                    showScanner = false
+                    handleCapture(image)
+                },
+                busyMessage: nil,
+                errorMessage: nil
+            )
+        }
+        .confirmationDialog(
+            "Photo parsing failed",
+            isPresented: $showPhotoRecovery,
+            titleVisibility: .visible
+        ) {
+            Button("Retry photo") { runPhotoRecovery(preference: .serverPhoto) }
+            Button("On server (text only)") { runPhotoRecovery(preference: .server) }
+            Button("Manual entry") { continueWithManualEntry() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The captured photo is kept only in this editor session while you choose how to continue.")
+        }
+        .sheet(isPresented: $showReceiptSettings) {
+            SettingsView()
+        }
+        .sheet(item: $presentedEditor) { editor in
+            editorSheet(editor)
+        }
+        .alert("Keep the receipt total?", isPresented: $showKeepMismatchConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Keep receipt total") { draft.confirmKeepReceiptTotal() }
+        } message: {
+            Text("The item lines and total differ materially. Keep this total only after checking the receipt for missing or duplicated rows.")
+        }
+        .alert("Clear existing claims?", isPresented: $showClaimChangeConfirmation) {
+            Button("Cancel", role: .cancel) { pendingClaimClearIDs = [] }
+            Button("Save and clear claims", role: .destructive) {
+                let ids = pendingClaimClearIDs
+                pendingClaimClearIDs = []
+                submitEdit(clearClaimsFor: ids)
+            }
+        } message: {
+            Text(claimChangeMessage)
+        }
+        .alert("Discard this split?", isPresented: $showDiscardConfirmation) {
+            Button("Keep editing", role: .cancel) {}
+            Button("Discard", role: .destructive) { cancelFlow() }
+        } message: {
+            Text("Your receipt or split changes will be lost.")
+        }
+        .task(id: canUseCreditCards) {
+            if canUseCreditCards {
+                await loadCards()
+            } else {
+                cardLoadState = .idle
+            }
         }
         .onAppear { applyInitialDraftOnce() }
-        .onChange(of: canUseCreditCards) { _, _ in normalizeCardPaymentState() }
+        .onChange(of: canUseCreditCards) { _, enabled in
+            if !enabled { normalizeCardPaymentState() }
+        }
         .onDisappear { photoRecovery.clear() }
         .interactiveDismissDisabled(isScanning || isSubmitting)
     }
 
-    private var saveButtonTitle: String {
-        if isEditing { return "Save" }
-        return network.isOnline ? "Create" : "Save for later"
+    @ViewBuilder
+    private func guidedScreen(_ step: GuidedSplitStep) -> some View {
+        ZStack {
+            Theme.bg.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    SplitProgressRail(step: step)
+                    if let scanNotice, step == .setup {
+                        Text(scanNotice)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Theme.muted)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Theme.expense)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    stepView(step)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 32)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .disabled(isScanning || isSubmitting)
+
+            if isScanning { scanningOverlay }
+        }
+        .navigationTitle(title(for: step))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { navigationToolbar(for: step) }
     }
 
-    // MARK: - Scan
-
     @ViewBuilder
-    private var scanBanner: some View {
-        VStack(spacing: 10) {
-            Button {
-                scanNotice = nil
-                errorMessage = nil
-                showScanner = true
-            } label: {
-                HStack(spacing: 10) {
-                    if isScanning {
-                        ProgressView().tint(Theme.buttonInk)
-                    } else {
-                        Image(systemName: "doc.viewfinder").font(.system(size: 17, weight: .semibold))
-                    }
-                    Text(isScanning ? "Reading receipt…" : (hasScanned ? "Scan again" : "Scan receipt"))
-                        .font(.system(size: 16, weight: .semibold))
-                }
-                .foregroundStyle(Theme.buttonInk)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Theme.accent)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            }
-            .disabled(isScanning)
-            .accessibilityHint(isScanning ? "Receipt fields are locked until reading finishes." : "Opens the receipt scanner.")
+    private func stepView(_ step: GuidedSplitStep) -> some View {
+        switch step {
+        case .setup:
+            SplitSetupStepView(
+                draft: $draft,
+                totalCents: effectiveTotalCents,
+                cards: canUseCreditCards ? creditCards : [],
+                cardLoadState: canUseCreditCards ? cardLoadState : .idle,
+                validationIssue: validationIssue,
+                onEditReceipt: { presentedEditor = .receipt },
+                onEditPeople: { presentedEditor = .people },
+                onScanAgain: beginScan,
+                onOpenParserSettings: { showReceiptSettings = true },
+                onRetryCards: { Task { await loadCards() } },
+                onContinue: continueFromSetup
+            )
+        case .items:
+            SplitItemsStepView(
+                draft: $draft,
+                filter: $itemFilter,
+                validationIssue: validationIssue,
+                onEditItem: { presentedEditor = .item($0.id) },
+                onAddItem: { presentedEditor = .newItem(SplitDraft.Item()) },
+                onContinue: continueFromItems
+            )
+        case .confirm:
+            SplitConfirmStepView(
+                draft: $draft,
+                totalEdited: $totalEdited,
+                presentation: .init(draft: submissionDraft, totalEdited: totalEdited),
+                primaryAction: primaryAction,
+                validationIssue: validationIssue,
+                isSubmitting: isSubmitting,
+                onEditSetupValue: editSetupValue,
+                onEditMoney: { presentedEditor = .money($0) },
+                onKeepReceiptTotal: { showKeepMismatchConfirmation = true },
+                onUseCalculatedTotal: {
+                    draft.useCalculatedTotal()
+                    totalEdited = true
+                    validationIssue = nil
+                },
+                onSubmit: validateAndSave
+            )
+        }
+    }
 
-            if let scanNotice {
-                Text(scanNotice)
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.muted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+    @ToolbarContentBuilder
+    private func navigationToolbar(for step: GuidedSplitStep) -> some ToolbarContent {
+        if step == .setup, onBackToReview != nil {
+            ToolbarItemGroup(placement: .navigationBarLeading) {
+                Button("Back", action: backToReview)
+                Button("Cancel", action: requestCancel)
             }
-
-            if let legend = vm.scanPrivacyLegend {
-                Text(legend)
-                    .font(.system(size: 11))
-                    .foregroundStyle(Theme.faint)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        } else if step == .setup {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel", action: requestCancel)
             }
-
-            if scanNeedsReview {
-                Button("Receipt parsing settings") {
-                    showReceiptSettings = true
-                }
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Theme.accentText)
-                .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Cancel", action: requestCancel)
             }
         }
+    }
+
+    private var scanningOverlay: some View {
+        ZStack {
+            Theme.scrim.ignoresSafeArea()
+            VStack(spacing: 12) {
+                ProgressView().tint(Theme.buttonInk)
+                Text("Reading receipt…")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+                if let legend = vm.scanPrivacyLegend {
+                    Text(legend)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.muted)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .padding(24)
+            .background(Theme.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+    }
+
+    @ViewBuilder
+    private func editorSheet(_ editor: SplitPresentedEditor) -> some View {
+        switch editor {
+        case .receipt:
+            SplitReceiptDetailsSheet(merchant: draft.merchant, occurredAt: draft.occurredAt) { merchant, date in
+                draft.merchant = merchant
+                draft.occurredAt = date
+                validationIssue = nil
+            }
+        case .people:
+            SplitPeopleEditorSheet(participants: draft.participants) { participants in
+                draft.participants = participants
+                validationIssue = nil
+            }
+        case .item(let id):
+            if let item = draft.items.first(where: { $0.id == id }) {
+                SplitItemEditorSheet(
+                    item: item,
+                    onCommit: commitItem,
+                    onRemove: { removeItem(id) }
+                )
+            }
+        case .newItem(let item):
+            SplitItemEditorSheet(item: item) { committed in
+                draft.items.append(committed)
+                draft.mismatchAcknowledged = false
+                validationIssue = nil
+            }
+        case .money(let field):
+            SplitMoneyEditorSheet(
+                kind: field,
+                cents: cents(for: field),
+                tipBaseCents: tipBaseCents,
+                onCommit: { commitMoney($0, field: field) }
+            )
+        }
+    }
+
+    private func title(for step: GuidedSplitStep) -> String {
+        switch step {
+        case .setup: isEditing ? "Edit Bill Split" : "Split a Bill"
+        case .items: "Review Items"
+        case .confirm: "Confirm Split"
+        }
+    }
+
+    // MARK: - Navigation and validation
+
+    private func continueFromSetup() {
+        errorMessage = nil
+        if let issue = firstSetupIssue() {
+            validationIssue = issue
+            return
+        }
+        validationIssue = nil
+        path.append(GuidedSplitFlowPolicy.nextStep(splitMode: draft.splitMode))
+    }
+
+    private func continueFromItems() {
+        errorMessage = nil
+        if let issue = submissionIssue().map(issueOwnedByItsEditor), issue.step == .items {
+            validationIssue = issue
+            return
+        }
+        validationIssue = nil
+        path.append(.confirm)
+    }
+
+    private func validateAndSave() {
+        errorMessage = nil
+        normalizeCardPaymentState()
+        if let issue = submissionIssue().map(issueOwnedByItsEditor) {
+            present(issue)
+            return
+        }
+        save()
+    }
+
+    private func firstSetupIssue() -> GuidedSplitValidationIssue? {
+        if draft.merchant.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return .init(step: .setup, field: .merchant, message: "Add a merchant name.")
+        }
+        if draft.participants.isEmpty {
+            return .init(step: .setup, field: .payer, message: "Add at least one participant.")
+        }
+        if BillSplitPayerMode(persistedValue: draft.payer) == .unavailable {
+            return .init(step: .setup, field: .payer, message: "Choose who paid.")
+        }
+        if draft.paymentChannel == "credit_card", draft.creditCardId == nil {
+            return .init(step: .setup, field: .paymentMethod, message: "Select a credit card.")
+        }
+        return nil
+    }
+
+    private func submissionIssue() -> GuidedSplitValidationIssue? {
+        GuidedSplitFlowPolicy.firstIssue(
+            on: .confirm,
+            draft: submissionDraft,
+            totalEdited: totalEdited,
+            isEditing: isEditing,
+            isOnline: network.isOnline
+        )
+    }
+
+    private func issueOwnedByItsEditor(_ issue: GuidedSplitValidationIssue) -> GuidedSplitValidationIssue {
+        let step: GuidedSplitStep
+        switch issue.field {
+        case .merchant, .payer, .division, .paymentMethod:
+            step = .setup
+        case .items:
+            step = .items
+        case .total, .reconciliation, .onlineEdit:
+            step = .confirm
+        }
+        return .init(step: step, field: issue.field, message: issue.message)
+    }
+
+    private func present(_ issue: GuidedSplitValidationIssue) {
+        validationIssue = issue
+        switch issue.step {
+        case .setup:
+            path.removeAll()
+        case .items:
+            path = [.items]
+        case .confirm:
+            if path.last != .confirm { path.append(.confirm) }
+        }
+    }
+
+    private func editSetupValue(_ field: GuidedSplitField) {
+        validationIssue = nil
+        switch field {
+        case .total:
+            presentedEditor = .money(.total)
+        default:
+            path.removeAll()
+        }
+    }
+
+    private func backToReview() {
+        photoRecovery.clear()
+        onBackToReview?(draft, totalEdited)
+    }
+
+    private func requestCancel() {
+        guard initialSnapshot?.hasUnsavedChanges(
+            draft: draft,
+            totalEdited: totalEdited,
+            importedReceipt: scannerImportedReceipt
+        ) == true else {
+            cancelFlow()
+            return
+        }
+        showDiscardConfirmation = true
+    }
+
+    private func cancelFlow() {
+        photoRecovery.clear()
+        if let onCancelFlow { onCancelFlow() } else { dismiss() }
+    }
+
+    // MARK: - Editors
+
+    private func commitItem(_ item: SplitDraft.Item) {
+        guard let index = draft.items.firstIndex(where: { $0.id == item.id }) else { return }
+        draft.items[index] = item
+        draft.mismatchAcknowledged = false
+        validationIssue = nil
+    }
+
+    private func removeItem(_ id: UUID) {
+        draft.items.removeAll { $0.id == id }
+        if draft.items.isEmpty { draft.items = [SplitDraft.Item()] }
+        draft.mismatchAcknowledged = false
+        validationIssue = nil
+    }
+
+    private func cents(for field: SplitMoneyField) -> Int {
+        switch field {
+        case .total: effectiveTotalCents
+        case .tax: draft.taxCents
+        case .tip: draft.tipCents
+        case .fee: draft.feeCents
+        }
+    }
+
+    private func commitMoney(_ cents: Int, field: SplitMoneyField) {
+        switch field {
+        case .total:
+            draft.selectedTotalCents = cents
+            totalEdited = true
+        case .tax:
+            draft.taxCents = cents
+        case .tip:
+            if totalEdited {
+                draft.selectedTotalCents = TipPreset.retotal(
+                    selectedTotal: draft.selectedTotalCents,
+                    replacing: draft.tipCents,
+                    with: cents
+                )
+            }
+            draft.tipCents = cents
+        case .fee:
+            draft.feeCents = cents
+        }
+        draft.mismatchAcknowledged = false
+        validationIssue = nil
+    }
+
+    private var tipBaseCents: Int {
+        if draft.itemSubtotalCents > 0 { return draft.itemSubtotalCents + draft.taxCents }
+        return max(0, effectiveTotalCents - draft.tipCents)
+    }
+
+    // MARK: - Scan recovery
+
+    private func beginScan() {
+        scanNotice = nil
+        errorMessage = nil
+        showScanner = true
     }
 
     private func handleCapture(_ image: UIImage) {
@@ -366,8 +569,6 @@ struct SplitCreateSheet: View {
         scanNotice = "Enter the receipt items manually."
     }
 
-    /// Fills the form from a scan that already happened in the capture flow.
-    /// Guarded because `onAppear` fires again when the camera cover dismisses.
     private func applyInitialDraftOnce() {
         guard !hasInitialized else { return }
         hasInitialized = true
@@ -375,25 +576,21 @@ struct SplitCreateSheet: View {
         if let initialDraft {
             draft = initialDraft
             totalEdited = initialTotalEdited ?? true
-            hasScanned = true
         } else if let editingSplit {
             draft = SplitDraft(split: editingSplit)
             openedEditVersion = editingSplit.version
             totalEdited = true
-            hasScanned = true
         } else if let prefill {
             applyScan(prefill)
         } else if draft.participants.count == 1 {
-            // Preserve the existing two-person starting point without baking a
-            // UI preference into the reusable draft model.
             draft.participants.append(.init(id: nil, name: "", isOrganizer: false))
         }
         normalizeCardPaymentState()
+        initialSnapshot = GuidedSplitSubmissionSnapshot(draft: draft, totalEdited: totalEdited)
     }
 
     private func applyScan(_ parsed: ScannedReceipt) {
         photoRecovery.clear()
-        hasScanned = true
         if draft.merchant.trimmingCharacters(in: .whitespaces).isEmpty, let scanned = parsed.merchant {
             draft.merchant = scanned
         }
@@ -410,8 +607,6 @@ struct SplitCreateSheet: View {
         draft.tipCents = parsed.tipCents
         draft.scanWarnings = parsed.warnings
         draft.mismatchAcknowledged = false
-        // A printed total the lines don't reconstruct is normal (service charge,
-        // rounding). Keep it: the server shares the difference across the table.
         if parsed.totalCents > 0 {
             draft.selectedTotalCents = parsed.totalCents
             totalEdited = true
@@ -419,765 +614,57 @@ struct SplitCreateSheet: View {
             draft.selectedTotalCents = draft.calculatedTotalCents
             totalEdited = false
         }
-
-        let unverifiedCount = parsed.items.filter { $0.verification == .unverified }.count
-        scanNeedsReview = unverifiedCount > 0 || !parsed.warnings.isEmpty
-        var notes = ["Parsed \(parsed.parser.displayName.lowercased()). Check every line before you send this to anyone."]
-        if unverifiedCount > 0 {
-            notes.append("\(unverifiedCount) item\(unverifiedCount == 1 ? "" : "s") need\(unverifiedCount == 1 ? "s" : "") review.")
-        }
-        notes.append(contentsOf: parsed.warnings)
-        scanNotice = notes.joined(separator: " ")
+        scanNotice = nil
+        validationIssue = nil
     }
 
-    // MARK: - How the bill is being split
+    // MARK: - Cards
 
-    /// The two questions that decide everything else: who actually paid, and
-    /// whether the table wants to itemise. Both are asked here rather than after
-    /// the fact because they change what the ledger records, and because at a
-    /// table the answer is known before anybody starts tapping.
-    private var splitModeSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SectionEyebrow("How was it paid?")
-            payerChoices
-            SectionEyebrow("How should it be divided?")
-            SegmentedToggle(
-                selection: $draft.splitMode,
-                options: [
-                    ToggleOption(value: "by_item", label: "By item", icon: "list.bullet"),
-                    ToggleOption(value: "even", label: "Evenly", icon: "equal")
-                ]
-            )
-
-            FormCard {
-                HStack {
-                    Text("How many people")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Theme.ink)
-                    Spacer()
-                    Text("\(headcount)")
-                        .font(.system(size: 17, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(Theme.accentText)
-                        .frame(minWidth: 32, alignment: .trailing)
-                    Stepper("", value: headcountBinding, in: 1...50)
-                        .labelsHidden()
-                        .fixedSize()
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                if isEvenSplit {
-                    FormRowDivider()
-                    HStack {
-                        Text("Each pays")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Theme.ink)
-                        Spacer()
-                        Text(formatSplitMoney(evenShareCents))
-                            .font(.system(size: 20, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(Theme.accentText)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-                }
-            }
-            guestNamesCard
-
-            Text(splitModeExplanation)
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.faint)
-                .padding(.horizontal, 4)
-        }
-    }
-
-    private var payerChoices: some View {
-        VStack(spacing: 0) {
-            payerChoice(
-                value: "me",
-                title: "I paid it all",
-                detail: "Track what everyone owes you",
-                icon: "person.fill"
-            )
-            FormRowDivider()
-            payerChoice(
-                value: "each_own",
-                title: "Each paid their own",
-                detail: "No one needs to pay you back",
-                icon: "person.2.fill"
-            )
-        }
-        .background(Theme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Theme.line, lineWidth: 1)
-        )
-    }
-
-    private func payerChoice(value: String, title: String, detail: String, icon: String) -> some View {
-        let selected = draft.payer == value
-        return Button {
-            draft.payer = value
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(selected ? Theme.accentText : Theme.muted)
-                    .frame(width: 24)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Theme.ink)
-                    Text(detail)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.muted)
-                }
-                Spacer(minLength: 8)
-                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(selected ? Theme.accentText : Theme.faint)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 13)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-        .accessibilityValue(selected ? "Selected" : "Not selected")
-        .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-
-    /// Scan results are deliberately a calm summary. Signal attention is only
-    /// used for an unverified row or a material reconciliation mismatch.
-    @ViewBuilder
-    private var receiptReviewSection: some View {
-        if hasScanned {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionEyebrow("Review")
-                FormCard {
-                    reviewRow("Merchant", draft.merchant.isEmpty ? "Not found" : draft.merchant, attention: draft.merchant.isEmpty)
-                    FormRowDivider()
-                    reviewRow("Printed total", formatSplitMoney(draft.selectedTotalCents), attention: reconciliation.isMaterial)
-                    FormRowDivider()
-                    reviewRow("Date", draft.occurredAt.formatted(date: .abbreviated, time: .omitted))
-                    FormRowDivider()
-                    reviewRow("Payment method", paymentMethodLabel)
-                    FormRowDivider()
-                    reviewRow("Category", draft.categoryId == nil ? "Uncategorized" : "Selected")
-                    FormRowDivider()
-                    reviewRow("Parser confidence", parserConfidence, attention: !draft.unverifiedItems.isEmpty || !draft.scanWarnings.isEmpty)
-                }
-
-                if !draft.unverifiedItems.isEmpty {
-                    FormCard {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Label("Unverified rows", systemImage: "exclamationmark.triangle.fill")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(Theme.warning)
-                            ForEach(draft.unverifiedItems) { item in
-                                Text("• " + (item.name.isEmpty ? "Unnamed item" : item.name))
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(Theme.muted)
-                            }
-                        }
-                        .padding(14)
-                    }
-                }
-            }
-        }
-    }
-
-    private var paymentMethodLabel: String {
-        draft.paymentChannel == "credit_card" ? "Credit card" : "Cash / debit"
-    }
-
-    private var parserConfidence: String {
-        draft.unverifiedItems.isEmpty && draft.scanWarnings.isEmpty ? "High confidence" : "Needs attention"
-    }
-
-    private func reviewRow(_ label: String, _ value: String, attention: Bool = false) -> some View {
-        HStack {
-            Text(label)
-                .font(.system(size: 14))
-                .foregroundStyle(Theme.muted)
-            Spacer(minLength: 12)
-            Text(value)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(attention ? Theme.warning : Theme.ink)
-                .multilineTextAlignment(.trailing)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-    }
-
-    /// Optional names for the rest of the table.
-    ///
-    /// Left blank they become "Person 2", "Person 3" — the whole point of an even
-    /// split is not having to type anything. But a split you'll still be looking
-    /// at tomorrow is worth names, and typing one or two of them shouldn't mean
-    /// typing all of them, so every field here stands on its own.
-    @ViewBuilder
-    private var guestNamesCard: some View {
-        if headcount > 1 {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Who's at the table?")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Theme.muted)
-                    Text("optional")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Theme.faint)
-                }
-                .padding(.horizontal, 4)
-
-                FormCard {
-                    ForEach(0..<(headcount - 1), id: \.self) { index in
-                        if index > 0 { FormRowDivider() }
-                        HStack(spacing: 10) {
-                            Text("\(index + 2)")
-                                .font(.system(size: 13, design: .monospaced))
-                                .foregroundStyle(Theme.faint)
-                                .frame(width: 18, alignment: .leading)
-                            TextField(
-                                "",
-                                text: guestNameBinding(index),
-                                prompt: Text("Person \(index + 2)").foregroundStyle(Theme.faint)
-                            )
-                            .font(.system(size: 15))
-                            .foregroundStyle(Theme.ink)
-                            .focused($focusedField, equals: .guestName(index))
-                            .submitLabel(.next)
-                            .autocorrectionDisabled()
-                            .onSubmit {
-                                focusedField = index + 1 < headcount - 1
-                                    ? .guestName(index + 1)
-                                    : nil
-                            }
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 11)
-                    }
-                }
-            }
-        }
-    }
-
-    /// Reads and writes a sparse array, growing it only when something is typed,
-    /// so lowering the headcount and raising it again keeps the earlier names.
-    private func guestNameBinding(_ index: Int) -> Binding<String> {
-        Binding(
-            get: {
-                let guests = draft.participants.indices.filter { !draft.participants[$0].isOrganizer }
-                guard index < guests.count else { return "" }
-                return draft.participants[guests[index]].name
-            },
-            set: { newValue in
-                let guests = draft.participants.indices.filter { !draft.participants[$0].isOrganizer }
-                guard index < guests.count else { return }
-                draft.participants[guests[index]].name = newValue
-            }
-        )
-    }
-
-    private var headcountBinding: Binding<Int> {
-        Binding(
-            get: { headcount },
-            set: { newCount in
-                while draft.participants.count < newCount {
-                    draft.participants.append(.init(id: nil, name: "", isOrganizer: false))
-                }
-                while draft.participants.count > newCount,
-                      let lastGuest = draft.participants.lastIndex(where: { !$0.isOrganizer }) {
-                    draft.participants.remove(at: lastGuest)
-                }
-            }
-        )
-    }
-
-    /// Says what this combination will do to the ledger, in the same words the
-    /// ledger will end up using. Getting this wrong is somebody's money.
-    private var splitModeExplanation: String {
-        switch BillSplitPayerMode(persistedValue: draft.payer) {
-        case .eachOwn:
-            return isEvenSplit
-                ? "Everyone pays the restaurant directly. Only your own share is recorded as your expense, with no reimbursements."
-                : "Everyone pays the restaurant directly. Tap the items you had; only your own share is recorded as your expense."
-        case .unavailable:
-            return "Choose who paid before saving. This decides whether the split records reimbursements or individual shares."
-        case .organizerPaid:
-            return isEvenSplit
-                ? "The full bill is recorded as one expense. Each person you mark as paid back is recorded as income."
-                : "The full bill is recorded as one expense. People claim what they ordered, and each one you mark as paid back is recorded as income."
-        }
-    }
-
-    // MARK: - Items
-
-    private var itemsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                SectionEyebrow("Items")
-                Spacer()
-                Text(formatSplitMoney(subtotalCents))
-                    .font(.system(size: 13, design: .monospaced))
-                    .foregroundStyle(Theme.muted)
-            }
-
-            FormCard {
-                ForEach($draft.items) { $item in
-                    if item.id != draft.items.first?.id { FormRowDivider() }
-                    itemRow($item)
-                }
-            }
-
-            Button {
-                draft.items.append(SplitDraft.Item())
-            } label: {
-                Label("Add item", systemImage: "plus")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Theme.accentText)
-            }
-            .padding(.leading, 4)
-        }
-    }
-
-    private func itemRow(_ item: Binding<SplitDraft.Item>) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                TextField("", text: item.name, prompt: Text("Item").foregroundStyle(Theme.faint))
-                    .font(.system(size: 15))
-                    .foregroundStyle(Theme.ink)
-                    .focused($focusedField, equals: .itemName(item.wrappedValue.id))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                Menu {
-                    ForEach(1...20, id: \.self) { n in
-                        Button("\(n)×") {
-                            guard n != item.wrappedValue.quantity else { return }
-                            item.wrappedValue.quantity = n
-                            draft.mismatchAcknowledged = false
-                        }
-                    }
-                } label: {
-                    Text("\(item.wrappedValue.quantity)×")
-                        .font(.system(size: 13, design: .monospaced))
-                        .foregroundStyle(item.wrappedValue.quantity > 1 ? Theme.accentText : Theme.faint)
-                        .frame(width: 44, height: 44)
-                }
-
-                TextField(
-                    "",
-                    text: itemPriceBinding(item.wrappedValue.id),
-                    prompt: Text("0.00").foregroundStyle(Theme.faint)
-                )
-                    .font(.system(size: 15, design: .monospaced))
-                    .foregroundStyle(Theme.ink)
-                    .keyboardType(.decimalPad)
-                    .focused($focusedField, equals: .itemPrice(item.wrappedValue.id))
-                    .multilineTextAlignment(.trailing)
-                    .frame(width: 88)
-
-                Button {
-                    let remove = {
-                        draft.items.removeAll { $0.id == item.wrappedValue.id }
-                        if draft.items.isEmpty { draft.items = [SplitDraft.Item()] }
-                        draft.mismatchAcknowledged = false
-                    }
-                    if reduceMotion { remove() }
-                    else { withAnimation(.easeOut(duration: 0.15)) { remove() } }
-                } label: {
-                    Image(systemName: "minus.circle")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Theme.faint)
-                        .frame(width: 44, height: 44)
-                }
-            }
-            Menu {
-                Button("Claim individual units") {
-                    guard item.wrappedValue.allocationMode != "units" else { return }
-                    item.wrappedValue.allocationMode = "units"
-                }
-                Button("Share the whole item") {
-                    guard item.wrappedValue.allocationMode != "shared" else { return }
-                    item.wrappedValue.allocationMode = "shared"
-                }
-            } label: {
-                Label(
-                    item.wrappedValue.allocationMode == "units" ? "Individual units" : "Shared item",
-                    systemImage: item.wrappedValue.allocationMode == "units" ? "square.stack.3d.up" : "person.2"
-                )
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Theme.muted)
-                .frame(minHeight: 44)
-            }
-            if item.wrappedValue.verification == .unverified {
-                Label("Unverified receipt row — check its name, quantity, and price", systemImage: "exclamationmark.triangle.fill")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Theme.warning)
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-    }
-
-    private func itemPriceBinding(_ id: UUID) -> Binding<String> {
-        Binding(
-            get: {
-                guard let item = draft.items.first(where: { $0.id == id }) else { return "" }
-                return item.unitPriceCents > 0 ? textFromCents(item.unitPriceCents) : ""
-            },
-            set: { value in
-                guard let index = draft.items.firstIndex(where: { $0.id == id }) else { return }
-                let newValue = centsFromText(value)
-                if draft.items[index].unitPriceCents != newValue {
-                    draft.items[index].unitPriceCents = newValue
-                    draft.mismatchAcknowledged = false
-                }
-            }
-        )
-    }
-
-    // MARK: - Extras + total
-
-    private var extrasSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SectionEyebrow("Tax, tip & total")
-            if !isEditing && !hasScanned || isEvenSplit || totalEdited {
-                HeroAmountField(
-                    amountText: totalAmountBinding,
-                    tint: Theme.accentText,
-                    focus: $totalAmountFocused
-                )
-            }
-            FormCard {
-                moneyRow(label: "Tax", text: moneyBinding(\.taxCents), field: .tax)
-                FormRowDivider()
-                moneyRow(label: "Tip", text: moneyBinding(\.tipCents), field: .tip)
-                if tipBaseCents > 0 {
-                    tipShortcuts
-                }
-                FormRowDivider()
-                moneyRow(label: "Fee", text: moneyBinding(\.feeCents), field: .fee)
-                if !isEvenSplit && !totalEdited {
-                    FormRowDivider()
-                    HStack {
-                        Text("Total")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Theme.ink)
-                        Spacer()
-                        Text(textFromCents(derivedTotalCents))
-                            .font(.system(size: 17, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(Theme.ink)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-                }
-            }
-
-            if totalEdited, effectiveTotalCents != derivedTotalCents {
-                Text(totalMismatchNote)
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.muted)
-                    .padding(.horizontal, 4)
-            }
-            reconciliationReview
-        }
-    }
-
-    @ViewBuilder
-    private var reconciliationReview: some View {
-        if reconciliation.isMaterial {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionEyebrow("Check the receipt")
-                FormCard {
-                    reconciliationRow("Item subtotal", reconciliation.itemSubtotalCents)
-                    FormRowDivider()
-                    reconciliationRow("Calculated total", reconciliation.calculatedTotalCents)
-                    FormRowDivider()
-                    reconciliationRow("Receipt total", reconciliation.selectedTotalCents)
-                    FormRowDivider()
-                    reconciliationRow("Difference", reconciliation.differenceCents, signed: true)
-                }
-
-                if !draft.unverifiedItems.isEmpty {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Unverified rows")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Theme.warning)
-                        ForEach(draft.unverifiedItems) { item in
-                            Text("• \(item.name)")
-                                .font(.system(size: 12))
-                                .foregroundStyle(Theme.muted)
-                        }
-                    }
-                    .padding(.horizontal, 4)
-                }
-
-                HStack(spacing: 10) {
-                    Button("Keep receipt total") { showKeepMismatchConfirmation = true }
-                        .buttonStyle(.bordered)
-                        .tint(draft.mismatchAcknowledged ? Theme.income : Theme.warning)
-                    Button("Use calculated total") {
-                        draft.useCalculatedTotal()
-                        totalEdited = true
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.accent)
-                    .foregroundStyle(Theme.buttonInk)
-                }
-                .font(.system(size: 13, weight: .semibold))
-
-                if draft.mismatchAcknowledged {
-                    Text("Receipt total confirmed.")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Theme.income)
-                }
-            }
-        }
-    }
-
-    private func reconciliationRow(_ label: String, _ cents: Int, signed: Bool = false) -> some View {
-        HStack {
-            Text(label).foregroundStyle(Theme.muted)
-            Spacer()
-            Text(signed && cents > 0 ? "+\(formatSplitMoney(cents))" : formatSplitMoney(cents))
-                .font(.system(size: 13, design: .monospaced))
-                .foregroundStyle(signed ? Theme.warning : Theme.ink)
-        }
-        .font(.system(size: 13))
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-    }
-
-    // MARK: - Tip shortcuts
-
-    /// Most receipts here print a suggested tip that isn't part of the total, or
-    /// print none at all — and `ReceiptReconciler` deliberately strips a printed
-    /// `PROPINA SUGERIDA` back out, because it was a suggestion nobody was
-    /// billed for. That leaves the organizer doing percentage arithmetic at a
-    /// table, which is the one moment they have least patience for it.
-    private var tipShortcuts: some View {
-        HStack(spacing: 8) {
-            ForEach(TipPreset.values, id: \.self) { percent in
-                tipChip(percent)
-            }
-            Spacer(minLength: 0)
-            Text(formatSplitMoney(tipBaseCents))
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(Theme.faint)
-        }
-        .padding(.horizontal, 14)
-        .padding(.bottom, 11)
-    }
-
-    private func tipChip(_ percent: Int) -> some View {
-        let isActive = activeTipPercent == percent
-        return Button {
-            // Tapping the active one clears it — the obvious way to undo, and
-            // otherwise there's no route back to no tip except the keyboard.
-            applyTip(percent: isActive ? nil : percent)
-        } label: {
-            Text("\(percent)%")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(isActive ? Theme.buttonInk : Theme.muted)
-                .padding(.horizontal, 12)
-                .frame(minHeight: 44)
-                .background(isActive ? Theme.accent : Theme.surface2)
-                .clipShape(Capsule())
-        }
-        .buttonStyle(.plain)
-    }
-
-    /// What the percentage is taken on: the bill before any tip.
-    ///
-    /// Mexican prices already include IVA, so after reconciliation `taxCents` is
-    /// usually zero and this is simply the items — which is what a `propina` is
-    /// customarily figured on. On a receipt that really does add tax on top,
-    /// including it gives the post-tax base instead. Falls back to the typed
-    /// total for an even split, where there are no lines to add up.
-    private var tipBaseCents: Int {
-        if subtotalCents > 0 { return subtotalCents + draft.taxCents }
-        return max(0, effectiveTotalCents - draft.tipCents)
-    }
-
-    /// The percentage currently in the tip field, if it is one of the presets.
-    private var activeTipPercent: Int? {
-        TipPreset.activePercent(base: tipBaseCents, tipCents: draft.tipCents)
-    }
-
-    private func tipCents(percent: Int) -> Int {
-        TipPreset.cents(base: tipBaseCents, percent: percent)
-    }
-
-    /// Sets the tip, and moves the total with it.
-    ///
-    /// A scanned receipt sets the total by hand (`totalEdited`), and from then
-    /// on the total stops tracking the lines. Without adjusting it here, adding
-    /// a tip would leave the total untouched — the tip would be swallowed, the
-    /// mismatch warning would fire, and the table would under-pay by exactly the
-    /// tip. Swapping the old tip out and the new one in also makes 10% → 15%
-    /// mean what it looks like rather than compounding.
-    private func applyTip(percent: Int?) {
-        let newTip = percent.map { tipCents(percent: $0) } ?? 0
-        if totalEdited {
-            draft.selectedTotalCents = TipPreset.retotal(
-                selectedTotal: draft.selectedTotalCents,
-                replacing: draft.tipCents,
-                with: newTip
-            )
-        }
-        draft.tipCents = newTip
-        draft.mismatchAcknowledged = false
-    }
-
-    /// The lines and the total disagreeing is worth saying plainly, and the two
-    /// directions need different fixes: short means a line was missed, over means
-    /// one was counted twice.
-    private var totalMismatchNote: String {
-        let gap = abs(effectiveTotalCents - derivedTotalCents)
-        if effectiveTotalCents > derivedTotalCents {
-            return "\(formatSplitMoney(gap)) of the total isn't in the lines above — check whether the scan missed a line. Whatever is left over is shared across the table in proportion to what everyone ordered."
-        }
-        return "The lines above add up to \(formatSplitMoney(gap)) more than the total. Check for a line that was counted twice."
-    }
-
-    private func moneyRow(label: String, text: Binding<String>, field: Field) -> some View {
-        HStack {
-            Text(label)
-                .font(.system(size: 15))
-                .foregroundStyle(Theme.ink)
-            Spacer()
-            TextField("", text: text, prompt: Text("0.00").foregroundStyle(Theme.faint))
-                .font(.system(size: 15, design: .monospaced))
-                .foregroundStyle(Theme.ink)
-                .keyboardType(.decimalPad)
-                .focused($focusedField, equals: field)
-                .multilineTextAlignment(.trailing)
-                .frame(width: 110)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
-    }
-
-    private func moneyBinding(_ keyPath: WritableKeyPath<SplitDraft, Int>) -> Binding<String> {
-        Binding(
-            get: {
-                let cents = draft[keyPath: keyPath]
-                return cents > 0 ? textFromCents(cents) : ""
-            },
-            set: {
-                draft[keyPath: keyPath] = centsFromText($0)
-                draft.mismatchAcknowledged = false
-            }
-        )
-    }
-
-    private var totalAmountBinding: Binding<String> {
-        Binding(
-            get: {
-                let cents = totalEdited ? draft.selectedTotalCents : derivedTotalCents
-                return cents > 0 ? textFromCents(cents) : ""
-            },
-            set: {
-                draft.selectedTotalCents = centsFromText($0)
-                draft.mismatchAcknowledged = false
-                totalEdited = true
-            }
-        )
-    }
-
-    // MARK: - Payment
-
-    private var paymentSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SectionEyebrow("You paid with")
-            SegmentedToggle(selection: $draft.paymentChannel, options: paymentOptions)
-            if draft.paymentChannel == "credit_card", canUseCreditCards {
-                SignalNativeFormRow {
-                    Menu {
-                        ForEach(creditCards) { card in
-                            Button(card.label) { draft.creditCardId = card.id }
-                        }
-                    } label: {
-                        HStack(spacing: 8) {
-                            Text("Card")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(Theme.muted)
-                            Spacer(minLength: 16)
-                            Text(creditCards.first { $0.id == draft.creditCardId }?.label ?? "Select")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(draft.creditCardId == nil ? Theme.faint : Theme.ink)
-                            Image(systemName: "chevron.up.chevron.down")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(Theme.faint)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private var dateRow: some View {
-        SignalNativeFormRow {
-            DatePicker("Date", selection: $draft.occurredAt, displayedComponents: .date)
-        }
-    }
-
-    private var paymentOptions: [ToggleOption] {
-        var options = [ToggleOption(value: "cash", label: "Cash / debit", icon: "banknote")]
-        if canUseCreditCards {
-            options.append(ToggleOption(value: "credit_card", label: "Credit card", icon: "creditcard"))
-        }
-        return options
-    }
-
-    // MARK: - Actions
-
-    private func dismissKeyboard() {
-        merchantFocused = false
-        focusedField = nil
-        totalAmountFocused = false
-    }
-
-    /// Cache first, network second.
-    ///
-    /// Without the cached list an offline split can only ever be recorded as
-    /// cash — `canSave` blocks "credit card" until a card is picked — and that
-    /// is a wrong ledger row, not a cosmetic gap: `paymentChannel` and
-    /// `creditCardId` decide what the expense the server writes looks like.
     private func loadCards() async {
-        guard canUseCreditCards else { return }
+        guard canUseCreditCards else {
+            cardLoadState = .idle
+            return
+        }
         creditCards = OfflineSessionCache.creditCards(workspaceId: workspaceId)
             .filter { !$0.isArchived }
-        guard let resp: CreditCardsResponse = try? await APIClient.shared.fetch(
-            Endpoints.creditCards(workspaceId)
-        ) else { return }
-        OfflineSessionCache.saveCreditCards(resp.creditCards, workspaceId: workspaceId)
-        creditCards = resp.creditCards.filter { !$0.isArchived }
+        cardLoadState = .refreshing
+        do {
+            let response: CreditCardsResponse = try await APIClient.shared.fetch(
+                Endpoints.creditCards(workspaceId)
+            )
+            OfflineSessionCache.saveCreditCards(response.creditCards, workspaceId: workspaceId)
+            creditCards = response.creditCards.filter { !$0.isArchived }
+            cardLoadState = .idle
+        } catch {
+            if error is CancellationError { return }
+            cardLoadState = .failed(error.localizedDescription)
+        }
     }
 
-    /// A feature can be revoked while this sheet is open. Normalize stale
-    /// card state before it can reach either a create or edit request.
     private func normalizeCardPaymentState() {
         guard !canUseCreditCards else { return }
         draft.paymentChannel = "cash"
         draft.creditCardId = nil
         creditCards = []
+        cardLoadState = .idle
     }
+
+    // MARK: - Submission
 
     private func save() {
         normalizeCardPaymentState()
-        let bodyDraft = submissionDraft
-        if bodyDraft.reconciliation.requiresDecision {
-            errorMessage = "Choose whether to keep the receipt total or use the calculated total."
+        guard canSave else {
+            if let issue = submissionIssue().map(issueOwnedByItsEditor) { present(issue) }
             return
         }
+        let bodyDraft = submissionDraft
 
         if let editingSplit {
             guard network.isOnline else {
                 errorMessage = "Editing needs an internet connection."
                 return
             }
-            guard let openedEditVersion else {
+            guard openedEditVersion != nil else {
                 errorMessage = "Reload this split before editing."
                 return
             }
@@ -1200,9 +687,6 @@ struct SplitCreateSheet: View {
         let body = bodyDraft.makeCreateBody()
         Task {
             defer { isSubmitting = false }
-            // Written to disk before a single byte goes out, so a split can't be
-            // lost to a dropped connection or to the app being killed
-            // mid-request. Online, it usually comes straight back as `.created`.
             let entry = queue.makeEntry(userId: userId, workspaceId: workspaceId, body: body)
             let outcome = await queue.save(entry)
             switch outcome {
@@ -1210,8 +694,6 @@ struct SplitCreateSheet: View {
                 onSaved(outcome)
                 if dismissOnSave { dismiss() }
             case .rejected(let message):
-                // The server looked at this and said no. Stay open with every
-                // field intact so it can be fixed — exactly as before.
                 errorMessage = message
             }
         }
@@ -1252,19 +734,4 @@ struct SplitCreateSheet: View {
             }
         }
     }
-
-}
-
-// MARK: - Money text helpers
-
-/// "12.50" → 1250. Tolerates a comma decimal separator and stray currency text.
-func centsFromText(_ raw: String) -> Int {
-    let cleaned = raw.replacingOccurrences(of: ",", with: ".")
-        .filter { $0.isNumber || $0 == "." }
-    guard let value = Double(cleaned) else { return 0 }
-    return Int((value * 100).rounded())
-}
-
-func textFromCents(_ cents: Int) -> String {
-    String(format: "%.2f", Double(cents) / 100.0)
 }

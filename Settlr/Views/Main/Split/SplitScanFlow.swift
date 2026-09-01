@@ -115,6 +115,7 @@ struct SplitScanFlow: View {
                 onSaved(outcome)
                 stage = .result
             case .queued:
+                resultSplit = nil
                 queuedResult = true
                 onSaved(outcome)
                 stage = .result
