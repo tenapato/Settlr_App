@@ -3,6 +3,12 @@
 set -eu
 
 html="docs/app-store-assets/app-store-screenshots.html"
+expected_width=1284
+expected_height=2778
+
+rg -q 'content="width=1284,height=2778,initial-scale=1"' "$html"
+rg -q 'html, body \{ width: 1284px; height: 2778px;' "$html"
+rg -q '\.canvas \{ position: relative; width: 1284px; height: 2778px;' "$html"
 
 test "$(rg -o 'class="screen iphone-device"' "$html" | wc -l | tr -d ' ')" = "5"
 test "$(rg -o 'class="app-screen' "$html" | wc -l | tr -d ' ')" = "5"
@@ -70,5 +76,17 @@ if rg -q 'captures/|validate-app-store-captures' docs/app-store-assets/README.md
   echo "Screenshot-input instructions remain in the App Store asset README." >&2
   exit 1
 fi
+
+if rg -q '1320|2868' "$html" docs/app-store-assets/README.md; then
+  echo "Obsolete 6.9-inch dimensions remain in the export pipeline." >&2
+  exit 1
+fi
+
+for image in docs/app-store-assets/0[1-5]-*.jpg docs/app-store-assets/0[1-5]-*.png; do
+  width="$(sips -g pixelWidth "$image" | awk '/pixelWidth/{print $2}')"
+  height="$(sips -g pixelHeight "$image" | awk '/pixelHeight/{print $2}')"
+  test "$width" = "$expected_width"
+  test "$height" = "$expected_height"
+done
 
 echo "App Store device-frame checks passed."
