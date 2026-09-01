@@ -22,9 +22,6 @@ struct DashboardView: View {
                         )
                         .padding(.horizontal, 20)
 
-                        MonthPickerRow(selectedMonth: $vm.selectedMonth)
-                            .padding(.horizontal, 20)
-
                         dashboardState
 
                         Spacer().frame(height: 92)
@@ -83,6 +80,7 @@ struct DashboardView: View {
                     summary: summary,
                     previousSummary: vm.previousSummary,
                     months: annualVM.months,
+                    selectedMonth: $vm.selectedMonth,
                     onOpenCategories: onOpenCategories
                 )
 
@@ -117,13 +115,13 @@ private struct DashboardWorkspaceHeader: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 SectionEyebrow("WORKSPACE", color: Theme.faint)
                 Text(name)
-                    .font(.largeTitle.bold())
+                    .font(.headline)
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                    .minimumScaleFactor(0.8)
             }
 
             Button(action: onSwitchWorkspace) {
@@ -149,14 +147,15 @@ private struct DashboardContent: View {
     let summary: SummaryResponse
     let previousSummary: SummaryResponse?
     let months: [MonthDataPoint]
+    @Binding var selectedMonth: String
     let onOpenCategories: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 28) {
-            AvailableBalanceHero(summary: summary)
+        VStack(alignment: .leading, spacing: 24) {
+            AvailableBalanceHero(summary: summary, selectedMonth: $selectedMonth)
                 .padding(.horizontal, 20)
 
-            FlowSummary(summary: summary)
+            MoneyFlowTrace(summary: summary)
                 .padding(.horizontal, 20)
 
             SpendingInsightsTicker(
@@ -166,10 +165,7 @@ private struct DashboardContent: View {
                 onTap: onOpenCategories
             )
 
-            SpendingBreakdownCard(summary: summary)
-                .padding(.horizontal, 20)
-
-            RecentActivityPreview(summary: summary)
+            MonthMovementCount(summary: summary)
                 .padding(.horizontal, 20)
         }
     }
@@ -177,17 +173,21 @@ private struct DashboardContent: View {
 
 private struct AvailableBalanceHero: View {
     let summary: SummaryResponse
-    @ScaledMetric(relativeTo: .largeTitle) private var amountSize: CGFloat = 44
+    @Binding var selectedMonth: String
+    @ScaledMetric(relativeTo: .largeTitle) private var amountSize: CGFloat = 48
 
     private var isPositive: Bool { summary.availableCents >= 0 }
-    private var amountColor: Color { isPositive ? Theme.accentText : Theme.expense }
+    private var amountColor: Color { isPositive ? Theme.ink : Theme.expense }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 9) {
+            MonthPickerRow(selectedMonth: $selectedMonth)
+                .padding(.horizontal, -12)
+
             SectionEyebrow("AVAILABLE THIS MONTH")
             AmountLabel(
                 cents: summary.availableCents,
-                font: .system(size: amountSize, weight: .bold, design: .rounded)
+                font: .system(size: amountSize, weight: .bold)
             )
             .foregroundStyle(amountColor)
             .contentTransition(.numericText(countsDown: summary.availableCents < 0))
@@ -196,7 +196,7 @@ private struct AvailableBalanceHero: View {
 
             HStack(spacing: 7) {
                 Circle()
-                    .fill(amountColor)
+                    .fill(isPositive ? Theme.accent : Theme.expense)
                     .frame(width: 6, height: 6)
                 Text(isPositive ? "After savings" : "Below zero after savings")
                     .font(.subheadline.weight(.medium))
@@ -207,95 +207,124 @@ private struct AvailableBalanceHero: View {
     }
 }
 
-// MARK: - Income, spending, and saved summary
+// MARK: - Monthly money flow
 
-private struct FlowSummary: View {
+private struct MoneyFlowTrace: View {
     let summary: SummaryResponse
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Monthly movement")
-                .font(.headline)
-                .foregroundStyle(Theme.ink)
-
-            HStack(spacing: 0) {
-                SummaryMetric(label: "Income", cents: summary.incomeCents, color: Theme.income)
-                summaryDivider
-                SummaryMetric(label: "Spending", cents: summary.expenseCents, color: Theme.expense)
-                summaryDivider
-                SummaryMetric(label: "Saved", cents: summary.savingsNetCents, color: Theme.accentText)
-            }
-            .padding(.vertical, 14)
-            .overlay(alignment: .top) { Rectangle().fill(Theme.line).frame(height: 1) }
-            .overlay(alignment: .bottom) { Rectangle().fill(Theme.line).frame(height: 1) }
-        }
+    private var presentation: DashboardMoneyFlowPresentation {
+        DashboardMoneyFlowPresentation(summary: summary)
     }
 
-    private var summaryDivider: some View {
-        Rectangle()
-            .fill(Theme.line)
-            .frame(width: 1, height: 36)
-    }
-}
-
-private struct SummaryMetric: View {
-    let label: String
-    let cents: Int
-    let color: Color
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(label)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(Theme.muted)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-            AmountLabel(cents: cents, font: .subheadline.weight(.semibold))
-                .foregroundStyle(color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.55)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 8)
-    }
-}
+        VStack(alignment: .leading, spacing: 0) {
+            SectionEyebrow("MONEY FLOW")
+                .padding(.bottom, 10)
 
-// MARK: - Compact recent activity
+            ForEach(Array(presentation.entries.enumerated()), id: \.offset) { index, entry in
+                HStack(spacing: 10) {
+                    flowTrace(entry: entry, isLast: index == presentation.entries.count - 1)
 
-private struct RecentActivityPreview: View {
-    let summary: SummaryResponse
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title(for: entry))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Theme.ink)
+                        Text(subtitle(for: entry.kind))
+                            .font(.caption2)
+                            .foregroundStyle(Theme.faint)
+                    }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Recent activity")
-                    .font(.headline)
-                    .foregroundStyle(Theme.ink)
-                Spacer()
-                Text("This month")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(Theme.faint)
-            }
-
-            HStack(spacing: 12) {
-                Image(systemName: "arrow.up.arrow.down")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Theme.accentText)
-                    .frame(width: 36, height: 36)
-                    .background(Circle().fill(Theme.surface2))
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(summary.transactionCount == 0 ? "No transactions yet" : "\(summary.transactionCount) transactions")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.ink)
-                    Text("\(summary.incomeCount) income · \(summary.expenseCount) spending")
-                        .font(.footnote)
-                        .foregroundStyle(Theme.muted)
+                    Spacer(minLength: 10)
+                    signedAmount(entry.signedCents, color: color(for: entry))
                 }
-                Spacer(minLength: 0)
+                .frame(minHeight: 44)
             }
-            .frame(minHeight: 52)
         }
+        .padding(.vertical, 14)
+        .overlay(alignment: .top) { Rectangle().fill(Theme.line).frame(height: 1) }
+        .overlay(alignment: .bottom) { Rectangle().fill(Theme.line).frame(height: 1) }
+    }
+
+    private func flowTrace(
+        entry: DashboardMoneyFlowPresentation.Entry,
+        isLast: Bool
+    ) -> some View {
+        VStack(spacing: 2) {
+            Circle()
+                .fill(Theme.bg)
+                .overlay(Circle().strokeBorder(color(for: entry), lineWidth: 2))
+                .frame(width: 8, height: 8)
+            if !isLast {
+                Rectangle()
+                    .fill(Theme.line)
+                    .frame(width: 1)
+                    .frame(maxHeight: .infinity)
+            }
+        }
+        .frame(width: 8)
+        .frame(minHeight: 44)
+    }
+
+    private func signedAmount(_ cents: Int, color: Color) -> some View {
+        HStack(spacing: 2) {
+            if cents != 0 {
+                Text(cents > 0 ? "+" : "−")
+            }
+            AmountLabel(
+                cents: abs(cents),
+                font: .subheadline.weight(.semibold),
+                positive: cents > 0
+            )
+        }
+        .foregroundStyle(color)
+        .lineLimit(1)
+        .minimumScaleFactor(0.65)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func title(for entry: DashboardMoneyFlowPresentation.Entry) -> String {
+        switch entry.kind {
+        case .income: "Came in"
+        case .spending: "Went out"
+        case .savings: entry.signedCents > 0 ? "Moved back" : "Moved aside"
+        }
+    }
+
+    private func subtitle(for kind: DashboardMoneyFlowPresentation.Kind) -> String {
+        switch kind {
+        case .income: "Income"
+        case .spending: "Spending"
+        case .savings: "Savings"
+        }
+    }
+
+    private func color(for entry: DashboardMoneyFlowPresentation.Entry) -> Color {
+        switch entry.kind {
+        case .income: Theme.income
+        case .spending: Theme.expense
+        case .savings: entry.signedCents > 0 ? Theme.income : Theme.accentText
+        }
+    }
+}
+
+private struct MonthMovementCount: View {
+    let summary: SummaryResponse
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("\(summary.transactionCount) movements")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Theme.ink)
+            Text("this month")
+                .font(.caption)
+                .foregroundStyle(Theme.muted)
+            Spacer(minLength: 8)
+            Text("\(summary.expenseCount) out · \(summary.incomeCount) in")
+                .font(.caption)
+                .foregroundStyle(Theme.faint)
+                .monospacedDigit()
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 

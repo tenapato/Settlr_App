@@ -53,6 +53,30 @@ struct SummaryResponse: Decodable {
     }
 }
 
+/// Converts summary totals into their direction through the user's available
+/// money. Income and savings withdrawals flow in; spending and deposits flow
+/// out. The server values remain untouched.
+struct DashboardMoneyFlowPresentation {
+    enum Kind: Equatable {
+        case income, spending, savings
+    }
+
+    struct Entry: Equatable {
+        let kind: Kind
+        let signedCents: Int
+    }
+
+    let entries: [Entry]
+
+    init(summary: SummaryResponse) {
+        entries = [
+            Entry(kind: .income, signedCents: summary.incomeCents),
+            Entry(kind: .spending, signedCents: -summary.expenseCents),
+            Entry(kind: .savings, signedCents: -summary.savingsNetCents),
+        ]
+    }
+}
+
 struct CategorySummary: Decodable, Identifiable {
     let categoryId: String?
     let categoryName: String?

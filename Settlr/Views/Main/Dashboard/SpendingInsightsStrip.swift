@@ -667,38 +667,66 @@ struct SpendingInsightsTicker: View {
     let months: [MonthDataPoint]
     var onTap: () -> Void = {}
 
-    @State private var appeared = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     private var insights: [SpendingInsight] {
         SpendingInsights.build(current: summary, previous: previous, months: months)
+    }
+
+    private var tickerInsights: [SpendingInsight] {
+        let secondary = Array(insights.dropFirst())
+        return secondary.isEmpty ? insights : secondary
     }
 
     var body: some View {
         if summary.expenseCents == 0 || summary.sortedCategories.isEmpty {
             EmptyView()
-        } else {
-            InsightTicker(insights: insights, onTap: onTap)
-                .padding(.horizontal, 24)
-                .opacity(reduceMotion || appeared ? 1 : 0)
-                .offset(y: reduceMotion || appeared ? 0 : 12)
-                .animation(
-                    reduceMotion ? nil : .spring(response: 0.6, dampingFraction: 0.8).delay(0.15),
-                    value: appeared
-                )
-                .onAppear { reveal() }
-                .onChange(of: summary.expenseCents) { _, _ in
-                    appeared = false
-                    reveal()
+        } else if let primary = insights.first {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    SectionEyebrow("THIS MONTH'S SIGNAL")
+                    Spacer()
+                    Text("Swipe for more")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.faint)
                 }
-        }
-    }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 9)
 
-    private func reveal() {
-        if reduceMotion { appeared = true }
-        else {
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.15)) {
-                appeared = true
+                Button(action: onTap) {
+                    HStack(alignment: .bottom, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("\(primary.title) leads spending")
+                                .font(.title3.weight(.bold))
+                                .foregroundStyle(Theme.ink)
+                                .lineLimit(2)
+                            if let detail = primary.detail {
+                                Text(detail)
+                                    .font(.caption)
+                                    .foregroundStyle(Theme.muted)
+                            }
+                        }
+                        Spacer(minLength: 8)
+                        Text(primary.value)
+                            .font(.system(size: 34, weight: .bold))
+                            .monospacedDigit()
+                            .foregroundStyle(primary.tone.color)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.65)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 14)
+
+                InsightTicker(insights: tickerInsights, onTap: onTap)
+                    .padding(.horizontal, 20)
+                    .overlay(alignment: .top) {
+                        Rectangle().fill(Theme.line).frame(height: 1)
+                    }
+                    .overlay(alignment: .bottom) {
+                        Rectangle().fill(Theme.line).frame(height: 1)
+                    }
             }
         }
     }
