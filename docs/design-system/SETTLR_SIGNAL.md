@@ -225,7 +225,7 @@ Each step has one coordinator-owned bottom action, inset above the home indicato
 - Items: `Check total`.
 - Confirm: `Create split`, `Save changes`, or `Save on this phone` when offline.
 
-The label stays visible while the action is available. A tap validates the step and focuses the first actionable problem; the action is disabled only while scanning or submitting. Missing input is explained inline rather than represented by a permanently disabled navigation control.
+The label stays visible while the action is available. A tap validates the step and moves VoiceOver focus to the first actionable problem through the production `AccessibilityFocusState` binding; the action is disabled while scanning, submitting, or when an edit has been put behind the stale-version retry gate (`editRetryBlocked`) until the editor is reopened. Missing input is explained inline rather than represented by a permanently disabled navigation control.
 
 ### Setup
 
@@ -237,7 +237,7 @@ Setup contains the compact receipt header followed by decisions that define acco
 
 Items is only for by-item splits. Its summary gives item count, participant count, and item subtotal. The compact filter offers `Needs review` when unverified lines exist and `All`; creation does not expose the post-creation Unassigned claim filter.
 
-The dense item row contains name, line amount, quantity only when greater than one, allocation (`Shared` or `By units`), and a compact `Needs review` warning when parser verification is unavailable. Tapping a row opens `SplitItemEditorSheet`, with native fields for name, quantity, unit price, allocation, and `Remove item`. `Add item` opens the same sheet with an empty item. Decimal entry supplies a keyboard `Done` action. Removing an item that could clear edit-time claims requires destructive confirmation.
+The dense item row contains name, line amount, quantity only when greater than one, allocation (`Shared` or `By units`), and a compact `Needs review` warning when parser verification is unavailable. Tapping a row opens `SplitItemEditorSheet`, with native fields for name, quantity, unit price, allocation, and `Remove item`. `Add item` opens the same sheet with an empty item. Decimal entry supplies a keyboard `Done` action. Removing an item that could clear edit-time claims is applied in the draft immediately; the `Clear existing claims?` destructive confirmation occurs at save time, immediately before the edit request is sent.
 
 Unverified lines are evidence warnings, not blocking validation. They warn but do not block creation by themselves because the parser model does not claim a separate verified-by-user state. Priced-line and payer/payment rules still apply when Confirm validates the draft.
 
@@ -245,7 +245,7 @@ Unverified lines are evidence warnings, not blocking validation. They warn but d
 
 Confirm is the only screen that creates or saves. It presents the receipt or calculated total as the hero amount, then a compact math group for items, tax, tip, fee, and calculated total. Tax, tip, fee, and permitted total edits open focused money sheets. Tip keeps the `10%`, `12%`, `15%`, and `20%` presets and retotals immediately.
 
-A material difference between the receipt and calculated totals appears directly below the math group as a warning decision block. The user must choose `Keep receipt total` or `Use calculated total`. Keeping the receipt total retains the existing confirmation alert. A material reconciliation without a decision blocks submission; an unverified item warning does not. The read-only summary shows payer mode, division and participant count, payment/card, even-split share, and offline status, with each editable row returning to its owning step.
+A material difference between the receipt and calculated totals appears directly below the math group as a warning decision block. The user must choose `Keep receipt total` or `Use calculated total`. Keeping the receipt total retains the existing confirmation alert. A material reconciliation without a decision blocks submission; an unverified item warning does not. The read-only summary shows payer mode, division and participant count, payment/card, even-split share, and an offline status row when relevant (`Will save on this phone` for creation or `Reconnect to save changes` for editing), with each editable row returning to its owning step. A stale edit must be refreshed and reviewed before the save action becomes available again.
 
 The existing `canSave` rules remain authoritative: merchant, positive totals and headcount, priced by-item lines, payer, gated card selection, reconciliation decision, online-only editing, and no active scan/submission. Offline creation remains queued with its stable idempotency key and is described as saved on this phone rather than complete.
 
@@ -257,7 +257,7 @@ The monthly signal section always reserves its position between Money flow and m
 - **Fallback:** when spending is zero or categories are empty, `DashboardFallbackSignals.build` derives factual monthly signals already present in `SummaryResponse`: income received, available this month, savings movement when nonzero, no spending yet, and movement count. It may scroll when there is more than one signal, but it is not a Categories link and has no button accessibility trait. Income is positive; available uses `availableCents`; savings uses `-savingsNetCents` so deposits read as money moved aside.
 - **Quiet:** when the month has no movements at all, show one static signal. Do not loop duplicate text or imply a trend. Reduce Motion also turns fallback content into a static row.
 
-When real spending data arrives, the section changes to the normal spending hero and ticker without moving its place on Dashboard. Loading keeps cached content visible with the Signal trace; a cold start uses the Settlr pulse. Refresh errors retain safe cached content and offer a nearby retry.
+When real spending data arrives, the section changes to the normal spending hero and ticker without moving its place on Dashboard. Loading keeps cached content visible with `SignalTraceLoadingView`: a thin moving trace and last-updated context. Reduce Motion holds one static signal bar. A cold start uses the Settlr pulse. Refresh errors retain safe cached content and offer a nearby retry.
 
 ## Screen recipes
 

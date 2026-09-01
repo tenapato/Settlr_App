@@ -497,3 +497,24 @@ grep -Fq 'dashboard-signal-fallback' docs/design-system/settlr-signal-components
 grep -Fq 'SplitSetupStepView' Settlr/Views/Main/Split/SplitCreateSheet.swift
 grep -Fq 'SplitItemsStepView' Settlr/Views/Main/Split/SplitCreateSheet.swift
 grep -Fq 'SplitConfirmStepView' Settlr/Views/Main/Split/SplitCreateSheet.swift
+
+# Task 8 review parity: keep the documented implementation states aligned with
+# the production coordinator, guided views, and Dashboard signal renderer.
+grep -Fq '`editRetryBlocked`' docs/design-system/SETTLR_SIGNAL.md
+grep -Fq '`AccessibilityFocusState`' docs/design-system/SETTLR_SIGNAL.md
+grep -Fq 'at save time, immediately before the edit request' docs/design-system/SETTLR_SIGNAL.md
+grep -Fq 'offline status row when relevant' docs/design-system/SETTLR_SIGNAL.md
+grep -Fq 'SignalTraceLoadingView' docs/design-system/SETTLR_SIGNAL.md
+grep -Fq 'dashboard-signal-quiet' docs/design-system/settlr-signal-components.html
+grep -Fq 'No movements yet' docs/design-system/settlr-signal-components.html
+grep -Fq '@media(prefers-contrast:more)' docs/design-system/settlr-signal-components.html
+grep -Fq 'Calculated total' docs/design-system/settlr-signal-components.html
+grep -Fq 'Difference' docs/design-system/settlr-signal-components.html
+grep -Fq 'signal-trace-loading' docs/design-system/settlr-signal-components.html
+grep -Fq 'Reduce Motion: one static signal bar.' docs/design-system/settlr-signal-components.html
+grep -Fq 'editRetryBlocked' Settlr/Views/Main/Split/SplitCreateSheet.swift
+grep -Fq 'showClaimChangeConfirmation' Settlr/Views/Main/Split/SplitCreateSheet.swift
+grep -Fq 'offlineStatus' Settlr/Views/Main/Split/SplitConfirmStepView.swift
+grep -Fq '.accessibilityFocused(accessibilityFocus' Settlr/Views/Main/Split/SplitConfirmStepView.swift
+grep -Fq 'case .noMovement:' Settlr/Views/Main/Dashboard/SpendingInsightsStrip.swift
+grep -Fq 'SignalTraceLoadingView' Settlr/Views/Main/Dashboard/DashboardView.swift
