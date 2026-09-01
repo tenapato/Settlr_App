@@ -476,3 +476,12 @@ for contrast_view in \
   Settlr/Views/Main/Split/SplitListView.swift; do
   grep -Fq 'Theme.buttonInk' "$contrast_view"
 done
+
+# Task 8 artifacts: the design-system preview and source gate must describe
+# the coordinator-owned guided split and its three Dashboard signal modes.
+grep -Fq 'Setup → Items → Confirm' docs/design-system/SETTLR_SIGNAL.md
+grep -Fq 'guided-split-flow' docs/design-system/settlr-signal-components.html
+grep -Fq 'dashboard-signal-fallback' docs/design-system/settlr-signal-components.html
+grep -Fq 'SplitSetupStepView' Settlr/Views/Main/Split/SplitCreateSheet.swift
+grep -Fq 'SplitItemsStepView' Settlr/Views/Main/Split/SplitCreateSheet.swift
+grep -Fq 'SplitConfirmStepView' Settlr/Views/Main/Split/SplitCreateSheet.swift

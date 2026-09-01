@@ -1,8 +1,8 @@
 # Settlr Signal design system
 
-Version 1.1, finalized August 29, 2026.
+Version 1.2, finalized September 1, 2026.
 
-This document is the implementation reference for Settlr's iOS redesign. The companion preview is `settlr-signal-components.html` in this directory. Product behavior and screen architecture are specified in `docs/superpowers/specs/2026-08-28-signal-black-app-redesign-design.md`.
+This document is the implementation reference for Settlr's iOS redesign. The companion preview is `settlr-signal-components.html` in this directory. Product behavior and screen architecture are specified in `docs/superpowers/specs/2026-09-01-guided-bill-split-and-live-dashboard-signal-design.md`.
 
 ## Identity
 
@@ -210,6 +210,54 @@ Home uses the exact recovery promise `Saved Home data is still visible and may b
 - Signature Scanner uses a full-screen modal stack.
 - Settings and workspace selection belong to the profile modal.
 - Completion returns to the originating context. It does not switch tabs or reset a stack.
+
+## Guided bill split
+
+The scanner and manual split task use one draft owned by `SplitCreateSheet` and one native navigation stack. The primary path is **Setup → Items → Confirm**. Scanner Review remains the evidence checkpoint before Setup; even splits intentionally skip Items and go from Setup directly to Confirm. Editing an existing split uses the same three-step presentation and changes the final action to `Save changes`.
+
+### Progress and sticky actions
+
+`SplitProgressRail` shows Setup, Items, and Confirm in order. The current step is emphasized with Signal Black lime, completed steps retain the signal treatment, and future steps remain neutral. The rail announces the current step and total count. Back preserves the shared draft, scan evidence, payer, participants, payment choice, and reconciliation decision. Native edge swipe remains available unless scanning or submitting is in flight.
+
+Each step has one coordinator-owned bottom action, inset above the home indicator. Labels are state- and mode-specific:
+
+- Setup: `Review N items` for by-item splits, or `Check total` for even splits.
+- Items: `Check total`.
+- Confirm: `Create split`, `Save changes`, or `Save on this phone` when offline.
+
+The label stays visible while the action is available. A tap validates the step and focuses the first actionable problem; the action is disabled only while scanning or submitting. Missing input is explained inline rather than represented by a permanently disabled navigation control.
+
+### Setup
+
+Setup contains the compact receipt header followed by decisions that define accounting. The header shows merchant, current draft date, receipt total, current payment channel, and a warning count when scan warnings or unverified lines exist. Its menu contains `Edit receipt details`, `Scan again`, and `Receipt parsing settings`; the old full-width scan banner does not return.
+
+`Who paid?` uses two explicit rows: `I paid it all` explains that Settlr tracks reimbursements, while `Each paid their own` explains that nobody needs to pay the organizer back. `By item` and `Evenly` use a native segmented control. People opens a focused participant sheet. Paid with defaults to `Cash / debit`; credit-card options are shown only when the feature is available and a selected card is required before submission. Cached cards remain usable if refresh fails, with a compact `Retry` row near the payment control. Merchant and date are edited in the receipt-details sheet.
+
+### Items
+
+Items is only for by-item splits. Its summary gives item count, participant count, and item subtotal. The compact filter offers `Needs review` when unverified lines exist and `All`; creation does not expose the post-creation Unassigned claim filter.
+
+The dense item row contains name, line amount, quantity only when greater than one, allocation (`Shared` or `By units`), and a compact `Needs review` warning when parser verification is unavailable. Tapping a row opens `SplitItemEditorSheet`, with native fields for name, quantity, unit price, allocation, and `Remove item`. `Add item` opens the same sheet with an empty item. Decimal entry supplies a keyboard `Done` action. Removing an item that could clear edit-time claims requires destructive confirmation.
+
+Unverified lines are evidence warnings, not blocking validation. They warn but do not block creation by themselves because the parser model does not claim a separate verified-by-user state. Priced-line and payer/payment rules still apply when Confirm validates the draft.
+
+### Confirm and reconciliation
+
+Confirm is the only screen that creates or saves. It presents the receipt or calculated total as the hero amount, then a compact math group for items, tax, tip, fee, and calculated total. Tax, tip, fee, and permitted total edits open focused money sheets. Tip keeps the `10%`, `12%`, `15%`, and `20%` presets and retotals immediately.
+
+A material difference between the receipt and calculated totals appears directly below the math group as a warning decision block. The user must choose `Keep receipt total` or `Use calculated total`. Keeping the receipt total retains the existing confirmation alert. A material reconciliation without a decision blocks submission; an unverified item warning does not. The read-only summary shows payer mode, division and participant count, payment/card, even-split share, and offline status, with each editable row returning to its owning step.
+
+The existing `canSave` rules remain authoritative: merchant, positive totals and headcount, priced by-item lines, payer, gated card selection, reconciliation decision, online-only editing, and no active scan/submission. Offline creation remains queued with its stable idempotency key and is described as saved on this phone rather than complete.
+
+## Dashboard signal states
+
+The monthly signal section always reserves its position between Money flow and movement count. It has three honest presentation states and never invents a category insight.
+
+- **Live spending:** when `SpendingInsights.build` returns real insights, show the ranked hero and up to five total insights. The carousel moves at about 30 points per second, loops seamlessly, pauses on touch, supports one-to-one drag, resumes after about 2.5 seconds, and opens Categories from real insight content. Reduce Motion uses a static horizontal row.
+- **Fallback:** when spending is zero or categories are empty, `DashboardFallbackSignals.build` derives factual monthly signals already present in `SummaryResponse`: income received, available this month, savings movement when nonzero, no spending yet, and movement count. It may scroll when there is more than one signal, but it is not a Categories link and has no button accessibility trait. Income is positive; available uses `availableCents`; savings uses `-savingsNetCents` so deposits read as money moved aside.
+- **Quiet:** when the month has no movements at all, show one static signal. Do not loop duplicate text or imply a trend. Reduce Motion also turns fallback content into a static row.
+
+When real spending data arrives, the section changes to the normal spending hero and ticker without moving its place on Dashboard. Loading keeps cached content visible with the Signal trace; a cold start uses the Settlr pulse. Refresh errors retain safe cached content and offer a nearby retry.
 
 ## Screen recipes
 
