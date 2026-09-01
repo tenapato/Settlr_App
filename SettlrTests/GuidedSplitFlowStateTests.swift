@@ -31,4 +31,28 @@ final class GuidedSplitFlowStateTests: XCTestCase {
         XCTAssertTrue(snapshot.hasUnsavedChanges(draft: draft, totalEdited: false, importedReceipt: true))
         XCTAssertFalse(snapshot.hasUnsavedChanges(draft: draft, totalEdited: false, importedReceipt: false))
     }
+
+    func testByItemNamedLineWithoutPriceBlocksConfirmation() {
+        var draft = SplitDraft()
+        draft.merchant = "Cafe"
+        draft.items = [.init(name: "Lunch", quantity: 1, unitPriceCents: 0)]
+
+        XCTAssertEqual(
+            GuidedSplitFlowPolicy.firstIssue(on: .confirm, draft: draft, totalEdited: false, isEditing: false, isOnline: true)?.field,
+            .items
+        )
+    }
+
+    func testEvenSplitWithoutParticipantsBlocksConfirmation() {
+        var draft = SplitDraft()
+        draft.merchant = "Cafe"
+        draft.splitMode = "even"
+        draft.selectedTotalCents = 1_000
+        draft.participants = []
+
+        XCTAssertEqual(
+            GuidedSplitFlowPolicy.firstIssue(on: .confirm, draft: draft, totalEdited: false, isEditing: false, isOnline: true)?.field,
+            .payer
+        )
+    }
 }

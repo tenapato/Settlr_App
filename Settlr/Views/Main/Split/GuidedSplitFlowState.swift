@@ -67,8 +67,12 @@ enum GuidedSplitFlowPolicy {
             if draft.selectedTotalCents <= 0 {
                 return .init(step: .setup, field: .total, message: "Add a total greater than zero.")
             }
-        } else if draft.filledItems.isEmpty {
+        } else if draft.filledItems.isEmpty || draft.filledItems.contains(where: { $0.lineTotalCents <= 0 }) {
             return .init(step: .items, field: .items, message: "Add at least one item.")
+        }
+
+        if draft.participants.isEmpty {
+            return .init(step: .setup, field: .payer, message: "Add at least one participant.")
         }
 
         if BillSplitPayerMode(persistedValue: draft.payer) == .unavailable {
