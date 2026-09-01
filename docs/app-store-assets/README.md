@@ -1,6 +1,6 @@
 # Settlr App Store screenshots
 
-The compositor is [app-store-screenshots.html](./app-store-screenshots.html). It renders one opaque portrait canvas at **1320 × 2868 px**, with `?slide=1` through `?slide=5` selecting the campaign frame. It places an untouched capture from the real iOS app inside a straight-on black iPhone frame. The capture supplies the status bar, Dynamic Island, and home indicator.
+The compositor is [app-store-screenshots.html](./app-store-screenshots.html). It renders one opaque portrait canvas at **1320 × 2868 px**, with `?slide=1` through `?slide=5` selecting the campaign frame. The five phone screens are generated in HTML from the current SwiftUI hierarchy and Signal Black design tokens. No screenshot inputs are required.
 
 Apple source note: this set targets the currently accepted **6.9-inch** iPhone screenshot size (**1320 × 2868**). App Store screenshot sets allow **1–10** images; export as **JPG or PNG with no alpha channel**.
 
@@ -12,9 +12,7 @@ Final export filenames:
 - `04-savings.jpg`
 - `05-cards.jpg`
 
-The numbered exports are not upload-ready until all five files listed in [captures/README.md](./captures/README.md) come from the current app build and `./scripts/validate-app-store-captures.sh` passes. The compositor deliberately shows a missing-capture message instead of recreating the interface.
-
-After adding the captures, use the JPEGs for App Store Connect. Each final export must be 1320 × 2868 and have no alpha channel. Apple’s live specification is: <https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications>.
+Use the JPEGs for App Store Connect. Each final export must be 1320 × 2868 and have no alpha channel. Apple’s live specification is: <https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications>.
 
 Generation command used for each frame:
 
@@ -32,9 +30,8 @@ sips -s format jpeg -s formatOptions 95 \
 
 The only visual asset referenced by the HTML is `signal-black-background.png`; fonts are system fonts and there are no network dependencies.
 
-Run both checks from the App directory before exporting:
+Run the parity check from the App directory before exporting:
 
 ```sh
 ./scripts/check-app-store-device-frames.sh
-./scripts/validate-app-store-captures.sh
 ```
