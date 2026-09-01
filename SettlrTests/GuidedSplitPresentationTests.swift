@@ -66,4 +66,25 @@ final class GuidedSplitPresentationTests: XCTestCase {
         XCTAssertEqual(value.items(for: .needsReview).count, 0)
         XCTAssertEqual(value.items(for: .all).map(\.name), ["Soup"])
     }
+
+    func testConfirmPresentationIncludesEvenShareAndMaterialDifference() {
+        var draft = SplitDraft()
+        draft.merchant = "Cafe"
+        draft.splitMode = "even"
+        draft.participants.append(.init(id: nil, name: "Ana", isOrganizer: false))
+        draft.items = [.init(name: "Bill", quantity: 1, unitPriceCents: 8_000)]
+        draft.selectedTotalCents = 10_000
+
+        let value = SplitConfirmPresentation(draft: draft, totalEdited: true)
+
+        XCTAssertEqual(value.effectiveTotalCents, 10_000)
+        XCTAssertEqual(value.evenShareCents, 5_000)
+        XCTAssertEqual(value.differenceCents, 2_000)
+    }
+
+    func testPrimaryActionCopyMatchesOutcome() {
+        XCTAssertEqual(GuidedSplitPrimaryAction.create.title, "Create split")
+        XCTAssertEqual(GuidedSplitPrimaryAction.saveChanges.title, "Save changes")
+        XCTAssertEqual(GuidedSplitPrimaryAction.saveOnPhone.title, "Save on this phone")
+    }
 }

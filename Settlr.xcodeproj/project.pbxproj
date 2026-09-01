@@ -126,6 +126,7 @@
 		AA000000000000000000BB99 /* SplitGuidedComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR99 /* SplitGuidedComponents.swift */; };
 		AA000000000000000000BB9A /* SplitSetupStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR9A /* SplitSetupStepView.swift */; };
 		AA000000000000000000BB9B /* SplitItemsStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR9B /* SplitItemsStepView.swift */; };
+		AA000000000000000000BB9C /* SplitConfirmStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR9C /* SplitConfirmStepView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -237,6 +238,7 @@
 		AA000000000000000000FR99 /* SplitGuidedComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitGuidedComponents.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR9A /* SplitSetupStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitSetupStepView.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR9B /* SplitItemsStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitItemsStepView.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR9C /* SplitConfirmStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitConfirmStepView.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR76 /* PublicSplitClaimView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicSplitClaimView.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR77 /* ReceiptCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptCaptureView.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR78 /* SplitScanFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitScanFlow.swift; sourceTree = "<group>"; };
@@ -474,6 +476,7 @@
 				AA000000000000000000FR99 /* SplitGuidedComponents.swift */,
 				AA000000000000000000FR9A /* SplitSetupStepView.swift */,
 				AA000000000000000000FR9B /* SplitItemsStepView.swift */,
+				AA000000000000000000FR9C /* SplitConfirmStepView.swift */,
 				AA000000000000000000FR76 /* PublicSplitClaimView.swift */,
 				AA000000000000000000FR77 /* ReceiptCaptureView.swift */,
 				AA000000000000000000FR78 /* SplitScanFlow.swift */,
@@ -775,6 +778,7 @@
 				AA000000000000000000BB99 /* SplitGuidedComponents.swift in Sources */,
 				AA000000000000000000BB9A /* SplitSetupStepView.swift in Sources */,
 				AA000000000000000000BB9B /* SplitItemsStepView.swift in Sources */,
+				AA000000000000000000BB9C /* SplitConfirmStepView.swift in Sources */,
 				AA000000000000000000BB76 /* PublicSplitClaimView.swift in Sources */,
 				AA000000000000000000BB77 /* ReceiptCaptureView.swift in Sources */,
 				AA000000000000000000BB78 /* SplitScanFlow.swift in Sources */,
