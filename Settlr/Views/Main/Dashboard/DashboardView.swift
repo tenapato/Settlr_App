@@ -14,28 +14,22 @@ struct DashboardView: View {
             ZStack {
                 Theme.bg.ignoresSafeArea()
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        DashboardWorkspaceHeader(
-                            name: appState.activeWorkspace?.name ?? "Dashboard",
-                            onSwitchWorkspace: { appState.activeWorkspace = nil }
-                        )
-                        .padding(.horizontal, 20)
-
-                        dashboardState
-
-                        Spacer().frame(height: 92)
-                    }
-                    .padding(.top, 12)
-                }
-                .refreshable {
-                    await vm.load(workspaceId: workspaceId)
-                    annualVM.invalidate()
-                    await annualVM.load(workspaceId: workspaceId, year: selectedYear)
+                if rootPresentation == .coldLoading {
+                    SettlrPulseLoadingView(
+                        message: "Getting your workspace",
+                        detail: "Loading balances and account access."
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.opacity)
+                } else {
+                    dashboardScroll
+                        .transition(.opacity)
                 }
             }
+            .animation(.easeOut(duration: 0.18), value: rootPresentation)
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar(rootPresentation == .coldLoading ? .hidden : .visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { showSettings = true } label: {
@@ -61,6 +55,36 @@ struct DashboardView: View {
                 await annualVM.load(workspaceId: workspaceId, year: selectedYear)
             }
         }
+    }
+
+    private var dashboardScroll: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                DashboardWorkspaceHeader(
+                    name: appState.activeWorkspace?.name ?? "Dashboard",
+                    onSwitchWorkspace: { appState.activeWorkspace = nil }
+                )
+                .padding(.horizontal, 20)
+
+                dashboardState
+
+                Spacer().frame(height: 92)
+            }
+            .padding(.top, 12)
+        }
+        .refreshable {
+            await vm.load(workspaceId: workspaceId)
+            annualVM.invalidate()
+            await annualVM.load(workspaceId: workspaceId, year: selectedYear)
+        }
+    }
+
+    private var rootPresentation: DashboardRootPresentation {
+        DashboardRootPresentation.resolve(
+            hasSummary: vm.summary != nil,
+            isLoading: vm.isLoading,
+            hasError: vm.errorMessage != nil
+        )
     }
 
     private var selectedYear: Int {
@@ -91,13 +115,6 @@ struct DashboardView: View {
                     .padding(.horizontal, 20)
                 }
             }
-        } else if vm.isLoading {
-            SettlrPulseLoadingView(
-                message: "Getting your workspace",
-                detail: "Loading balances and account access."
-            )
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 56)
         } else if let errorMessage = vm.errorMessage {
             DashboardRecoveryCard(message: errorMessage, hasCachedData: false) {
                 Task { await vm.load(workspaceId: workspaceId) }

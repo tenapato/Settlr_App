@@ -191,7 +191,7 @@ Use one compact glyph, a direct title, one short explanation, and one action tha
 Choose the loader by context:
 
 - Signal trace for background refresh. Keep cached content visible and show its last update time when useful.
-- Settlr pulse for a cold start or workspace change with no content to show. Stack three 31 × 5 pt horizontal bars inside a 65 pt raised tile, offset the middle bar by 5 pt, and light them in sequence. Pair a specific headline such as `Getting your workspace` with one short detail line. Do not place a second logo above the pulse mark.
+- Settlr pulse for a cold start or workspace change with no content to show. Stack three 31 × 5 pt horizontal bars inside a 65 pt raised tile, offset the middle bar by 5 pt, and light them in sequence. Pair a specific headline such as `Getting your workspace` with one short detail line. Keep it centered in the screen root across session restoration and the Home cold load; never move the cold loader into scroll content. Do not place a second logo above the pulse mark.
 - Screen-shaped skeleton only when the incoming geometry helps orientation, such as the first Activity timeline load.
 
 After a delay, expose Retry or a specific recovery path. Reduce Motion holds one signal bar or the mark static. Do not shimmer every screen by default.

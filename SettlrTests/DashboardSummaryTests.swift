@@ -35,4 +35,44 @@ final class DashboardSummaryTests: XCTestCase {
         XCTAssertEqual(savings.kind, .savings)
         XCTAssertEqual(savings.signedCents, 75_000)
     }
+
+    func testColdLoadOwnsDashboardRootBeforeContentExists() {
+        let state = DashboardRootPresentation.resolve(
+            hasSummary: false,
+            isLoading: true,
+            hasError: false
+        )
+
+        XCTAssertEqual(state, .coldLoading)
+    }
+
+    func testInitialDashboardFrameUsesColdLoaderBeforeTaskStarts() {
+        let state = DashboardRootPresentation.resolve(
+            hasSummary: false,
+            isLoading: false,
+            hasError: false
+        )
+
+        XCTAssertEqual(state, .coldLoading)
+    }
+
+    func testRetryReplacesUncachedErrorWithLoadingFeedback() {
+        let state = DashboardRootPresentation.resolve(
+            hasSummary: false,
+            isLoading: true,
+            hasError: true
+        )
+
+        XCTAssertEqual(state, .coldLoading)
+    }
+
+    func testRefreshKeepsCachedDashboardContentVisible() {
+        let state = DashboardRootPresentation.resolve(
+            hasSummary: true,
+            isLoading: true,
+            hasError: false
+        )
+
+        XCTAssertEqual(state, .content)
+    }
 }

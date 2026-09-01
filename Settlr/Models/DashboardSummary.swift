@@ -1,5 +1,20 @@
 import Foundation
 
+enum DashboardRootPresentation: Equatable {
+    case coldLoading
+    case content
+    case recovery
+
+    static func resolve(hasSummary: Bool, isLoading: Bool, hasError: Bool) -> Self {
+        if hasSummary { return .content }
+        if isLoading { return .coldLoading }
+        if hasError { return .recovery }
+        // Dashboard starts its first request from `.task`, one render after
+        // appearing. Keep that initial frame in the same cold-loading state.
+        return .coldLoading
+    }
+}
+
 struct ExpensesByChannel: Decodable {
     let cashCents: Int
     let creditCardCents: Int
