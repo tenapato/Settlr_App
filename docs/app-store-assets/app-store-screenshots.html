@@ -319,6 +319,131 @@
     .payment-card .button { width: 100%; margin-top: 26px; }
     .card-note { margin-top: 25px; padding: 18px 20px; color: var(--muted); font-size: 13px; line-height: 1.45; }
     .card-note b { color: var(--ink); }
+
+    /* App Store presentation — straight-on iPhone shell */
+    .campaign-title { margin-top: 104px; }
+    .campaign-title h1 { font-size: 70px; }
+    .iphone-device {
+      position: relative;
+      isolation: isolate;
+      width: 720px;
+      height: 1510px;
+      margin: 58px auto 0;
+      padding: 108px 34px 42px;
+      border: 12px solid #303336;
+      border-radius: 98px;
+      background-color: #050607;
+      background-image: linear-gradient(90deg, #f5f5f1, #f5f5f1);
+      background-repeat: no-repeat;
+      background-position: center calc(100% - 20px);
+      background-size: 180px 6px;
+      box-shadow:
+        0 0 0 3px #0d0f10,
+        0 34px 90px rgba(0, 0, 0, .58),
+        0 0 70px rgba(202, 255, 58, .08),
+        inset 0 0 0 2px rgba(255, 255, 255, .055);
+    }
+    .iphone-device::before,
+    .iphone-device::after {
+      content: "";
+      position: absolute;
+      z-index: 0;
+      width: 10px;
+      border-radius: 5px;
+      background: linear-gradient(180deg, #464a4d, #17191a);
+      box-shadow: inset 1px 0 rgba(255, 255, 255, .13);
+    }
+    .iphone-device::before {
+      left: -20px;
+      top: 250px;
+      height: 190px;
+      box-shadow: 0 238px 0 #26292b, inset 1px 0 rgba(255, 255, 255, .13);
+    }
+    .iphone-device::after { right: -20px; top: 330px; height: 250px; }
+    .device-status {
+      position: absolute;
+      top: 29px;
+      left: 50px;
+      right: 50px;
+      height: 55px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #f5f5f1;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -.02em;
+    }
+    .iphone-device > .device-status,
+    .iphone-device > .screen-chrome,
+    .iphone-device > .dashboard-screen,
+    .iphone-device > .activity-screen,
+    .iphone-device > .activity-separator,
+    .iphone-device > .filter-note,
+    .iphone-device > .split-flow,
+    .iphone-device > .split-footnote,
+    .iphone-device > .savings-screen,
+    .iphone-device > .cards-screen { z-index: 1; }
+    .device-status > span:last-child { color: #d8dcda; font-size: 13px; letter-spacing: .13em; }
+    .dynamic-island {
+      position: absolute;
+      left: 50%;
+      top: 0;
+      width: 192px;
+      height: 54px;
+      border: 2px solid #111315;
+      border-radius: 999px;
+      background: #000;
+      transform: translateX(-50%);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .025);
+    }
+    .iphone-device .screen-chrome { margin-bottom: 22px; }
+    .iphone-device .screen-chrome .workspace { font-size: 17px; }
+    .iphone-device .screen-chrome .icon { width: 36px; height: 36px; }
+    .iphone-device .panel { border-radius: 22px; }
+
+    .iphone-device .dashboard-screen { height: calc(100% - 60px); grid-template-columns: 1fr; grid-template-rows: auto auto 1fr auto; gap: 14px; }
+    .iphone-device .dashboard-main { grid-row: auto; padding: 28px; }
+    .iphone-device .month-row { margin-bottom: 30px; }
+    .iphone-device .available { font-size: 54px; }
+    .iphone-device .flow { margin-top: 35px; }
+    .iphone-device .signal-panel { min-height: 0; padding: 25px 28px; }
+    .iphone-device .signal-headline { margin-top: 19px; font-size: 25px; }
+    .iphone-device .signal-cards { margin-top: 19px; }
+    .iphone-device .dots { margin-top: 14px; }
+    .iphone-device .fallback-panel { display: none; }
+    .iphone-device .nav-bar { grid-column: 1; align-self: end; height: 70px; }
+
+    .iphone-device .activity-screen { padding: 27px; }
+    .iphone-device .activity-toolbar { align-items: flex-start; gap: 18px; }
+    .iphone-device .activity-toolbar .title { font-size: 27px; }
+    .iphone-device .filter-pair { flex-direction: column; }
+    .iphone-device .filter { min-width: 230px; }
+    .iphone-device .activity-separator { margin: 34px 0 20px; }
+
+    .iphone-device .split-flow { display: block; }
+    .iphone-device .split-step { display: none; }
+    .iphone-device .split-step:nth-child(2) { min-height: 1160px; display: flex; }
+    .iphone-device .split-footnote { margin: 16px 16px 0; }
+
+    .iphone-device .savings-screen { padding: 27px; }
+    .iphone-device .savings-top { align-items: flex-start; }
+    .iphone-device .savings-top h2 { font-size: 27px; }
+    .iphone-device .account-chips { overflow: hidden; }
+    .iphone-device .account-chip { min-width: 154px; }
+    .iphone-device .goal-amounts b { font-size: 34px; }
+
+    .iphone-device .cards-screen { padding: 27px; }
+    .iphone-device .cards-heading h2 { font-size: 27px; }
+    .iphone-device .totals { margin-top: 20px; }
+    .iphone-device .total-cell { padding: 0 13px; }
+    .iphone-device .total-cell b { font-size: 17px; }
+    .iphone-device .card-list { grid-template-columns: 1fr; gap: 12px; margin-top: 18px; }
+    .iphone-device .payment-card { padding: 20px; }
+    .iphone-device .pay-main { margin-top: 23px; }
+    .iphone-device .mini-stats { margin-top: 18px; padding-top: 15px; }
+    .iphone-device .payment-card .button { min-height: 45px; margin-top: 16px; }
+    .iphone-device .card-note { margin-top: 16px; }
   </style>
 </head>
 <body>
@@ -326,7 +451,7 @@
     <section class="slide" data-slide="1" aria-label="Dashboard screenshot">
       <header class="topbar"><div class="wordmark"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span><span class="brand-name">SETTLR</span></div><div class="top-meta">Signal Black / 01 <b>Live</b></div></header>
       <div class="campaign-title"><div class="kicker">Money, in signal</div><h1>Your month,<br>at a glance.</h1><p>See what moved, what remains, and the signal behind every number.</p></div>
-      <div class="screen"><div class="screen-chrome"><div class="workspace"><span class="mini-mark" aria-hidden="true"><i></i><i></i><i></i></span>Personal <span class="faint">⌄</span></div><span class="icon" aria-hidden="true"><i class="settings-glyph"></i></span></div>
+      <div class="screen iphone-device" aria-label="iPhone frame"><div class="device-status" aria-hidden="true"><span>9:41</span><span class="dynamic-island"></span><span>● ◒ ▰</span></div><div class="screen-chrome"><div class="workspace"><span class="mini-mark" aria-hidden="true"><i></i><i></i><i></i></span>Personal <span class="faint">⌄</span></div><span class="icon" aria-hidden="true"><i class="settings-glyph"></i></span></div>
         <div class="dashboard-screen">
           <div class="panel dashboard-main"><div class="month-row"><span class="month">August 2026</span><span class="arrows">‹ · ›</span></div><div class="eyebrow available-label">Available this month</div><div class="available money">$18,420.00</div><div class="after-savings"><i></i>After savings</div><div class="flow"><div class="eyebrow">Money flow</div><div class="flow-row"><span class="trace"><i></i></span><div><b>Income</b><small>Received this month</small></div><strong class="row-money money positive">+$24,000</strong></div><div class="flow-row"><span class="trace"><i></i></span><div><b>Savings</b><small>Moved aside</small></div><strong class="row-money money negative">−$3,200</strong></div><div class="flow-row"><span class="trace"><i></i></span><div><b>Spending</b><small>Across 5 categories</small></div><strong class="row-money money negative">−$2,380</strong></div></div></div>
           <div class="panel signal-panel"><div class="signal-header"><span class="eyebrow signal">This month's signal · live</span><span class="live-tag">Live</span></div><div class="signal-headline">Food &amp; drink<br>leads spending</div><div class="signal-amount">43%</div><div class="signal-caption money">$1,020 · swipe for more</div><div class="signal-cards"><div class="signal-card"><b>Transport</b><span class="money">$760 · next</span></div><div class="signal-card"><b>Shopping</b><span class="money">$600 · next</span></div></div><div class="dots">• · ·</div></div>
@@ -340,7 +465,7 @@
     <section class="slide" data-slide="2" aria-label="Activity screenshot">
       <header class="topbar"><div class="wordmark"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span><span class="brand-name">SETTLR</span></div><div class="top-meta">Signal Black / 02 <b>Live</b></div></header>
       <div class="campaign-title"><div class="kicker">A clear ledger</div><h1>Every movement.<br>Clearly.</h1><p>A calm timeline for expenses, income, savings, and splits.</p></div>
-      <div class="screen"><div class="screen-chrome"><div class="workspace"><span class="mini-mark" aria-hidden="true"><i></i><i></i><i></i></span>Personal <span class="faint">⌄</span></div><span class="icon" aria-hidden="true">≡</span></div>
+      <div class="screen iphone-device" aria-label="iPhone frame"><div class="device-status" aria-hidden="true"><span>9:41</span><span class="dynamic-island"></span><span>● ◒ ▰</span></div><div class="screen-chrome"><div class="workspace"><span class="mini-mark" aria-hidden="true"><i></i><i></i><i></i></span>Personal <span class="faint">⌄</span></div><span class="icon" aria-hidden="true">≡</span></div>
         <div class="panel activity-screen"><div class="activity-toolbar"><span class="title">Activity</span><div class="filter-pair"><div class="filter type"><b>All</b><span>⌄</span></div><div class="filter time"><b>August 2026</b><span>⌄</span></div></div></div><div class="activity-summary"><b>4 movements</b><span>Newest first · MXN</span></div><div class="timeline"><div class="day"><div class="day-label">Today · August 31</div><div class="event live"><div><b>Mercado Roma</b><div class="context">Food &amp; drink · Split</div></div><div><div class="event-money money">−$428.00</div><div class="time">12:42</div></div></div><div class="event"><div><b>Freelance project</b><div class="context">Income · MXN</div></div><div><div class="event-money money positive">+$8,500.00</div><div class="time">10:20</div></div></div></div><div class="day"><div class="day-label">August 29</div><div class="event"><div><b>Rent</b><div class="context">Housing · Cash</div></div><div><div class="event-money money">−$9,200.00</div><div class="time">09:00</div></div></div></div><div class="day"><div class="day-label">August 28</div><div class="event"><div><b>Cajita Nu</b><div class="context">Deposit · Savings</div></div><div><div class="event-money money positive">+$3,200.00</div><div class="time">18:15</div></div></div></div></div><div class="activity-foot"><span>Activity is one unified ledger.</span><b>Expenses · Income · Savings · Splits</b></div></div>
         <div class="activity-separator">Separated filters</div><div class="filter-note"><strong>Type</strong> narrows the movement kind. <strong>Time</strong> sets the period. They stay distinct so the ledger remains easy to scan.</div>
       </div>
@@ -350,7 +475,7 @@
     <section class="slide" data-slide="3" aria-label="Guided bill split screenshot">
       <header class="topbar"><div class="wordmark"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span><span class="brand-name">SETTLR</span></div><div class="top-meta">Signal Black / 03 <b>Guided</b></div></header>
       <div class="campaign-title"><div class="kicker">A shared draft</div><h1>Scan. Review.<br>Split.</h1><p>One receipt, one guided path: setup, items, then a confident confirm.</p></div>
-      <div class="screen"><div class="screen-chrome"><div class="workspace"><span class="mini-mark" aria-hidden="true"><i></i><i></i><i></i></span>New split <span class="faint">· Casa Roma</span></div><span class="icon" aria-hidden="true">×</span></div>
+      <div class="screen iphone-device" aria-label="iPhone frame"><div class="device-status" aria-hidden="true"><span>9:41</span><span class="dynamic-island"></span><span>● ◒ ▰</span></div><div class="screen-chrome"><div class="workspace"><span class="mini-mark" aria-hidden="true"><i></i><i></i><i></i></span>New split <span class="faint">· Casa Roma</span></div><span class="icon" aria-hidden="true">×</span></div>
         <div class="split-flow">
           <article class="panel split-step"><div class="progress"><b class="current">1</b><span>Setup</span><i></i><b>2</b><span>Items</span><i></i><b>3</b></div><h2>Setup</h2><p class="step-intro">Choose the accounting meaning before reviewing receipt lines.</p><div class="receipt-head"><strong>Casa Roma</strong><strong class="receipt-total money">$620.00</strong><span>Aug 31 · Cash / debit</span><span class="warning">2 warnings</span></div><div class="decision-row"><div><b>Who paid?</b><small>I paid it all · Track what everyone owes you</small></div><b>✓</b></div><div class="decision-row"><div><b>How should it be divided?</b><small>By item</small></div><b>›</b></div><div class="segmented"><span class="selected">By item</span><span>Evenly</span></div><button class="button primary step-button">Review 4 items</button></article>
           <article class="panel split-step"><div class="progress"><b class="done">1</b><span>Setup</span><i></i><b class="current">2</b><span>Items</span><i></i><b>3</b></div><h2>Items</h2><p class="step-intro">Receipt evidence stays readable, editable, and honest.</p><div class="item-summary">4 items · 3 people · $594.00 subtotal</div><div class="item-list"><div class="item-row"><div><strong>Chilaquiles</strong><small>Shared · Qty 1</small></div><b class="money">$180.00</b></div><div class="item-row"><div><strong>Guacamole</strong><small>By units · Qty 2</small></div><b class="money">$140.00</b></div><div class="item-row"><div><strong>Agua mineral</strong><small>Shared · Qty 1</small><em>Needs review</em></div><b class="money">$74.00</b></div><div class="item-row"><div><strong>Enchiladas</strong><small>Shared · Qty 1</small></div><b class="money">$200.00</b></div></div><button class="button secondary add-item">＋ Add item</button><button class="button primary step-button">Check total</button></article>
@@ -363,7 +488,7 @@
     <section class="slide" data-slide="4" aria-label="Savings screenshot">
       <header class="topbar"><div class="wordmark"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span><span class="brand-name">SETTLR</span></div><div class="top-meta">Signal Black / 04 <b>Direction</b></div></header>
       <div class="campaign-title"><div class="kicker">A plan you can see</div><h1>Savings with<br>direction.</h1><p>Give every goal a destination, then watch the distance close.</p></div>
-      <div class="screen"><div class="screen-chrome"><div class="workspace"><span class="mini-mark" aria-hidden="true"><i></i><i></i><i></i></span>Personal <span class="faint">⌄</span></div><span class="icon" aria-hidden="true">＋</span></div>
+      <div class="screen iphone-device" aria-label="iPhone frame"><div class="device-status" aria-hidden="true"><span>9:41</span><span class="dynamic-island"></span><span>● ◒ ▰</span></div><div class="screen-chrome"><div class="workspace"><span class="mini-mark" aria-hidden="true"><i></i><i></i><i></i></span>Personal <span class="faint">⌄</span></div><span class="icon" aria-hidden="true">＋</span></div>
         <div class="panel savings-screen"><div class="savings-top"><div><div class="eyebrow signal">Savings</div><h2>Accounts with intent.</h2></div><div class="total"><span>Total balance</span><b class="money">$8,650.00</b></div></div><div class="metrics"><div class="metric"><span>This month</span><b class="money positive">+$680.00</b></div><div class="metric"><span>Accounts</span><b>2</b></div></div><div class="account-chips"><div class="account-chip active"><b>All</b><span class="money">$8,650.00</span></div><div class="account-chip"><b>Emergency fund</b><span class="money">$7,200.00</span></div><div class="account-chip"><b>Daily buffer</b><span class="money">$1,450.00</span></div></div><h3 class="section-label">Your goals</h3><div class="panel goal-card"><div class="goal-head"><div class="goal-name"><i class="goal-dot"></i>Emergency fund</div><span class="goal-status">In progress</span></div><div class="goal-amounts"><b class="money">$7,200.00</b><span>of <strong class="money">$12,000.00</strong></span></div><div class="progress-copy"><span>In progress</span><b>60%</b></div><div class="progress-track"><i></i></div><div class="goal-meta"><span class="money">$4,800.00 remaining</span><span>by Dec 31, 2026</span></div></div><div class="panel flex-card"><div><strong>Daily buffer</strong><span>Flexible savings · no target</span></div><b class="money">$1,450.00</b></div><div class="entries"><h3 class="section-label">Recent entries</h3><div class="entry"><div class="entry-label"><span class="entry-icon">↓</span><div><strong>Deposit</strong><small>Emergency fund · Today</small></div></div><b class="money">+$800.00</b></div><div class="entry"><div class="entry-label"><span class="entry-icon">↑</span><div><strong>Withdrawal</strong><small>Daily buffer · Aug 29</small></div></div><b class="money negative-red">−$120.00</b></div></div><div class="savings-actions"><button class="button primary">Add savings</button><button class="button secondary">Manage accounts</button></div></div>
       </div>
       <div class="bottom-note"><span>Targets are server-owned; progress is never guessed.</span><strong>04 / 05</strong></div>
@@ -372,7 +497,7 @@
     <section class="slide" data-slide="5" aria-label="Cards screenshot">
       <header class="topbar"><div class="wordmark"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span><span class="brand-name">SETTLR</span></div><div class="top-meta">Signal Black / 05 <b>On time</b></div></header>
       <div class="campaign-title"><div class="kicker">A calmer due date</div><h1>Cards without<br>surprises.</h1><p>See the fortnight, the recorded payments, and what is still owed.</p></div>
-      <div class="screen"><div class="screen-chrome"><div class="workspace"><span class="mini-mark" aria-hidden="true"><i></i><i></i><i></i></span>Personal <span class="faint">⌄</span></div><span class="icon" aria-hidden="true">▭</span></div>
+      <div class="screen iphone-device" aria-label="iPhone frame"><div class="device-status" aria-hidden="true"><span>9:41</span><span class="dynamic-island"></span><span>● ◒ ▰</span></div><div class="screen-chrome"><div class="workspace"><span class="mini-mark" aria-hidden="true"><i></i><i></i><i></i></span>Personal <span class="faint">⌄</span></div><span class="icon" aria-hidden="true">▭</span></div>
         <div class="panel cards-screen"><div class="cards-heading"><div><div class="eyebrow signal">Cards</div><h2>Payment status</h2></div><span class="menu">⋯</span></div><div class="fortnight"><button aria-label="Previous fortnight">‹</button><div class="range">16–31 Aug<small>August 2026 · payment dates</small><i></i></div><button aria-label="Next fortnight">›</button></div><div class="card-filter"><span class="pill"><span>All cards</span><span class="chev">⌄</span></span></div><div class="panel totals"><div class="total-cell"><span>To pay</span><b class="money">$6,420.00</b></div><div class="total-cell"><span>Recorded</span><b class="money">$5,020.00</b></div><div class="total-cell"><span>Still owed</span><b class="money">$1,400.00</b></div></div><div class="card-list"><article class="panel payment-card"><div class="payment-card-head"><div><strong>BBVA Gold</strong><small>•••• 4821</small></div><span class="status">OPEN</span></div><div class="pay-main"><div><span>To pay</span><b class="money">$2,400.00</b></div><div class="pay-due"><span>Due</span><b>31 Aug</b></div></div><div class="mini-stats"><div class="mini-stat"><span>Recorded</span><b class="money">$1,000.00</b></div><div class="mini-stat"><span>Still owed</span><b class="money">$1,400.00</b></div><div class="mini-stat"><span>Usage</span><b>42%</b></div></div><button class="button primary">Record payment</button><button class="button secondary">Mark as paid</button></article><article class="panel payment-card paid"><div class="payment-card-head"><div><strong>Nu Card</strong><small>•••• 1208</small></div><span class="status paid">PAID</span></div><div class="pay-main"><div><span>To pay</span><b class="money">$4,020.00</b></div><div class="pay-due"><span>Due</span><b>28 Aug</b></div></div><div class="mini-stats"><div class="mini-stat"><span>Recorded</span><b class="money">$4,020.00</b></div><div class="mini-stat"><span>Still owed</span><b class="money">$0.00</b></div><div class="mini-stat"><span>Status</span><b class="positive">Paid in full</b></div></div><button class="button secondary">Undo paid status</button></article></div><div class="panel card-note"><b>Payment dates 16–31 Aug · August 2026.</b> Cards without a cutoff or payment day stay out of this fortnight.</div></div>
       </div>
       <div class="bottom-note"><span>Dates are exact. Status is never implied.</span><strong>05 / 05</strong></div>

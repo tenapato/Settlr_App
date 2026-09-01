@@ -1,6 +1,6 @@
 # Settlr App Store screenshots
 
-The compositor is [app-store-screenshots.html](./app-store-screenshots.html). It renders one opaque portrait canvas at **1320 × 2868 px**, with `?slide=1` through `?slide=5` selecting the campaign frame.
+The compositor is [app-store-screenshots.html](./app-store-screenshots.html). It renders one opaque portrait canvas at **1320 × 2868 px**, with `?slide=1` through `?slide=5` selecting the campaign frame. Each app screen sits in the same straight-on black iPhone shell, including the Dynamic Island, status area, side controls, and home indicator treatment.
 
 Apple source note: this set targets the currently accepted **6.9-inch** iPhone screenshot size (**1320 × 2868**). App Store screenshot sets allow **1–10** images; export as **JPG or PNG with no alpha channel**.
 
@@ -29,3 +29,5 @@ sips -s format jpeg -s formatOptions 95 \
 ```
 
 The only visual asset referenced by the HTML is `signal-black-background.png`; fonts are system fonts and there are no network dependencies.
+
+Run `./scripts/check-app-store-device-frames.sh` from the App directory after editing the compositor.
