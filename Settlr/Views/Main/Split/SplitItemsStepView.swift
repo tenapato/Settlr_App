@@ -44,6 +44,12 @@ struct SplitItemsPresentation {
             filledItems
         }
     }
+
+    func accessibilityValue(for filter: SplitItemFilter, isSelected: Bool) -> String {
+        let matchingCount = items(for: filter).count
+        let itemLabel = matchingCount == 1 ? "item" : "items"
+        return "\(matchingCount) \(itemLabel), \(isSelected ? "Selected" : "Not selected")"
+    }
 }
 
 struct SplitItemsStepView: View {
@@ -126,7 +132,7 @@ struct SplitItemsStepView: View {
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
-        .accessibilityValue(filter == option ? "Selected" : "Not selected")
+        .accessibilityValue(presentation.accessibilityValue(for: option, isSelected: filter == option))
     }
 
     private func itemRow(_ item: SplitDraft.Item) -> some View {

@@ -94,6 +94,29 @@ final class SplitDraftTests: XCTestCase {
         }
     }
 
+    func testEvenCreateBodyOmitsRetainedByItemDraftRows() {
+        var draft = makeDraft(itemTotal: 1_000, selectedTotal: 1_000)
+        let retainedItems = draft.items
+        draft.splitMode = "even"
+
+        let body = draft.makeCreateBody()
+
+        XCTAssertTrue(body.items.isEmpty)
+        XCTAssertEqual(draft.items, retainedItems)
+    }
+
+    func testEvenEditBodyOmitsRetainedByItemDraftRows() throws {
+        let split = try decodeSplit()
+        var draft = SplitDraft(split: split)
+        let retainedItems = draft.items
+        draft.splitMode = "even"
+
+        let body = draft.makeEditBody(version: split.version)
+
+        XCTAssertTrue(body.items.isEmpty)
+        XCTAssertEqual(draft.items, retainedItems)
+    }
+
     func testManualFlowOriginDoesNotOfferReviewBack() {
         XCTAssertFalse(SplitScanFlowMetadata(origin: .manual, totalEdited: false).canReturnToReview)
         XCTAssertTrue(SplitScanFlowMetadata(origin: .capturedReceipt, totalEdited: false).canReturnToReview)
@@ -125,6 +148,21 @@ final class SplitDraftTests: XCTestCase {
         draft.selectedTotalCents = 199_599
         XCTAssertEqual(draft.reconciliation.kind, .overshoot)
         XCTAssertEqual(draft.reconciliation.differenceCents, -201)
+    }
+
+    func testReconciliationAcknowledgementIsAsymmetricInsideRoundingTolerance() {
+        var draft = makeDraft(itemTotal: 10_000, selectedTotal: 10_050)
+        XCTAssertEqual(draft.reconciliation.kind, .rounding)
+        XCTAssertFalse(draft.reconciliation.requiresAcknowledgement)
+        XCTAssertFalse(draft.reconciliation.requiresDecision)
+
+        draft.selectedTotalCents = 9_950
+        XCTAssertEqual(draft.reconciliation.kind, .rounding)
+        XCTAssertTrue(draft.reconciliation.requiresAcknowledgement)
+        XCTAssertTrue(draft.reconciliation.requiresDecision)
+
+        draft.confirmKeepReceiptTotal()
+        XCTAssertFalse(draft.reconciliation.requiresDecision)
     }
 
     func testMismatchActionsNeverSilentlyReplaceSelectedTotal() {
@@ -195,6 +233,19 @@ final class SplitDraftTests: XCTestCase {
         let plan = draft.claimImpact(comparedTo: split)
 
         XCTAssertEqual(plan.itemIDsRequiringConfirmation, ["item-1"])
+        XCTAssertEqual(plan.removedItemIDs, ["item-1"])
+    }
+
+    func testSwitchingEditToEvenTreatsClaimedItemsAsRemoved() throws {
+        let split = try decodeSplit()
+        var draft = SplitDraft(split: split)
+        draft.splitMode = "even"
+
+        let plan = draft.claimImpact(comparedTo: split)
+
+        XCTAssertTrue(plan.requiresConfirmation)
+        XCTAssertEqual(plan.itemIDsRequiringConfirmation, ["item-1"])
+        XCTAssertEqual(plan.itemNamesRequiringConfirmation, ["Tacos 23"])
         XCTAssertEqual(plan.removedItemIDs, ["item-1"])
     }
 

@@ -20,6 +20,10 @@ struct SplitListView: View {
         return queue.entries(userId: userId, workspaceId: workspaceId)
     }
 
+    private var hasWaitingPending: Bool {
+        pending.contains { $0.isWaiting }
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -55,9 +59,12 @@ struct SplitListView: View {
             }
             .fullScreenCover(isPresented: $showCreate) {
                 SplitScanFlow(workspaceId: workspaceId) { outcome in
-                    // A queued split has no server id, so there is nothing to
-                    // open — it appears in the pending section instead.
-                    if case .created(let split) = outcome { openSplitId = split.id }
+                    // A durable local split has no server id, so there is
+                    // nothing to open — it appears in the pending section.
+                    switch outcome {
+                    case .created(let split): openSplitId = split.id
+                    case .queued, .needsAttention, .rejected: break
+                    }
                     Task { await vm.load(workspaceId: workspaceId) }
                 }
             }
@@ -123,14 +130,14 @@ struct SplitListView: View {
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
-    // MARK: - Waiting to upload
+    // MARK: - Pending splits
 
     private var pendingSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                SectionEyebrow("Waiting to upload")
+                SectionEyebrow("Pending splits")
                 Spacer()
-                if network.isOnline {
+                if network.isOnline && hasWaitingPending {
                     Button("Sync now") { Task { await syncPending() } }
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Theme.accent)

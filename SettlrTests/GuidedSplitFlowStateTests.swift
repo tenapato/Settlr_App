@@ -33,13 +33,71 @@ final class GuidedSplitFlowStateTests: XCTestCase {
     }
 
     func testByItemNamedLineWithoutPriceBlocksConfirmation() {
+        let itemID = UUID()
         var draft = SplitDraft()
         draft.merchant = "Cafe"
-        draft.items = [.init(name: "Lunch", quantity: 1, unitPriceCents: 0)]
+        draft.items = [.init(localID: itemID, name: "Lunch", quantity: 1, unitPriceCents: 0)]
 
         XCTAssertEqual(
             GuidedSplitFlowPolicy.firstIssue(on: .confirm, draft: draft, totalEdited: false, isEditing: false, isOnline: true)?.field,
-            .items
+            .item(itemID)
+        )
+    }
+
+    func testByItemPricedLineWithoutNameTargetsItsEditor() {
+        let itemID = UUID()
+        var draft = SplitDraft()
+        draft.merchant = "Cafe"
+        draft.items = [.init(localID: itemID, name: "   ", quantity: 1, unitPriceCents: 1_000)]
+        draft.selectedTotalCents = 1_000
+
+        let issue = GuidedSplitFlowPolicy.firstIssue(
+            on: .confirm,
+            draft: draft,
+            totalEdited: true,
+            isEditing: false,
+            isOnline: true
+        )
+
+        XCTAssertEqual(issue?.field, .item(itemID))
+        XCTAssertEqual(issue?.step, .items)
+    }
+
+    func testExplicitZeroTotalBlocksBothDivisionModes() {
+        for splitMode in ["by_item", "even"] {
+            var draft = SplitDraft()
+            draft.merchant = "Cafe"
+            draft.splitMode = splitMode
+            draft.items = [.init(name: "Lunch", quantity: 1, unitPriceCents: 1_000)]
+            draft.selectedTotalCents = 0
+
+            let issue = GuidedSplitFlowPolicy.firstIssue(
+                on: .confirm,
+                draft: draft,
+                totalEdited: true,
+                isEditing: false,
+                isOnline: true
+            )
+
+            XCTAssertEqual(issue?.field, .total, "Expected a total issue for \(splitMode)")
+            XCTAssertEqual(issue?.step, .confirm, "Expected Confirm to own the total issue for \(splitMode)")
+        }
+    }
+
+    func testDerivedPositiveByItemTotalDoesNotUseStaleSelectedZero() {
+        var draft = SplitDraft()
+        draft.merchant = "Cafe"
+        draft.items = [.init(name: "Lunch", quantity: 1, unitPriceCents: 1_000)]
+        draft.selectedTotalCents = 0
+
+        XCTAssertNil(
+            GuidedSplitFlowPolicy.firstIssue(
+                on: .confirm,
+                draft: draft,
+                totalEdited: false,
+                isEditing: false,
+                isOnline: true
+            )
         )
     }
 
@@ -51,8 +109,38 @@ final class GuidedSplitFlowStateTests: XCTestCase {
         draft.participants = []
 
         XCTAssertEqual(
-            GuidedSplitFlowPolicy.firstIssue(on: .confirm, draft: draft, totalEdited: false, isEditing: false, isOnline: true)?.field,
-            .payer
+            GuidedSplitFlowPolicy.firstIssue(on: .confirm, draft: draft, totalEdited: true, isEditing: false, isOnline: true)?.field,
+            .participants
+        )
+    }
+
+    func testNegativeRoundingDifferenceRequiresReceiptAcknowledgement() {
+        var draft = SplitDraft()
+        draft.merchant = "Cafe"
+        draft.items = [.init(name: "Lunch", quantity: 1, unitPriceCents: 10_050)]
+        draft.selectedTotalCents = 10_000
+
+        XCTAssertEqual(draft.reconciliation.kind, .rounding)
+        XCTAssertEqual(
+            GuidedSplitFlowPolicy.firstIssue(
+                on: .confirm,
+                draft: draft,
+                totalEdited: true,
+                isEditing: false,
+                isOnline: true
+            )?.field,
+            .reconciliation
+        )
+
+        draft.confirmKeepReceiptTotal()
+        XCTAssertNil(
+            GuidedSplitFlowPolicy.firstIssue(
+                on: .confirm,
+                draft: draft,
+                totalEdited: true,
+                isEditing: false,
+                isOnline: true
+            )
         )
     }
 

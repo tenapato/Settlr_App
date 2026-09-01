@@ -99,19 +99,33 @@ enum GuidedSplitFlowPolicy {
             return .init(step: .setup, field: .merchant, message: "Add a merchant name.")
         }
 
-        if draft.splitMode == "even" {
-            if draft.selectedTotalCents <= 0 {
-                return .init(step: .setup, field: .total, message: "Add a total greater than zero.")
+        if draft.splitMode != "even" {
+            if draft.filledItems.isEmpty {
+                return .init(step: .items, field: .items, message: "Add at least one item.")
             }
-        } else if draft.filledItems.isEmpty {
-            return .init(step: .items, field: .items, message: "Add at least one item.")
-        } else if let invalidItem = draft.filledItems.first(where: { $0.lineTotalCents <= 0 }) {
-            return .init(
-                step: .items,
-                field: .item(invalidItem.id),
-                message: "Add a price greater than zero for this item."
-            )
+            if let invalidItem = draft.filledItems.first(where: {
+                $0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }) {
+                return .init(
+                    step: .items,
+                    field: .item(invalidItem.id),
+                    message: "Add a name for this item."
+                )
+            }
+            if let invalidItem = draft.filledItems.first(where: { $0.lineTotalCents <= 0 }) {
+                return .init(
+                    step: .items,
+                    field: .item(invalidItem.id),
+                    message: "Add a price greater than zero for this item."
+                )
+            }
         }
+
+        let effectiveTotalCents = totalEdited ? draft.selectedTotalCents : draft.calculatedTotalCents
+        if effectiveTotalCents <= 0 {
+            return .init(step: .confirm, field: .total, message: "Add a total greater than zero.")
+        }
+        let effectiveReconciliation = draft.reconciliation(selectedTotalCents: effectiveTotalCents)
 
         if draft.participants.isEmpty {
             return .init(step: .setup, field: .participants, message: "Add at least one participant.")
@@ -125,7 +139,7 @@ enum GuidedSplitFlowPolicy {
             return .init(step: .setup, field: .paymentMethod, message: "Select a credit card.")
         }
 
-        if draft.reconciliation.requiresDecision {
+        if effectiveReconciliation.requiresDecision {
             return .init(step: .confirm, field: .reconciliation, message: "Resolve the total mismatch.")
         }
 
@@ -133,7 +147,6 @@ enum GuidedSplitFlowPolicy {
             return .init(step: .confirm, field: .onlineEdit, message: "Reconnect to save this edit.")
         }
 
-        _ = totalEdited
         return nil
     }
 }

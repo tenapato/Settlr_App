@@ -4,6 +4,39 @@ enum SplitScanStage {
     case capture, review, split, result
 }
 
+struct SplitPendingResultPresentation: Equatable {
+    let title: String
+    let reason: String?
+    let supportingMessage: String
+    let actionTitle: String
+    let isWaiting: Bool
+
+    init(entry: PendingSplit) {
+        if let reason = entry.blockedReason {
+            title = "Needs attention"
+            self.reason = reason.message
+            supportingMessage = "This split is saved on this phone. Open pending splits to try again or discard it."
+            actionTitle = "View pending splits"
+            isWaiting = false
+        } else {
+            title = "Waiting to upload"
+            reason = nil
+            supportingMessage = "This split is saved on this phone and will upload when you're back online."
+            actionTitle = "Done"
+            isWaiting = true
+        }
+    }
+}
+
+/// Everything the editor must retain while Review temporarily replaces it.
+/// Keeping the queue identity beside the draft prevents a corrected save from
+/// accidentally becoming a second durable operation.
+struct SplitEditorContinuation {
+    let draft: SplitDraft
+    let totalEdited: Bool
+    let blockedEntryID: UUID?
+}
+
 /// The `+ → Split a Bill` entry point.
 ///
 /// Opens straight into the camera, because that is what splitting a bill starts
@@ -30,13 +63,15 @@ struct SplitScanFlow: View {
     /// to know why the form is empty.
     @State private var notice: String?
     @State private var resultSplit: BillSplit?
-    @State private var queuedResult = false
-    @State private var flowDraft: SplitDraft?
-    @State private var flowDraftTotalEdited = false
+    @State private var pendingResult: PendingSplit?
+    @State private var editorContinuation: SplitEditorContinuation?
     @State private var flowOrigin: SplitScanFlowOrigin = .capturedReceipt
 
     private var flowMetadata: SplitScanFlowMetadata {
-        SplitScanFlowMetadata(origin: flowOrigin, totalEdited: flowDraftTotalEdited)
+        SplitScanFlowMetadata(
+            origin: flowOrigin,
+            totalEdited: editorContinuation?.totalEdited ?? false
+        )
     }
 
     var body: some View {
@@ -98,11 +133,15 @@ struct SplitScanFlow: View {
             vm: vm,
             prefill: prefill,
             notice: notice,
-            initialDraft: flowDraft,
-            initialTotalEdited: flowDraft == nil ? nil : flowDraftTotalEdited,
-            onBackToReview: flowMetadata.canReturnToReview ? { draft, totalEdited in
-                flowDraft = draft
-                flowDraftTotalEdited = totalEdited
+            initialDraft: editorContinuation?.draft,
+            initialTotalEdited: editorContinuation?.totalEdited,
+            initialBlockedEntryID: editorContinuation?.blockedEntryID,
+            onBackToReview: flowMetadata.canReturnToReview ? { draft, totalEdited, blockedEntryID in
+                editorContinuation = SplitEditorContinuation(
+                    draft: draft,
+                    totalEdited: totalEdited,
+                    blockedEntryID: blockedEntryID
+                )
                 stage = .review
             } : nil,
             onCancelFlow: { dismiss() },
@@ -111,12 +150,16 @@ struct SplitScanFlow: View {
             switch outcome {
             case .created(let split):
                 resultSplit = split
-                queuedResult = false
+                pendingResult = nil
+                editorContinuation = nil
                 onSaved(outcome)
                 stage = .result
-            case .queued:
+            case .queued(let entry), .needsAttention(let entry):
                 resultSplit = nil
-                queuedResult = true
+                pendingResult = entry
+                // SplitCreateSheet only forwards non-fixable needs-attention
+                // outcomes; fixable ones stay in the editor with their ID.
+                editorContinuation = nil
                 onSaved(outcome)
                 stage = .result
             case .rejected:
@@ -142,8 +185,8 @@ struct SplitScanFlow: View {
                         Button("Close") { dismiss() }
                     }
                 }
-        } else if queuedResult {
-            queuedResultView
+        } else if let pendingResult {
+            pendingResultView(pendingResult)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Close") { dismiss() }
@@ -154,19 +197,36 @@ struct SplitScanFlow: View {
         }
     }
 
-    private var queuedResultView: some View {
-        ZStack {
+    private func pendingResultView(_ entry: PendingSplit) -> some View {
+        let presentation = SplitPendingResultPresentation(entry: entry)
+        return ZStack {
             Theme.bg.ignoresSafeArea()
             VStack(spacing: 16) {
                 Spacer()
-                SettlrPulseLoadingView(message: "Waiting to upload")
-                Text("This split is saved on this phone and will upload when you're back online.")
+                if presentation.isWaiting {
+                    SettlrPulseLoadingView(message: presentation.title)
+                } else {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .font(.system(size: 42, weight: .semibold))
+                        .foregroundStyle(Theme.warning)
+                    Text(presentation.title)
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundStyle(Theme.ink)
+                    if let reason = presentation.reason {
+                        Text(reason)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Theme.expense)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 36)
+                    }
+                }
+                Text(presentation.supportingMessage)
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.muted)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 36)
                 Spacer()
-                Button("Done") { dismiss() }
+                Button(presentation.actionTitle) { dismiss() }
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(Theme.buttonInk)
                     .frame(maxWidth: .infinity)
@@ -181,8 +241,7 @@ struct SplitScanFlow: View {
     private func handleCapture(_ image: UIImage) {
         vm.beginReceiptScan()
         errorMessage = nil
-        flowDraft = nil
-        flowDraftTotalEdited = false
+        editorContinuation = nil
         flowOrigin = .capturedReceipt
         photoRecovery.clear()
         busyImage = image
@@ -264,16 +323,14 @@ struct SplitScanFlow: View {
         errorMessage = nil
         notice = "Enter the receipt items manually."
         prefill = nil
-        flowDraft = nil
-        flowDraftTotalEdited = false
+        editorContinuation = nil
         flowOrigin = .manual
         stage = .split
     }
 
     private func resetCapture() {
         prefill = nil
-        flowDraft = nil
-        flowDraftTotalEdited = false
+        editorContinuation = nil
         flowOrigin = .capturedReceipt
         notice = nil
         errorMessage = nil

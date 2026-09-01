@@ -417,6 +417,18 @@ grep -Fq '.accessibilityFocused(accessibilityFocus, equals: .item(item.id))' "$s
 grep -Fq '.accessibilityFocused(accessibilityFocus, equals: .total)' "$split_confirm"
 grep -Fq '.accessibilityFocused(accessibilityFocus, equals: .onlineEdit)' "$split_confirm"
 grep -Fq 'Button("Check connection"' "$split_confirm"
+grep -Fq 'moneyRow("Receipt total"' "$split_confirm"
+grep -Fq 'moneyRow("Difference"' "$split_confirm"
+grep -Fq 'The scan likely missed a line.' "$split_confirm"
+grep -Fq 'The scan likely duplicated or overcounted a line.' "$split_confirm"
+grep -Fq 'acknowledgementExplanation' "$split_confirm"
+grep -Fq 'reconciliation.requiresAcknowledgement' "$split_confirm"
+grep -Fq 'var requiresAcknowledgement: Bool { isMaterial || differenceCents < 0 }' Settlr/Views/Main/Split/SplitDraft.swift
+grep -Fq 'effectiveReconciliation.requiresDecision' Settlr/Views/Main/Split/GuidedSplitFlowState.swift
+grep -Fq 'func testConfirmPresentationRequiresDecisionForNegativeRoundingDifference()' SettlrTests/GuidedSplitPresentationTests.swift
+grep -Fq 'private var requestItems: [Item] { splitMode == "even" ? [] : filledItems }' Settlr/Views/Main/Split/SplitDraft.swift
+grep -Fq 'func testSwitchingEditToEvenTreatsClaimedItemsAsRemoved()' SettlrTests/SplitDraftTests.swift
+grep -Fq 'func testByItemPricedLineWithoutNameTargetsItsEditor()' SettlrTests/GuidedSplitFlowStateTests.swift
 grep -Fq 'network.refreshStatus()' "$split_editor"
 grep -Fq 'func refreshStatus() -> Bool' Settlr/Network/PendingSplitQueue.swift
 grep -Fq '@State private var deferredFocusTask: Task<Void, Never>?' "$split_editor"

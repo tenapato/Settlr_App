@@ -102,6 +102,7 @@ struct SplitPeopleEditorSheet: View {
 
 struct SplitItemEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var focusedField: Field?
     @State private var name: String
     @State private var quantity: Int
     @State private var priceText: String
@@ -109,6 +110,11 @@ struct SplitItemEditorSheet: View {
     let item: SplitDraft.Item
     let onCommit: (SplitDraft.Item) -> Void
     let onRemove: (() -> Void)?
+
+    private enum Field: Hashable {
+        case name
+        case price
+    }
 
     init(item: SplitDraft.Item, onCommit: @escaping (SplitDraft.Item) -> Void, onRemove: (() -> Void)? = nil) {
         self.item = item
@@ -124,8 +130,11 @@ struct SplitItemEditorSheet: View {
         NavigationStack {
             Form {
                 TextField("Item", text: $name)
+                    .focused($focusedField, equals: .name)
                 Stepper("Quantity: \(quantity)", value: $quantity, in: 1...999)
-                TextField("Unit price", text: $priceText).keyboardType(.decimalPad)
+                TextField("Unit price", text: $priceText)
+                    .keyboardType(.decimalPad)
+                    .focused($focusedField, equals: .price)
                 Picker("Allocation", selection: $allocationMode) {
                     Text("Shared").tag("shared")
                     Text("By units").tag("units")
@@ -139,6 +148,10 @@ struct SplitItemEditorSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { commit() } }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { focusedField = nil }
+                }
             }
         }
     }
@@ -177,9 +190,11 @@ struct SplitMoneyEditorSheet: View {
                     .font(.system(.title2, design: .rounded).monospacedDigit())
                 if kind == .tip {
                     ForEach(TipPreset.values, id: \.self) { percent in
+                        let isActive = TipPreset.activePercent(base: tipBaseCents, tipCents: Self.parseMoney(text)) == percent
                         Button("\(percent)% — \(Self.money(TipPreset.cents(base: tipBaseCents, percent: percent)))") {
-                            text = String(format: "%.2f", Double(TipPreset.cents(base: tipBaseCents, percent: percent)) / 100)
+                            text = Self.moneyText(Self.toggledTipCents(base: tipBaseCents, currentCents: Self.parseMoney(text), percent: percent))
                         }
+                        .accessibilityValue(isActive ? "Selected" : "Not selected")
                     }
                 }
             }
@@ -193,7 +208,15 @@ struct SplitMoneyEditorSheet: View {
         }
     }
 
+    static func toggledTipCents(base: Int, currentCents: Int, percent: Int) -> Int {
+        if TipPreset.activePercent(base: base, tipCents: currentCents) == percent {
+            return 0
+        }
+        return TipPreset.cents(base: base, percent: percent)
+    }
+
     private static func parseMoney(_ value: String) -> Int { max(0, Int(((Double(value.replacingOccurrences(of: ",", with: ".")) ?? 0) * 100.0).rounded())) }
+    private static func moneyText(_ cents: Int) -> String { String(format: "%.2f", Double(cents) / 100) }
     private static func money(_ cents: Int) -> String { String(format: "$%.2f", Double(cents) / 100) }
 }
 

@@ -25,7 +25,9 @@ struct SplitConfirmPresentation: Equatable {
     let feeCents: Int
     let calculatedTotalCents: Int
     let effectiveTotalCents: Int
+    let receiptTotalCents: Int?
     let differenceCents: Int?
+    let acknowledgementExplanation: String?
     let payerLabel: String
     let divisionSummary: String
     let paymentLabel: String
@@ -42,7 +44,15 @@ struct SplitConfirmPresentation: Equatable {
         feeCents = draft.feeCents
         calculatedTotalCents = reconciliation.calculatedTotalCents
         effectiveTotalCents = totalEdited ? reconciliation.selectedTotalCents : reconciliation.calculatedTotalCents
-        differenceCents = totalEdited && reconciliation.isMaterial ? reconciliation.differenceCents : nil
+        receiptTotalCents = totalEdited ? reconciliation.selectedTotalCents : nil
+        differenceCents = totalEdited && reconciliation.differenceCents != 0 ? reconciliation.differenceCents : nil
+        if totalEdited && reconciliation.requiresAcknowledgement {
+            acknowledgementExplanation = reconciliation.differenceCents > 0
+                ? "The receipt total is higher than the calculated total. The scan likely missed a line."
+                : "The receipt total is lower than the calculated total. The scan likely duplicated or overcounted a line."
+        } else {
+            acknowledgementExplanation = nil
+        }
         switch draft.payer {
         case "me": payerLabel = "I paid it all"
         case "each_own": payerLabel = "Each paid their own"
@@ -90,8 +100,8 @@ struct SplitConfirmStepView: View {
             heroAmount
             mathRows
 
-            if presentation.differenceCents != nil {
-                mismatchDecision
+            if let explanation = presentation.acknowledgementExplanation {
+                mismatchDecision(explanation: explanation)
             }
 
             summaryRows
@@ -146,13 +156,21 @@ struct SplitConfirmStepView: View {
             moneyRow("Fee", presentation.feeCents, field: .fee)
             FormRowDivider()
             moneyRow("Calculated total", presentation.calculatedTotalCents, field: .total, emphasized: true)
+            if let receiptTotalCents = presentation.receiptTotalCents {
+                FormRowDivider()
+                moneyRow("Receipt total", receiptTotalCents, field: nil, emphasized: true)
+            }
+            if let differenceCents = presentation.differenceCents {
+                FormRowDivider()
+                moneyRow("Difference", differenceCents, field: nil, signed: true)
+            }
         }
     }
 
-    private var mismatchDecision: some View {
+    private func mismatchDecision(explanation: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionEyebrow("Check the receipt")
-            Text("The receipt and calculated totals differ by \(signedMoney(presentation.differenceCents ?? 0)).")
+            Text(explanation)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(Theme.ink)
 
@@ -207,22 +225,36 @@ struct SplitConfirmStepView: View {
         }
     }
 
-    private func moneyRow(_ label: String, _ cents: Int, field: SplitMoneyField?, emphasized: Bool = false) -> some View {
+    private func moneyRow(
+        _ label: String,
+        _ cents: Int,
+        field: SplitMoneyField?,
+        emphasized: Bool = false,
+        signed: Bool = false
+    ) -> some View {
         Group {
             if let field {
-                Button { onEditMoney(field) } label: { moneyRowContent(label, cents, emphasized: emphasized, editable: true) }
+                Button { onEditMoney(field) } label: {
+                    moneyRowContent(label, cents, emphasized: emphasized, editable: true, signed: signed)
+                }
                     .buttonStyle(.plain)
             } else {
-                moneyRowContent(label, cents, emphasized: emphasized, editable: false)
+                moneyRowContent(label, cents, emphasized: emphasized, editable: false, signed: signed)
             }
         }
     }
 
-    private func moneyRowContent(_ label: String, _ cents: Int, emphasized: Bool, editable: Bool) -> some View {
+    private func moneyRowContent(
+        _ label: String,
+        _ cents: Int,
+        emphasized: Bool,
+        editable: Bool,
+        signed: Bool
+    ) -> some View {
         HStack {
             Text(label).foregroundStyle(Theme.muted)
             Spacer()
-            Text(formatSplitMoney(cents))
+            Text(signed ? signedMoney(cents) : formatSplitMoney(cents))
                 .font(.system(size: emphasized ? 15 : 13, weight: emphasized ? .bold : .medium, design: .monospaced))
                 .foregroundStyle(Theme.ink)
             if editable {

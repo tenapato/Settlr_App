@@ -39,7 +39,8 @@ struct SplitCreateSheet: View {
     var editingSplit: BillSplit? = nil
     var initialDraft: SplitDraft? = nil
     var initialTotalEdited: Bool? = nil
-    var onBackToReview: ((SplitDraft, Bool) -> Void)? = nil
+    var initialBlockedEntryID: UUID? = nil
+    var onBackToReview: ((SplitDraft, Bool, UUID?) -> Void)? = nil
     var onCancelFlow: (() -> Void)? = nil
     var dismissOnSave: Bool = true
     let onSaved: (SplitSaveOutcome) -> Void
@@ -67,6 +68,9 @@ struct SplitCreateSheet: View {
     @State private var editBaseline: BillSplit?
     @State private var openedEditVersion: Int?
     @State private var isSubmitting = false
+    /// A server-rejected create remains durable while this draft is corrected.
+    /// Saving again updates that same queue entry so its replay key survives.
+    @State private var blockedEntryID: UUID?
 
     @State private var path: [GuidedSplitStep] = []
     @State private var validationIssue: GuidedSplitValidationIssue?
@@ -145,7 +149,7 @@ struct SplitCreateSheet: View {
             Button("Cancel", role: .cancel) {}
             Button("Keep receipt total", action: confirmKeepReceiptTotal)
         } message: {
-            Text("The item lines and total differ materially. Keep this total only after checking the receipt for missing or duplicated rows.")
+            Text("Keep this total only after checking the receipt for missing or duplicated rows.")
         }
         .alert("Clear existing claims?", isPresented: $showClaimChangeConfirmation) {
             Button("Cancel", role: .cancel) { pendingClaimClearIDs = [] }
@@ -496,7 +500,7 @@ struct SplitCreateSheet: View {
         guard !isScanning, !isSubmitting else { return }
         cancelDeferredAccessibilityFocus()
         photoRecovery.clear()
-        onBackToReview?(draft, totalEdited)
+        onBackToReview?(draft, totalEdited, blockedEntryID)
     }
 
     private func requestCancel() {
@@ -702,6 +706,7 @@ struct SplitCreateSheet: View {
     private func applyInitialDraftOnce() {
         guard !hasInitialized else { return }
         hasInitialized = true
+        blockedEntryID = initialBlockedEntryID
         if scanNotice == nil, let notice { scanNotice = notice }
         if let initialDraft {
             draft = initialDraft
@@ -823,12 +828,38 @@ struct SplitCreateSheet: View {
         let body = bodyDraft.makeCreateBody()
         Task {
             defer { isSubmitting = false }
-            let entry = queue.makeEntry(userId: userId, workspaceId: workspaceId, body: body)
-            let outcome = await queue.save(entry)
+            let submission = await queue.submit(
+                userId: userId,
+                workspaceId: workspaceId,
+                body: body,
+                replacing: blockedEntryID
+            )
+            if submission.route == .create {
+                // This is also the stale-ID fallback route. Forget the removed
+                // identity before interpreting the new entry's outcome.
+                blockedEntryID = nil
+            }
+            let outcome = submission.outcome
             switch outcome {
             case .created, .queued:
+                blockedEntryID = nil
                 onSaved(outcome)
                 if dismissOnSave { dismiss() }
+            case .needsAttention(let entry):
+                guard let reason = entry.blockedReason else {
+                    submissionErrorMessage = entry.lastErrorMessage ?? "This split needs attention."
+                    return
+                }
+                if reason.isFixableByEditing {
+                    // Stay on Confirm with the complete draft intact and point
+                    // the next Save at this same durable operation.
+                    blockedEntryID = entry.id
+                    submissionErrorMessage = reason.message
+                } else {
+                    blockedEntryID = nil
+                    onSaved(outcome)
+                    if dismissOnSave { dismiss() }
+                }
             case .rejected(let message):
                 submissionErrorMessage = message
             }

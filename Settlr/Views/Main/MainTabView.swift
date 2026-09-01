@@ -55,9 +55,11 @@ struct MainTabView: View {
                 guard appState.currentUser?.has(.billSplits) == true,
                       appState.activeWorkspace != nil else { return }
                 // Only a split that reached the server has an id worth opening.
-                // A queued one lands in the list's "Waiting to upload" section,
-                // and deep-linking a local id would spin forever.
-                if case .created(let split) = outcome { createdSplitId = split.id }
+                // Durable local outcomes land in the pending section instead.
+                switch outcome {
+                case .created(let split): createdSplitId = split.id
+                case .queued, .needsAttention, .rejected: break
+                }
                 showSplitList = true
             }
         }

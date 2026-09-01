@@ -81,6 +81,20 @@ struct PendingSplit: Codable, Identifiable {
         if case .needsAttention(let reason) = state { return reason }
         return nil
     }
+
+    /// Requeues this same durable operation after the user fixes its draft.
+    /// The queue identity is also the server replay identity, so a replacement
+    /// body must never be allowed to stamp a new idempotency key.
+    mutating func prepareForRetry(with replacementBody: CreateBillSplitBody? = nil) {
+        if var replacementBody {
+            replacementBody.idempotencyKey = idempotencyKey
+            body = replacementBody
+        }
+        state = .queued
+        attemptCount = 0
+        nextAttemptAt = nil
+        lastErrorMessage = nil
+    }
 }
 
 // MARK: - Classification
@@ -147,6 +161,55 @@ enum SplitSyncPolicy {
     {
         let base = min(pow(2.0, Double(max(1, attempt))), 300)
         return base * jitter
+    }
+
+    /// Applies one failed request to its durable entry. The returned outcome is
+    /// derived from the persisted state, so callers cannot accidentally label
+    /// a blocked entry as an ordinary queued upload.
+    static func transition(
+        _ entry: PendingSplit,
+        after verdict: SyncVerdict,
+        errorMessage: String,
+        now: Date = Date(),
+        jitter: Double = Double.random(in: 0.8...1.2)
+    ) -> PendingSplitFailureTransition {
+        var updated = entry
+        switch verdict {
+        case .notYet:
+            // Costs no attempt: being in a basement is not the split's fault.
+            updated.state = .queued
+            updated.nextAttemptAt = nil
+            updated.lastErrorMessage = nil
+        case .waitForSignIn:
+            updated.state = .queued
+        case .retryLater:
+            updated.attemptCount += 1
+            updated.lastErrorMessage = errorMessage
+            if updated.attemptCount >= maxAttempts {
+                updated.state = .needsAttention(.serverUnavailable(errorMessage))
+                updated.nextAttemptAt = nil
+            } else {
+                updated.state = .queued
+                updated.nextAttemptAt = now.addingTimeInterval(
+                    backoff(forAttempt: updated.attemptCount, jitter: jitter)
+                )
+            }
+        case .giveUp(let reason):
+            updated.attemptCount += 1
+            updated.state = .needsAttention(reason)
+            updated.nextAttemptAt = nil
+            updated.lastErrorMessage = reason.message
+        }
+        return PendingSplitFailureTransition(entry: updated)
+    }
+}
+
+struct PendingSplitFailureTransition {
+    let entry: PendingSplit
+
+    var outcome: SplitSaveOutcome {
+        if entry.blockedReason != nil { return .needsAttention(entry) }
+        return .queued(entry)
     }
 }
 
@@ -251,9 +314,30 @@ enum SplitSaveOutcome {
     case created(BillSplit)
     /// It is on disk and will upload itself. There is no split to open yet.
     case queued(PendingSplit)
+    /// It is still on disk, but automatic upload has stopped. The associated
+    /// reason determines whether the current editor can fix it or the pending
+    /// list should offer retry/discard controls.
+    case needsAttention(PendingSplit)
     /// The server refused the payload. The sheet stays open so it can be fixed
-    /// — byte-for-byte the behaviour before any of this existed.
+    /// before it was ever accepted into the durable queue.
     case rejected(String)
+}
+
+/// Decides whether a create-sheet submission updates its durable correction or
+/// starts one new operation because that correction was removed elsewhere.
+enum PendingSplitSubmissionRoute: Equatable {
+    case create
+    case resubmit(UUID)
+
+    static func resolve(replacing id: UUID?, entries: [PendingSplit]) -> Self {
+        guard let id, entries.contains(where: { $0.id == id }) else { return .create }
+        return .resubmit(id)
+    }
+}
+
+struct PendingSplitSubmission {
+    let route: PendingSplitSubmissionRoute
+    let outcome: SplitSaveOutcome
 }
 
 @MainActor
@@ -334,6 +418,41 @@ final class PendingSplitQueue {
         return await attempt(entry.id, timeout: 8)
     }
 
+    /// Saves one create-sheet submission without a check-then-await gap. A
+    /// stale correction ID falls back to one freshly stamped entry during the
+    /// same MainActor turn; a live ID keeps its original replay key.
+    func submit(
+        userId: String,
+        workspaceId: String,
+        body: CreateBillSplitBody,
+        replacing blockedEntryID: UUID?
+    ) async -> PendingSplitSubmission {
+        let route = PendingSplitSubmissionRoute.resolve(
+            replacing: blockedEntryID,
+            entries: entries
+        )
+        switch route {
+        case .resubmit(let id):
+            update(id) { $0.prepareForRetry(with: body) }
+            let outcome = await attempt(id, timeout: 8)
+            return PendingSplitSubmission(route: route, outcome: outcome)
+        case .create:
+            guard !isFull else {
+                return PendingSplitSubmission(
+                    route: route,
+                    outcome: .rejected(
+                        "You have \(maxEntries) splits waiting to upload. Send those first."
+                    )
+                )
+            }
+            let entry = makeEntry(userId: userId, workspaceId: workspaceId, body: body)
+            entries.append(entry)
+            persist()
+            let outcome = await attempt(entry.id, timeout: 8)
+            return PendingSplitSubmission(route: route, outcome: outcome)
+        }
+    }
+
     // MARK: Syncing
 
     /// Uploads everything waiting for this user, oldest first.
@@ -366,7 +485,7 @@ final class PendingSplitQueue {
 
         for entry in due {
             switch await attempt(entry.id, timeout: nil) {
-            case .created, .rejected:
+            case .created, .needsAttention, .rejected:
                 continue
             case .queued(let updated):
                 // No connection, or the session is gone: every remaining entry
@@ -401,49 +520,20 @@ final class PendingSplitQueue {
     }
 
     private func record(failure error: Error, for id: UUID) -> SplitSaveOutcome {
-        switch SplitSyncPolicy.classify(error) {
-        case .notYet:
-            // Costs no attempt: being in a basement is not the split's fault.
-            update(id) {
-                $0.state = .queued
-                $0.nextAttemptAt = nil
-                $0.lastErrorMessage = nil
-            }
-        case .waitForSignIn:
-            isWaitingForSignIn = true
-            update(id) { $0.state = .queued }
-        case .retryLater:
-            update(id) { entry in
-                entry.attemptCount += 1
-                entry.lastErrorMessage = error.localizedDescription
-                if entry.attemptCount >= SplitSyncPolicy.maxAttempts {
-                    entry.state = .needsAttention(.serverUnavailable(error.localizedDescription))
-                    entry.nextAttemptAt = nil
-                } else {
-                    entry.state = .queued
-                    entry.nextAttemptAt = Date().addingTimeInterval(
-                        SplitSyncPolicy.backoff(forAttempt: entry.attemptCount)
-                    )
-                }
-            }
-        case .giveUp(let reason):
-            // A payload the server won't take goes straight back to the sheet,
-            // exactly as it did before there was a queue.
-            if reason.isFixableByEditing {
-                remove(id)
-                return .rejected(reason.message)
-            }
-            update(id) { entry in
-                entry.attemptCount += 1
-                entry.state = .needsAttention(reason)
-                entry.nextAttemptAt = nil
-                entry.lastErrorMessage = reason.message
-            }
-        }
         guard let entry = entries.first(where: { $0.id == id }) else {
             return .rejected(error.localizedDescription)
         }
-        return .queued(entry)
+        let verdict = SplitSyncPolicy.classify(error)
+        if verdict == .waitForSignIn {
+            isWaitingForSignIn = true
+        }
+        let transition = SplitSyncPolicy.transition(
+            entry,
+            after: verdict,
+            errorMessage: error.localizedDescription
+        )
+        update(id) { $0 = transition.entry }
+        return transition.outcome
     }
 
     // MARK: Editing
@@ -452,12 +542,18 @@ final class PendingSplitQueue {
     /// attempt somehow did land, the retry replays it rather than creating a
     /// second split.
     func retry(_ id: UUID) {
-        update(id) {
-            $0.state = .queued
-            $0.attemptCount = 0
-            $0.nextAttemptAt = nil
-            $0.lastErrorMessage = nil
+        update(id) { $0.prepareForRetry() }
+    }
+
+    /// Replaces a rejected payload in place and immediately retries it. The
+    /// entry id and idempotency key survive the edit, avoiding both a stale
+    /// blocked copy and a duplicate server create.
+    func resubmit(_ id: UUID, body: CreateBillSplitBody) async -> SplitSaveOutcome {
+        guard entries.contains(where: { $0.id == id }) else {
+            return .rejected("This split is no longer waiting to upload.")
         }
+        update(id) { $0.prepareForRetry(with: body) }
+        return await attempt(id, timeout: 8)
     }
 
     func remove(_ id: UUID) {
