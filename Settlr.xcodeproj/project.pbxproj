@@ -123,6 +123,8 @@
 		AB0000000000000000000032 /* QuickActionLauncherMotionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000033 /* QuickActionLauncherMotionTests.swift */; };
 		AB0000000000000000000034 /* GuidedSplitPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000035 /* GuidedSplitPresentationTests.swift */; };
 		AA000000000000000000BB98 /* SplitEditorSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR98 /* SplitEditorSheets.swift */; };
+		AA000000000000000000BB99 /* SplitGuidedComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR99 /* SplitGuidedComponents.swift */; };
+		AA000000000000000000BB9A /* SplitSetupStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR9A /* SplitSetupStepView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -231,6 +233,8 @@
 		AA000000000000000000FR75 /* SplitDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitDetailView.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR88 /* SplitPaymentMethodSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitPaymentMethodSheet.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR98 /* SplitEditorSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitEditorSheets.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR99 /* SplitGuidedComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitGuidedComponents.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR9A /* SplitSetupStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitSetupStepView.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR76 /* PublicSplitClaimView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicSplitClaimView.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR77 /* ReceiptCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptCaptureView.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR78 /* SplitScanFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitScanFlow.swift; sourceTree = "<group>"; };
@@ -465,6 +469,8 @@
 				AA000000000000000000FR75 /* SplitDetailView.swift */,
 				AA000000000000000000FR88 /* SplitPaymentMethodSheet.swift */,
 				AA000000000000000000FR98 /* SplitEditorSheets.swift */,
+				AA000000000000000000FR99 /* SplitGuidedComponents.swift */,
+				AA000000000000000000FR9A /* SplitSetupStepView.swift */,
 				AA000000000000000000FR76 /* PublicSplitClaimView.swift */,
 				AA000000000000000000FR77 /* ReceiptCaptureView.swift */,
 				AA000000000000000000FR78 /* SplitScanFlow.swift */,
@@ -763,6 +769,8 @@
 				AA000000000000000000BB75 /* SplitDetailView.swift in Sources */,
 				AA000000000000000000BB88 /* SplitPaymentMethodSheet.swift in Sources */,
 				AA000000000000000000BB98 /* SplitEditorSheets.swift in Sources */,
+				AA000000000000000000BB99 /* SplitGuidedComponents.swift in Sources */,
+				AA000000000000000000BB9A /* SplitSetupStepView.swift in Sources */,
 				AA000000000000000000BB76 /* PublicSplitClaimView.swift in Sources */,
 				AA000000000000000000BB77 /* ReceiptCaptureView.swift in Sources */,
 				AA000000000000000000BB78 /* SplitScanFlow.swift in Sources */,
