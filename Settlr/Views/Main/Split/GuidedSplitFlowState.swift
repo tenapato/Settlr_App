@@ -9,6 +9,7 @@ enum GuidedSplitStep: Hashable {
 enum GuidedSplitField: Equatable {
     case merchant
     case payer
+    case division
     case paymentMethod
     case total
     case items

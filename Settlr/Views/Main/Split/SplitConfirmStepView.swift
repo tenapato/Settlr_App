@@ -17,6 +17,8 @@ enum GuidedSplitPrimaryAction: Equatable {
 /// Read-only values for the confirmation screen. Reconciliation remains owned
 /// by `SplitDraft`, so the UI never creates a second tolerance policy.
 struct SplitConfirmPresentation: Equatable {
+    static let divisionSetupField: GuidedSplitField = .division
+
     let itemSubtotalCents: Int
     let taxCents: Int
     let tipCents: Int
@@ -156,10 +158,12 @@ struct SplitConfirmStepView: View {
                 Button("Keep receipt total", action: onKeepReceiptTotal)
                     .buttonStyle(.bordered)
                     .tint(draft.mismatchAcknowledged ? Theme.income : Theme.warning)
+                    .frame(minHeight: 44)
                 Button("Use calculated total", action: onUseCalculatedTotal)
                     .buttonStyle(.borderedProminent)
                     .tint(Theme.accent)
                     .foregroundStyle(Theme.buttonInk)
+                    .frame(minHeight: 44)
             }
             .font(.system(size: 13, weight: .semibold))
 
@@ -182,7 +186,7 @@ struct SplitConfirmStepView: View {
         FormCard {
             summaryRow("Who paid", presentation.payerLabel, field: .payer)
             FormRowDivider()
-            summaryRow("Division", presentation.divisionSummary, field: .payer)
+            summaryRow("Division", presentation.divisionSummary, field: SplitConfirmPresentation.divisionSetupField)
             if let evenShare = presentation.evenShareCents {
                 FormRowDivider()
                 staticSummaryRow("Each person", formatSplitMoney(evenShare))
@@ -219,6 +223,7 @@ struct SplitConfirmStepView: View {
         .font(.system(size: 13))
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
+        .frame(minHeight: 44)
         .contentShape(Rectangle())
     }
 
@@ -248,6 +253,7 @@ struct SplitConfirmStepView: View {
         .font(.system(size: 14))
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
+        .frame(minHeight: 44)
         .contentShape(Rectangle())
     }
 

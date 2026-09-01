@@ -87,4 +87,8 @@ final class GuidedSplitPresentationTests: XCTestCase {
         XCTAssertEqual(GuidedSplitPrimaryAction.saveChanges.title, "Save changes")
         XCTAssertEqual(GuidedSplitPrimaryAction.saveOnPhone.title, "Save on this phone")
     }
+
+    func testConfirmDivisionSummaryRoutesToDivisionSetupField() {
+        XCTAssertEqual(SplitConfirmPresentation.divisionSetupField, .division)
+    }
 }
