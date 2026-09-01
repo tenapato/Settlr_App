@@ -5,6 +5,7 @@ struct SplitSetupStepView: View {
     let totalCents: Int
     let cards: [CreditCard]
     let cardLoadState: SplitCardLoadState
+    let accessibilityFocus: AccessibilityFocusState<GuidedSplitField?>.Binding
     let validationIssue: GuidedSplitValidationIssue?
     let onEditReceipt: () -> Void
     let onEditPeople: () -> Void
@@ -30,6 +31,7 @@ struct SplitSetupStepView: View {
         VStack(alignment: .leading, spacing: 20) {
             SplitReceiptHeader(
                 presentation: .init(draft: draft, totalCents: totalCents),
+                accessibilityFocus: accessibilityFocus,
                 onEditReceipt: onEditReceipt,
                 onScanAgain: onScanAgain,
                 onOpenParserSettings: onOpenParserSettings
@@ -38,6 +40,7 @@ struct SplitSetupStepView: View {
             VStack(alignment: .leading, spacing: 8) {
                 SectionEyebrow("Who paid?")
                 payerRow(value: "me", title: "I paid it all", detail: "Track what everyone owes you", icon: "person.fill")
+                    .accessibilityFocused(accessibilityFocus, equals: .payer)
                 payerRow(value: "each_own", title: "Each paid their own", detail: "No one needs to pay you back", icon: "person.2.fill")
             }
 
@@ -50,6 +53,7 @@ struct SplitSetupStepView: View {
                         ToggleOption(value: "even", label: "Evenly", icon: "equal")
                     ]
                 )
+                .accessibilityFocused(accessibilityFocus, equals: .division)
             }
 
             FormCard {
@@ -82,6 +86,7 @@ struct SplitSetupStepView: View {
                                 .foregroundStyle(Theme.faint)
                         }
                     }
+                    .accessibilityFocused(accessibilityFocus, equals: .paymentMethod)
                 }
                 if case let .failed(message) = cardLoadState {
                     SignalFormRow(label: message, action: onRetryCards) {
@@ -99,6 +104,11 @@ struct SplitSetupStepView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+        .onChange(of: draft.merchant) { _, _ in clearAccessibilityFocus(for: .merchant) }
+        .onChange(of: draft.payer) { _, _ in clearAccessibilityFocus(for: .payer) }
+        .onChange(of: draft.splitMode) { _, _ in clearAccessibilityFocus(for: .division) }
+        .onChange(of: draft.paymentChannel) { _, _ in clearAccessibilityFocus(for: .paymentMethod) }
+        .onChange(of: draft.creditCardId) { _, _ in clearAccessibilityFocus(for: .paymentMethod) }
     }
 
     private func payerRow(value: String, title: String, detail: String, icon: String) -> some View {
@@ -132,5 +142,11 @@ struct SplitSetupStepView: View {
     private func cardLabel(_ card: CreditCard) -> String {
         guard let lastFour = card.lastFour, !lastFour.isEmpty else { return card.label }
         return "\(card.label) •••• \(lastFour)"
+    }
+
+    private func clearAccessibilityFocus(for field: GuidedSplitField) {
+        if accessibilityFocus.wrappedValue == field {
+            accessibilityFocus.wrappedValue = nil
+        }
     }
 }

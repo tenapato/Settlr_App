@@ -70,6 +70,8 @@ struct SplitCreateSheet: View {
 
     @State private var path: [GuidedSplitStep] = []
     @State private var validationIssue: GuidedSplitValidationIssue?
+    @State private var pendingAccessibilityFocus: GuidedSplitField?
+    @AccessibilityFocusState private var accessibilityFocus: GuidedSplitField?
     @State private var itemFilter: SplitItemFilter = .all
     @State private var presentedEditor: SplitPresentedEditor?
     @State private var cardLoadState: SplitCardLoadState = .idle
@@ -139,7 +141,7 @@ struct SplitCreateSheet: View {
         }
         .alert("Keep the receipt total?", isPresented: $showKeepMismatchConfirmation) {
             Button("Cancel", role: .cancel) {}
-            Button("Keep receipt total") { draft.confirmKeepReceiptTotal() }
+            Button("Keep receipt total", action: confirmKeepReceiptTotal)
         } message: {
             Text("The item lines and total differ materially. Keep this total only after checking the receipt for missing or duplicated rows.")
         }
@@ -170,6 +172,14 @@ struct SplitCreateSheet: View {
         .onAppear { applyInitialDraftOnce() }
         .onChange(of: canUseCreditCards) { _, enabled in
             if !enabled { normalizeCardPaymentState() }
+        }
+        .onChange(of: network.isOnline) { _, isOnline in
+            if isOnline, validationIssue?.field == .onlineEdit {
+                clearValidationAndFocus()
+            }
+        }
+        .onChange(of: path) { _, _ in
+            if pendingAccessibilityFocus == nil { accessibilityFocus = nil }
         }
         .onDisappear { photoRecovery.clear() }
         .interactiveDismissDisabled(isScanning || isSubmitting)
@@ -229,6 +239,7 @@ struct SplitCreateSheet: View {
                 totalCents: effectiveTotalCents,
                 cards: canUseCreditCards ? creditCards : [],
                 cardLoadState: canUseCreditCards ? cardLoadState : .idle,
+                accessibilityFocus: $accessibilityFocus,
                 validationIssue: validationIssue,
                 onEditReceipt: { presentedEditor = .receipt },
                 onEditPeople: { presentedEditor = .people },
@@ -240,6 +251,7 @@ struct SplitCreateSheet: View {
             SplitItemsStepView(
                 draft: $draft,
                 filter: $itemFilter,
+                accessibilityFocus: $accessibilityFocus,
                 validationIssue: validationIssue,
                 onEditItem: { presentedEditor = .item($0.id) },
                 onAddItem: { presentedEditor = .newItem(SplitDraft.Item()) }
@@ -248,7 +260,13 @@ struct SplitCreateSheet: View {
             SplitConfirmStepView(
                 draft: $draft,
                 totalEdited: $totalEdited,
-                presentation: .init(draft: submissionDraft, totalEdited: totalEdited),
+                accessibilityFocus: $accessibilityFocus,
+                presentation: .init(
+                    draft: submissionDraft,
+                    totalEdited: totalEdited,
+                    isOnline: network.isOnline,
+                    isEditing: isEditing
+                ),
                 validationIssue: validationIssue,
                 onEditSetupValue: editSetupValue,
                 onEditMoney: { presentedEditor = .money($0) },
@@ -256,7 +274,7 @@ struct SplitCreateSheet: View {
                 onUseCalculatedTotal: {
                     draft.useCalculatedTotal()
                     totalEdited = true
-                    validationIssue = nil
+                    clearValidationAndFocus()
                 }
             )
         }
@@ -334,12 +352,12 @@ struct SplitCreateSheet: View {
             SplitReceiptDetailsSheet(merchant: draft.merchant, occurredAt: draft.occurredAt) { merchant, date in
                 draft.merchant = merchant
                 draft.occurredAt = date
-                validationIssue = nil
+                clearValidationAndFocus()
             }
         case .people:
             SplitPeopleEditorSheet(participants: draft.participants) { participants in
                 draft.participants = participants
-                validationIssue = nil
+                clearValidationAndFocus()
             }
         case .item(let id):
             if let item = draft.items.first(where: { $0.id == id }) {
@@ -353,7 +371,7 @@ struct SplitCreateSheet: View {
             SplitItemEditorSheet(item: item) { committed in
                 draft.items.append(committed)
                 draft.mismatchAcknowledged = false
-                validationIssue = nil
+                clearValidationAndFocus()
             }
         case .money(let field):
             SplitMoneyEditorSheet(
@@ -377,20 +395,20 @@ struct SplitCreateSheet: View {
 
     private func continueFromSetup() {
         if let issue = firstSetupIssue() {
-            validationIssue = issue
+            present(issue)
             return
         }
         setupErrorMessage = nil
-        validationIssue = nil
+        clearValidationAndFocus()
         path.append(GuidedSplitFlowPolicy.nextStep(splitMode: draft.splitMode))
     }
 
     private func continueFromItems() {
         if let issue = submissionIssue().map(issueOwnedByItsEditor), issue.step == .items {
-            validationIssue = issue
+            present(issue)
             return
         }
-        validationIssue = nil
+        clearValidationAndFocus()
         path.append(.confirm)
     }
 
@@ -431,20 +449,13 @@ struct SplitCreateSheet: View {
     }
 
     private func issueOwnedByItsEditor(_ issue: GuidedSplitValidationIssue) -> GuidedSplitValidationIssue {
-        let step: GuidedSplitStep
-        switch issue.field {
-        case .merchant, .payer, .division, .paymentMethod:
-            step = .setup
-        case .items:
-            step = .items
-        case .total, .reconciliation, .onlineEdit:
-            step = .confirm
-        }
-        return .init(step: step, field: issue.field, message: issue.message)
+        .init(step: issue.field.owningStep, field: issue.field, message: issue.message)
     }
 
     private func present(_ issue: GuidedSplitValidationIssue) {
         validationIssue = issue
+        pendingAccessibilityFocus = issue.field
+        accessibilityFocus = nil
         switch issue.step {
         case .setup:
             path.removeAll()
@@ -453,10 +464,16 @@ struct SplitCreateSheet: View {
         case .confirm:
             if path.last != .confirm { path.append(.confirm) }
         }
+        Task { @MainActor in
+            await Task.yield()
+            guard validationIssue == issue, pendingAccessibilityFocus == issue.field else { return }
+            accessibilityFocus = issue.field
+            pendingAccessibilityFocus = nil
+        }
     }
 
     private func editSetupValue(_ field: GuidedSplitField) {
-        validationIssue = nil
+        clearValidationAndFocus()
         switch field {
         case .total:
             presentedEditor = .money(.total)
@@ -496,14 +513,14 @@ struct SplitCreateSheet: View {
         guard let index = draft.items.firstIndex(where: { $0.id == item.id }) else { return }
         draft.items[index] = item
         draft.mismatchAcknowledged = false
-        validationIssue = nil
+        clearValidationAndFocus()
     }
 
     private func removeItem(_ id: UUID) {
         draft.items.removeAll { $0.id == id }
         if draft.items.isEmpty { draft.items = [SplitDraft.Item()] }
         draft.mismatchAcknowledged = false
-        validationIssue = nil
+        clearValidationAndFocus()
     }
 
     private func cents(for field: SplitMoneyField) -> Int {
@@ -535,7 +552,18 @@ struct SplitCreateSheet: View {
             draft.feeCents = cents
         }
         draft.mismatchAcknowledged = false
+        clearValidationAndFocus()
+    }
+
+    private func confirmKeepReceiptTotal() {
+        draft.confirmKeepReceiptTotal()
+        clearValidationAndFocus()
+    }
+
+    private func clearValidationAndFocus() {
         validationIssue = nil
+        pendingAccessibilityFocus = nil
+        accessibilityFocus = nil
     }
 
     private var tipBaseCents: Int {
@@ -654,7 +682,7 @@ struct SplitCreateSheet: View {
         }
         scanNotice = nil
         setupErrorMessage = nil
-        validationIssue = nil
+        clearValidationAndFocus()
     }
 
     // MARK: - Cards
@@ -793,7 +821,7 @@ struct SplitCreateSheet: View {
         openedEditVersion = refreshed.version
         totalEdited = true
         pendingClaimClearIDs = []
-        validationIssue = nil
+        clearValidationAndFocus()
         itemFilter = .all
         presentedEditor = nil
         submissionErrorMessage = nil

@@ -401,6 +401,18 @@ grep -Fq 'adoptRefreshedEdit(' "$split_editor"
 grep -Fq 'openedEditVersion = refreshed.version' "$split_editor"
 grep -Fq 'BillSplitPaymentConflictPresentation.message(didRefresh: true)' "$split_editor"
 grep -Fq 'self.openedEditVersion = nil' "$split_editor"
+grep -Fq '@AccessibilityFocusState private var accessibilityFocus: GuidedSplitField?' "$split_editor"
+grep -Fq 'field.owningStep' "$split_editor"
+grep -Fq 'await Task.yield()' "$split_editor"
+grep -Fq 'offlineStatus' "$split_confirm"
+grep -Fq 'staticSummaryRow("Status", offlineStatus)' "$split_confirm"
+grep -Fq 'AccessibilityFocusState<GuidedSplitField?>.Binding' "$split_setup"
+grep -Fq 'AccessibilityFocusState<GuidedSplitField?>.Binding' "$split_items"
+grep -Fq 'AccessibilityFocusState<GuidedSplitField?>.Binding' "$split_confirm"
+grep -Fq 'accessibilityFocus: accessibilityFocus' "$split_setup"
+grep -Fq '.accessibilityFocused(accessibilityFocus, equals: .merchant)' "$split_guided"
+grep -Fq '.accessibilityFocused(accessibilityFocus, equals: .items)' "$split_items"
+grep -Fq '.accessibilityFocused(accessibilityFocus, equals: .total)' "$split_confirm"
 for step_view in "$split_setup" "$split_items" "$split_confirm"; do
     if grep -Fq 'SplitStickyAction' "$step_view"; then
         echo "Guided step content must not embed the coordinator-owned sticky action: $step_view" >&2

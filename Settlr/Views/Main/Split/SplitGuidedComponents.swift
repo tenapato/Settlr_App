@@ -25,6 +25,7 @@ extension GuidedSplitFlowPolicy {
 
 struct SplitReceiptHeader: View {
     let presentation: SplitReceiptHeaderPresentation
+    let accessibilityFocus: AccessibilityFocusState<GuidedSplitField?>.Binding
     let onEditReceipt: () -> Void
     let onScanAgain: () -> Void
     let onOpenParserSettings: () -> Void
@@ -55,6 +56,9 @@ struct SplitReceiptHeader: View {
                         .foregroundStyle(Theme.muted)
                         .frame(width: 44, height: 44, alignment: .trailing)
                 }
+                .accessibilityLabel("Receipt options")
+                .accessibilityHint("Edit the merchant and receipt date")
+                .accessibilityFocused(accessibilityFocus, equals: .merchant)
                 Text(formatSplitMoney(presentation.totalCents))
                     .font(.system(size: 20, weight: .bold, design: .monospaced))
                     .foregroundStyle(Theme.ink)

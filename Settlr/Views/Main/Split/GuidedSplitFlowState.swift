@@ -6,7 +6,7 @@ enum GuidedSplitStep: Hashable {
     case confirm
 }
 
-enum GuidedSplitField: Equatable {
+enum GuidedSplitField: Hashable {
     case merchant
     case payer
     case division
@@ -15,6 +15,17 @@ enum GuidedSplitField: Equatable {
     case items
     case reconciliation
     case onlineEdit
+
+    var owningStep: GuidedSplitStep {
+        switch self {
+        case .merchant, .payer, .division, .paymentMethod:
+            .setup
+        case .items:
+            .items
+        case .total, .reconciliation, .onlineEdit:
+            .confirm
+        }
+    }
 }
 
 struct GuidedSplitValidationIssue: Equatable {

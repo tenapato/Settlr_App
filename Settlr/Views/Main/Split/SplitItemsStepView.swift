@@ -49,6 +49,7 @@ struct SplitItemsPresentation {
 struct SplitItemsStepView: View {
     @Binding var draft: SplitDraft
     @Binding var filter: SplitItemFilter
+    let accessibilityFocus: AccessibilityFocusState<GuidedSplitField?>.Binding
     let validationIssue: GuidedSplitValidationIssue?
     let onEditItem: (SplitDraft.Item) -> Void
     let onAddItem: () -> Void
@@ -100,6 +101,7 @@ struct SplitItemsStepView: View {
                     }
             }
             .buttonStyle(.plain)
+            .accessibilityFocused(accessibilityFocus, equals: .items)
 
             if let validationIssue, validationIssue.step == .items {
                 Text(validationIssue.message)

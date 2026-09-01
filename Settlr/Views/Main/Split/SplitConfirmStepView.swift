@@ -30,9 +30,10 @@ struct SplitConfirmPresentation: Equatable {
     let divisionSummary: String
     let paymentLabel: String
     let evenShareCents: Int?
+    let offlineStatus: String?
     let reconciliation: SplitDraft.Reconciliation
 
-    init(draft: SplitDraft, totalEdited: Bool) {
+    init(draft: SplitDraft, totalEdited: Bool, isOnline: Bool = true, isEditing: Bool = false) {
         reconciliation = draft.reconciliation
         itemSubtotalCents = reconciliation.itemSubtotalCents
         taxCents = draft.taxCents
@@ -47,6 +48,7 @@ struct SplitConfirmPresentation: Equatable {
         default: payerLabel = "Choose who paid"
         }
         paymentLabel = draft.paymentChannel == "credit_card" ? "Credit card" : "Cash / debit"
+        offlineStatus = isOnline ? nil : (isEditing ? "Reconnect to save changes" : "Will save on this phone")
 
         let people = max(1, draft.participants.count)
         if draft.splitMode == "even" {
@@ -62,6 +64,7 @@ struct SplitConfirmPresentation: Equatable {
 struct SplitConfirmStepView: View {
     @Binding var draft: SplitDraft
     @Binding var totalEdited: Bool
+    let accessibilityFocus: AccessibilityFocusState<GuidedSplitField?>.Binding
     let presentation: SplitConfirmPresentation
     let validationIssue: GuidedSplitValidationIssue?
     let onEditSetupValue: (GuidedSplitField) -> Void
@@ -95,6 +98,7 @@ struct SplitConfirmStepView: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Theme.warning)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityFocused(accessibilityFocus, equals: .onlineEdit)
             }
         }
     }
@@ -126,6 +130,7 @@ struct SplitConfirmStepView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(totalEdited ? "Receipt" : "Calculated") total, \(formatSplitMoney(presentation.effectiveTotalCents))")
+        .accessibilityFocused(accessibilityFocus, equals: .total)
     }
 
     private var mathRows: some View {
@@ -154,6 +159,7 @@ struct SplitConfirmStepView: View {
                     .buttonStyle(.bordered)
                     .tint(draft.mismatchAcknowledged ? Theme.income : Theme.warning)
                     .frame(minHeight: 44)
+                    .accessibilityFocused(accessibilityFocus, equals: .reconciliation)
                 Button("Use calculated total", action: onUseCalculatedTotal)
                     .buttonStyle(.borderedProminent)
                     .tint(Theme.accent)
@@ -188,6 +194,10 @@ struct SplitConfirmStepView: View {
             }
             FormRowDivider()
             summaryRow("Paid with", presentation.paymentLabel, field: .paymentMethod)
+            if let offlineStatus = presentation.offlineStatus {
+                FormRowDivider()
+                staticSummaryRow("Status", offlineStatus)
+            }
         }
     }
 

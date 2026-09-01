@@ -91,4 +91,26 @@ final class GuidedSplitPresentationTests: XCTestCase {
     func testConfirmDivisionSummaryRoutesToDivisionSetupField() {
         XCTAssertEqual(SplitConfirmPresentation.divisionSetupField, .division)
     }
+
+    func testConfirmPresentationDisclosesOfflineSaveStatus() {
+        let value = SplitConfirmPresentation(draft: SplitDraft(), totalEdited: false, isOnline: false)
+
+        XCTAssertEqual(value.offlineStatus, "Will save on this phone")
+        XCTAssertNil(SplitConfirmPresentation(draft: SplitDraft(), totalEdited: false, isOnline: true).offlineStatus)
+        XCTAssertEqual(
+            SplitConfirmPresentation(draft: SplitDraft(), totalEdited: false, isOnline: false, isEditing: true).offlineStatus,
+            "Reconnect to save changes"
+        )
+    }
+
+    func testGuidedFieldsMapToStableOwningSteps() {
+        XCTAssertEqual(GuidedSplitField.merchant.owningStep, .setup)
+        XCTAssertEqual(GuidedSplitField.payer.owningStep, .setup)
+        XCTAssertEqual(GuidedSplitField.division.owningStep, .setup)
+        XCTAssertEqual(GuidedSplitField.paymentMethod.owningStep, .setup)
+        XCTAssertEqual(GuidedSplitField.items.owningStep, .items)
+        XCTAssertEqual(GuidedSplitField.total.owningStep, .confirm)
+        XCTAssertEqual(GuidedSplitField.reconciliation.owningStep, .confirm)
+        XCTAssertEqual(GuidedSplitField.onlineEdit.owningStep, .confirm)
+    }
 }
