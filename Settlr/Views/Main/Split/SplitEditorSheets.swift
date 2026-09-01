@@ -33,7 +33,7 @@ struct SplitPeopleEditDraft {
         let organizer = participants.first(where: \.isOrganizer) ?? .init(id: nil, name: "You", isOrganizer: true)
         var guests = participants.filter { !$0.isOrganizer }
         while guests.count < target - 1 {
-            guests.append(.init(id: nil, name: "Person \(guests.count + 2)", isOrganizer: false))
+            guests.append(.init(id: nil, name: "", isOrganizer: false))
         }
         if guests.count > target - 1 { guests.removeLast(guests.count - (target - 1)) }
         participants = [organizer] + guests

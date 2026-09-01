@@ -14,6 +14,7 @@ final class GuidedSplitPresentationTests: XCTestCase {
     func testGuestEditorKeepsBlankNamesForRequestNormalization() {
         var draft = SplitPeopleEditDraft(participants: SplitDraft().participants)
         draft.setHeadcount(2)
+        XCTAssertEqual(draft.participants[1].name, "")
         draft.participants[1].name = "   "
         XCTAssertEqual(draft.participants[1].name, "   ")
     }
