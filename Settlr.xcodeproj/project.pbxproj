@@ -107,6 +107,7 @@
 		AA000000000000000000BB89 /* AppearancePreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR89 /* AppearancePreference.swift */; };
 		AA000000000000000000BB90 /* SignalLoadingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR90 /* SignalLoadingViews.swift */; };
 		AA000000000000000000BB91 /* QuickActionLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR91 /* QuickActionLauncher.swift */; };
+		AA000000000000000000BB96 /* QuickActionLauncherMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR96 /* QuickActionLauncherMotion.swift */; };
 		AA000000000000000000BB92 /* ActivityEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR92 /* ActivityEvent.swift */; };
 		AA000000000000000000BB93 /* ActivityVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR93 /* ActivityVM.swift */; };
 		AA000000000000000000BB7A /* ScanningOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000FR7A /* ScanningOverlay.swift */; };
@@ -117,6 +118,7 @@
 		AB0000000000000000000026 /* ActivityEventTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000027 /* ActivityEventTests.swift */; };
 		AB0000000000000000000028 /* SavingsGoalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000029 /* SavingsGoalTests.swift */; };
 		AB0000000000000000000030 /* CardFortnightPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000031 /* CardFortnightPresentationTests.swift */; };
+		AB0000000000000000000032 /* QuickActionLauncherMotionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000033 /* QuickActionLauncherMotionTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -234,6 +236,7 @@
 		AA000000000000000000FR89 /* AppearancePreference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearancePreference.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR90 /* SignalLoadingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalLoadingViews.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR91 /* QuickActionLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickActionLauncher.swift; sourceTree = "<group>"; };
+		AA000000000000000000FR96 /* QuickActionLauncherMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickActionLauncherMotion.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR92 /* ActivityEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityEvent.swift; sourceTree = "<group>"; };
 		AA000000000000000000FR93 /* ActivityVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityVM.swift; sourceTree = "<group>"; };
 		AB0000000000000000000021 /* AppearancePreferenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearancePreferenceTests.swift; sourceTree = "<group>"; };
@@ -242,6 +245,7 @@
 		AB0000000000000000000027 /* ActivityEventTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityEventTests.swift; sourceTree = "<group>"; };
 		AB0000000000000000000029 /* SavingsGoalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavingsGoalTests.swift; sourceTree = "<group>"; };
 		AB0000000000000000000031 /* CardFortnightPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardFortnightPresentationTests.swift; sourceTree = "<group>"; };
+		AB0000000000000000000033 /* QuickActionLauncherMotionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickActionLauncherMotionTests.swift; sourceTree = "<group>"; };
 		AA000000000000000000PROD /* Settlr.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Settlr.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -470,6 +474,7 @@
 			children = (
 				AA000000000000000000FR28 /* FloatingTabBar.swift */,
 				AA000000000000000000FR91 /* QuickActionLauncher.swift */,
+				AA000000000000000000FR96 /* QuickActionLauncherMotion.swift */,
 				AA000000000000000000FR90 /* SignalLoadingViews.swift */,
 				AA000000000000000000FR29 /* AmountLabel.swift */,
 				AA000000000000000000FR30 /* CategoryBadge.swift */,
@@ -520,6 +525,7 @@
 				AB0000000000000000000027 /* ActivityEventTests.swift */,
 				AB0000000000000000000029 /* SavingsGoalTests.swift */,
 				AB0000000000000000000031 /* CardFortnightPresentationTests.swift */,
+				AB0000000000000000000033 /* QuickActionLauncherMotionTests.swift */,
 				AB0000000000000000000023 /* FeatureAccessTests.swift */,
 				AB0000000000000000000003 /* ReceiptEvidenceTests.swift */,
 				AB0000000000000000000004 /* ParserPreferenceTests.swift */,
@@ -637,6 +643,7 @@
 				AB0000000000000000000026 /* ActivityEventTests.swift in Sources */,
 				AB0000000000000000000028 /* SavingsGoalTests.swift in Sources */,
 				AB0000000000000000000030 /* CardFortnightPresentationTests.swift in Sources */,
+				AB0000000000000000000032 /* QuickActionLauncherMotionTests.swift in Sources */,
 				AB0000000000000000000001 /* ReceiptEvidenceTests.swift in Sources */,
 				AB0000000000000000000002 /* ParserPreferenceTests.swift in Sources */,
 				AC0000000000000000000003 /* ReceiptPhotoUploadTests.swift in Sources */,
@@ -690,6 +697,7 @@
 				AA000000000000000000BB28 /* FloatingTabBar.swift in Sources */,
 				AA000000000000000000BB90 /* SignalLoadingViews.swift in Sources */,
 				AA000000000000000000BB91 /* QuickActionLauncher.swift in Sources */,
+				AA000000000000000000BB96 /* QuickActionLauncherMotion.swift in Sources */,
 				AA000000000000000000BB29 /* AmountLabel.swift in Sources */,
 				AA000000000000000000BB30 /* CategoryBadge.swift in Sources */,
 				AA000000000000000000BB31 /* SectionCard.swift in Sources */,

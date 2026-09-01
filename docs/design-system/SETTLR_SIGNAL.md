@@ -150,7 +150,7 @@ Show the feature-aware subset of Home, Activity, Savings, and Cards. Every desti
 
 ### C6 launcher
 
-The visible control is a 52 pt lime circle with a standard plus. Keep its outer ring subtle. On expansion it becomes a charcoal close control while the satellite menu opens above it.
+The visible control is a 52 pt lime circle with a standard plus. Keep its outer ring subtle. Pressing compresses the full control to 94% for 120 ms. On expansion, the plus rotates 45 degrees with a restrained 280 ms spring while the control becomes charcoal and the satellite menu opens above it. Never pulse the launcher while idle. With Reduce Motion, keep the control at full scale and swap directly between plus and close symbols without rotation.
 
 ### Signature Scanner menu
 

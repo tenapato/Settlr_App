@@ -16,6 +16,25 @@ enum QuickActionRole {
     case standard
 }
 
+private struct QuickActionLauncherPressStyle: ButtonStyle {
+    let reduceMotion: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        let motion = QuickActionLauncherMotion(
+            isOpen: false,
+            isPressed: configuration.isPressed,
+            reduceMotion: reduceMotion
+        )
+
+        configuration.label
+            .scaleEffect(motion.scale)
+            .animation(
+                reduceMotion ? nil : .easeOut(duration: 0.12),
+                value: configuration.isPressed
+            )
+    }
+}
+
 /// C6's global launcher: a lime action circle with a small, anchored satellite
 /// menu. The signature item is intentionally titled “Scan and split”.
 struct QuickActionLauncher: View {
@@ -37,6 +56,10 @@ struct QuickActionLauncher: View {
 
     private var transition: AnyTransition {
         reduceMotion ? .opacity : .scale(scale: 0.82, anchor: .bottomTrailing).combined(with: .opacity)
+    }
+
+    private var launcherMotion: QuickActionLauncherMotion {
+        QuickActionLauncherMotion(isOpen: isOpen, isPressed: false, reduceMotion: reduceMotion)
     }
 
     var body: some View {
@@ -61,10 +84,14 @@ struct QuickActionLauncher: View {
                 generator.selectionChanged()
                 onSetOpen(!isOpen)
             } label: {
-                Image(systemName: isOpen ? "xmark" : "plus")
+                Image(systemName: launcherMotion.symbolName)
                     .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(isOpen ? Theme.ink : Theme.buttonInk)
-                    .rotationEffect(.degrees(isOpen ? 0 : 0))
+                    .rotationEffect(.degrees(launcherMotion.rotationDegrees))
+                    .animation(
+                        reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.28, dampingFraction: 0.78),
+                        value: isOpen
+                    )
                     .frame(width: 58, height: 58)
                     .background(
                         Circle()
@@ -78,7 +105,7 @@ struct QuickActionLauncher: View {
                     )
                     .shadow(color: isOpen ? .clear : Theme.accent.opacity(0.3), radius: 16, y: 4)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(QuickActionLauncherPressStyle(reduceMotion: reduceMotion))
             .accessibilityLabel(isOpen ? "Close quick actions" : "Open quick actions")
             .accessibilityHint(isOpen ? "Dismisses the quick action menu" : "Shows quick actions")
             .accessibilityAddTraits(.isButton)
