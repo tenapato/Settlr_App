@@ -18,7 +18,7 @@ struct SplitScanFlowMetadata {
 ///
 /// Money stays in integer cents here. Text-field formatting belongs to the
 /// view, while this type owns the server contract and reconciliation rules.
-struct SplitDraft {
+struct SplitDraft: Equatable {
     struct ClaimImpact: Equatable {
         let itemIDsRequiringConfirmation: [String]
         let itemNamesRequiringConfirmation: [String]
