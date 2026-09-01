@@ -52,7 +52,6 @@ struct SplitItemsStepView: View {
     let validationIssue: GuidedSplitValidationIssue?
     let onEditItem: (SplitDraft.Item) -> Void
     let onAddItem: () -> Void
-    let onContinue: () -> Void
 
     private var presentation: SplitItemsPresentation { .init(draft: draft) }
 
@@ -108,8 +107,6 @@ struct SplitItemsStepView: View {
                     .foregroundStyle(Theme.warning)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-
-            SplitStickyAction(title: "Check total", action: onContinue)
         }
         .onAppear(perform: normalizeFilter)
         .onChange(of: presentation.reviewCount) { _, _ in normalizeFilter() }

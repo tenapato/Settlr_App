@@ -11,7 +11,6 @@ struct SplitSetupStepView: View {
     let onScanAgain: () -> Void
     let onOpenParserSettings: () -> Void
     let onRetryCards: () -> Void
-    let onContinue: () -> Void
 
     private var paymentOptions: [ToggleOption] {
         var options = [ToggleOption(value: "cash", label: "Cash / debit", icon: "banknote")]
@@ -99,11 +98,6 @@ struct SplitSetupStepView: View {
                     .foregroundStyle(Theme.warning)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-
-            SplitStickyAction(
-                title: GuidedSplitFlowPolicy.setupActionTitle(splitMode: draft.splitMode, itemCount: draft.filledItems.count),
-                action: onContinue
-            )
         }
     }
 

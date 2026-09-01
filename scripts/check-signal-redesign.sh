@@ -110,7 +110,7 @@ grep -Fq '.accessibilityAddTraits(draft.payer == value ? .isSelected : [])' "$sp
 # normalization window opened by the claims confirmation dialog.
 grep -Fq '.onChange(of: canUseCreditCards)' Settlr/Views/Main/Expenses/ExpenseFormSheet.swift
 grep -Fq 'normalizeCardPaymentState()' Settlr/Views/Main/Expenses/ExpenseFormSheet.swift
-if ! rg -U -q 'private func submitEdit\(clearClaimsFor: Set<String>\) \{\n[[:space:]]+guard let editingSplit else \{ return \}\n[[:space:]]+normalizeCardPaymentState\(\)\n[[:space:]]+let bodyDraft = submissionDraft' Settlr/Views/Main/Split/SplitCreateSheet.swift; then
+if ! rg -U -q 'private func submitEdit\(clearClaimsFor: Set<String>\) \{\n[[:space:]]+guard let editBaseline else \{ return \}\n[[:space:]]+normalizeCardPaymentState\(\)\n[[:space:]]+let bodyDraft = submissionDraft' Settlr/Views/Main/Split/SplitCreateSheet.swift; then
     echo "Split submitEdit must normalize gated card state immediately before building its request draft." >&2
     exit 1
 fi
@@ -386,6 +386,21 @@ if rg -q 'ToolbarItem\(placement: \.confirmationAction\)' "$split_editor"; then
     echo "Guided split must keep Create in the sticky Confirm action." >&2
     exit 1
 fi
+grep -Fq '.safeAreaInset(edge: .bottom, spacing: 0)' "$split_editor"
+grep -Fq 'Theme.bg.ignoresSafeArea(edges: .bottom)' "$split_guided"
+grep -Fq '@State private var setupErrorMessage: String?' "$split_editor"
+grep -Fq '@State private var submissionErrorMessage: String?' "$split_editor"
+grep -Fq 'guard !isScanning, !isSubmitting else { return }' "$split_editor"
+grep -Fq 'adoptRefreshedEdit(' "$split_editor"
+grep -Fq 'openedEditVersion = refreshed.version' "$split_editor"
+grep -Fq 'BillSplitPaymentConflictPresentation.message(didRefresh: true)' "$split_editor"
+grep -Fq 'self.openedEditVersion = nil' "$split_editor"
+for step_view in "$split_setup" "$split_items" "$split_confirm"; do
+    if grep -Fq 'SplitStickyAction' "$step_view"; then
+        echo "Guided step content must not embed the coordinator-owned sticky action: $step_view" >&2
+        exit 1
+    fi
+done
 
 # Task 8 fix round 1: safe flash, navigable scanner stages, and privacy-safe
 # acceptance of meaningful on-device rows.

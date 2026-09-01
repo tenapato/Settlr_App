@@ -63,14 +63,11 @@ struct SplitConfirmStepView: View {
     @Binding var draft: SplitDraft
     @Binding var totalEdited: Bool
     let presentation: SplitConfirmPresentation
-    let primaryAction: GuidedSplitPrimaryAction
     let validationIssue: GuidedSplitValidationIssue?
-    let isSubmitting: Bool
     let onEditSetupValue: (GuidedSplitField) -> Void
     let onEditMoney: (SplitMoneyField) -> Void
     let onKeepReceiptTotal: () -> Void
     let onUseCalculatedTotal: () -> Void
-    let onSubmit: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -99,8 +96,6 @@ struct SplitConfirmStepView: View {
                     .foregroundStyle(Theme.warning)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-
-            SplitStickyAction(title: primaryAction.title, isSubmitting: isSubmitting, action: onSubmit)
         }
     }
 

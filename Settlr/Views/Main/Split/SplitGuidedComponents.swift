@@ -127,8 +127,9 @@ struct SplitStickyAction: View {
         .padding(.horizontal, 20)
         .padding(.top, 12)
         .padding(.bottom, 8)
-        .background(Theme.bg)
-        .ignoresSafeArea(edges: .bottom)
+        .background {
+            Theme.bg.ignoresSafeArea(edges: .bottom)
+        }
         .accessibilityLabel(isSubmitting ? "Submitting split" : title)
     }
 }

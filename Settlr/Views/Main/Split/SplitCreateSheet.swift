@@ -55,14 +55,16 @@ struct SplitCreateSheet: View {
     @State private var showScanner = false
     @State private var isScanning = false
     @State private var scanNotice: String?
+    @State private var setupErrorMessage: String?
+    @State private var submissionErrorMessage: String?
     @State private var showReceiptSettings = false
-    @State private var errorMessage: String?
     @State private var photoRecovery = ReceiptPhotoRecovery()
     @State private var showPhotoRecovery = false
     @State private var showKeepMismatchConfirmation = false
     @State private var showClaimChangeConfirmation = false
     @State private var pendingClaimClearIDs: Set<String> = []
     @State private var hasInitialized = false
+    @State private var editBaseline: BillSplit?
     @State private var openedEditVersion: Int?
     @State private var isSubmitting = false
 
@@ -97,6 +99,7 @@ struct SplitCreateSheet: View {
         if isEditing { return .saveChanges }
         return network.isOnline ? .create : .saveOnPhone
     }
+    private var editRetryBlocked: Bool { isEditing && openedEditVersion == nil }
     private var scannerImportedReceipt: Bool { onBackToReview != nil }
 
     var body: some View {
@@ -153,6 +156,7 @@ struct SplitCreateSheet: View {
         .alert("Discard this split?", isPresented: $showDiscardConfirmation) {
             Button("Keep editing", role: .cancel) {}
             Button("Discard", role: .destructive) { cancelFlow() }
+                .disabled(isScanning || isSubmitting)
         } message: {
             Text("Your receipt or split changes will be lost.")
         }
@@ -184,8 +188,14 @@ struct SplitCreateSheet: View {
                             .foregroundStyle(Theme.muted)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    if let errorMessage {
-                        Text(errorMessage)
+                    if let setupErrorMessage, step == .setup {
+                        Text(setupErrorMessage)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Theme.expense)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    if let submissionErrorMessage, step == .confirm {
+                        Text(submissionErrorMessage)
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(Theme.expense)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -204,6 +214,10 @@ struct SplitCreateSheet: View {
         .navigationTitle(title(for: step))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { navigationToolbar(for: step) }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            stickyAction(for: step)
+                .disabled(isScanning || isSubmitting || editRetryBlocked)
+        }
     }
 
     @ViewBuilder
@@ -220,8 +234,7 @@ struct SplitCreateSheet: View {
                 onEditPeople: { presentedEditor = .people },
                 onScanAgain: beginScan,
                 onOpenParserSettings: { showReceiptSettings = true },
-                onRetryCards: { Task { await loadCards() } },
-                onContinue: continueFromSetup
+                onRetryCards: { Task { await loadCards() } }
             )
         case .items:
             SplitItemsStepView(
@@ -229,17 +242,14 @@ struct SplitCreateSheet: View {
                 filter: $itemFilter,
                 validationIssue: validationIssue,
                 onEditItem: { presentedEditor = .item($0.id) },
-                onAddItem: { presentedEditor = .newItem(SplitDraft.Item()) },
-                onContinue: continueFromItems
+                onAddItem: { presentedEditor = .newItem(SplitDraft.Item()) }
             )
         case .confirm:
             SplitConfirmStepView(
                 draft: $draft,
                 totalEdited: $totalEdited,
                 presentation: .init(draft: submissionDraft, totalEdited: totalEdited),
-                primaryAction: primaryAction,
                 validationIssue: validationIssue,
-                isSubmitting: isSubmitting,
                 onEditSetupValue: editSetupValue,
                 onEditMoney: { presentedEditor = .money($0) },
                 onKeepReceiptTotal: { showKeepMismatchConfirmation = true },
@@ -247,8 +257,29 @@ struct SplitCreateSheet: View {
                     draft.useCalculatedTotal()
                     totalEdited = true
                     validationIssue = nil
-                },
-                onSubmit: validateAndSave
+                }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func stickyAction(for step: GuidedSplitStep) -> some View {
+        switch step {
+        case .setup:
+            SplitStickyAction(
+                title: GuidedSplitFlowPolicy.setupActionTitle(
+                    splitMode: draft.splitMode,
+                    itemCount: draft.filledItems.count
+                ),
+                action: continueFromSetup
+            )
+        case .items:
+            SplitStickyAction(title: "Check total", action: continueFromItems)
+        case .confirm:
+            SplitStickyAction(
+                title: primaryAction.title,
+                isSubmitting: isSubmitting,
+                action: validateAndSave
             )
         }
     }
@@ -258,15 +289,19 @@ struct SplitCreateSheet: View {
         if step == .setup, onBackToReview != nil {
             ToolbarItemGroup(placement: .navigationBarLeading) {
                 Button("Back", action: backToReview)
+                    .disabled(isScanning || isSubmitting)
                 Button("Cancel", action: requestCancel)
+                    .disabled(isScanning || isSubmitting)
             }
         } else if step == .setup {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel", action: requestCancel)
+                    .disabled(isScanning || isSubmitting)
             }
         } else {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button("Cancel", action: requestCancel)
+                    .disabled(isScanning || isSubmitting)
             }
         }
     }
@@ -341,17 +376,16 @@ struct SplitCreateSheet: View {
     // MARK: - Navigation and validation
 
     private func continueFromSetup() {
-        errorMessage = nil
         if let issue = firstSetupIssue() {
             validationIssue = issue
             return
         }
+        setupErrorMessage = nil
         validationIssue = nil
         path.append(GuidedSplitFlowPolicy.nextStep(splitMode: draft.splitMode))
     }
 
     private func continueFromItems() {
-        errorMessage = nil
         if let issue = submissionIssue().map(issueOwnedByItsEditor), issue.step == .items {
             validationIssue = issue
             return
@@ -361,7 +395,7 @@ struct SplitCreateSheet: View {
     }
 
     private func validateAndSave() {
-        errorMessage = nil
+        submissionErrorMessage = nil
         normalizeCardPaymentState()
         if let issue = submissionIssue().map(issueOwnedByItsEditor) {
             present(issue)
@@ -432,11 +466,13 @@ struct SplitCreateSheet: View {
     }
 
     private func backToReview() {
+        guard !isScanning, !isSubmitting else { return }
         photoRecovery.clear()
         onBackToReview?(draft, totalEdited)
     }
 
     private func requestCancel() {
+        guard !isScanning, !isSubmitting else { return }
         guard initialSnapshot?.hasUnsavedChanges(
             draft: draft,
             totalEdited: totalEdited,
@@ -449,6 +485,7 @@ struct SplitCreateSheet: View {
     }
 
     private func cancelFlow() {
+        guard !isScanning, !isSubmitting else { return }
         photoRecovery.clear()
         if let onCancelFlow { onCancelFlow() } else { dismiss() }
     }
@@ -510,7 +547,7 @@ struct SplitCreateSheet: View {
 
     private func beginScan() {
         scanNotice = nil
-        errorMessage = nil
+        setupErrorMessage = nil
         showScanner = true
     }
 
@@ -518,7 +555,7 @@ struct SplitCreateSheet: View {
         vm.beginReceiptScan()
         photoRecovery.clear()
         isScanning = true
-        errorMessage = nil
+        setupErrorMessage = nil
         Task {
             defer { isScanning = false }
             var recognizedText: String?
@@ -531,10 +568,10 @@ struct SplitCreateSheet: View {
             } catch {
                 if let recognizedText, vm.lastScanPreference == .serverPhoto {
                     photoRecovery.retain(image: image, ocrText: recognizedText)
-                    errorMessage = error.localizedDescription
+                    setupErrorMessage = error.localizedDescription
                     showPhotoRecovery = true
                 } else {
-                    errorMessage = error.localizedDescription
+                    setupErrorMessage = error.localizedDescription
                 }
             }
         }
@@ -544,7 +581,7 @@ struct SplitCreateSheet: View {
         guard let image = photoRecovery.image, let text = photoRecovery.ocrText else { return }
         vm.beginReceiptScan()
         isScanning = true
-        errorMessage = nil
+        setupErrorMessage = nil
         Task {
             defer { isScanning = false }
             do {
@@ -556,7 +593,7 @@ struct SplitCreateSheet: View {
                 )
                 applyScan(parsed)
             } catch {
-                errorMessage = error.localizedDescription
+                setupErrorMessage = error.localizedDescription
                 showPhotoRecovery = true
             }
         }
@@ -565,7 +602,7 @@ struct SplitCreateSheet: View {
     private func continueWithManualEntry() {
         vm.beginReceiptScan()
         photoRecovery.clear()
-        errorMessage = nil
+        setupErrorMessage = nil
         scanNotice = "Enter the receipt items manually."
     }
 
@@ -578,6 +615,7 @@ struct SplitCreateSheet: View {
             totalEdited = initialTotalEdited ?? true
         } else if let editingSplit {
             draft = SplitDraft(split: editingSplit)
+            editBaseline = editingSplit
             openedEditVersion = editingSplit.version
             totalEdited = true
         } else if let prefill {
@@ -615,6 +653,7 @@ struct SplitCreateSheet: View {
             totalEdited = false
         }
         scanNotice = nil
+        setupErrorMessage = nil
         validationIssue = nil
     }
 
@@ -659,16 +698,20 @@ struct SplitCreateSheet: View {
         }
         let bodyDraft = submissionDraft
 
-        if let editingSplit {
+        if isEditing {
+            guard let editBaseline else {
+                submissionErrorMessage = "Reload this split before editing."
+                return
+            }
             guard network.isOnline else {
-                errorMessage = "Editing needs an internet connection."
+                submissionErrorMessage = "Editing needs an internet connection."
                 return
             }
             guard openedEditVersion != nil else {
-                errorMessage = "Reload this split before editing."
+                submissionErrorMessage = "Reload this split before editing."
                 return
             }
-            let impact = bodyDraft.claimImpact(comparedTo: editingSplit)
+            let impact = bodyDraft.claimImpact(comparedTo: editBaseline)
             if impact.requiresConfirmation {
                 pendingClaimClearIDs = Set(impact.itemIDsRequiringConfirmation)
                 showClaimChangeConfirmation = true
@@ -679,10 +722,10 @@ struct SplitCreateSheet: View {
         }
 
         guard let userId = appState.currentUser?.id else {
-            errorMessage = "Sign in again to save this split."
+            submissionErrorMessage = "Sign in again to save this split."
             return
         }
-        errorMessage = nil
+        submissionErrorMessage = nil
         isSubmitting = true
         let body = bodyDraft.makeCreateBody()
         Task {
@@ -694,44 +737,70 @@ struct SplitCreateSheet: View {
                 onSaved(outcome)
                 if dismissOnSave { dismiss() }
             case .rejected(let message):
-                errorMessage = message
+                submissionErrorMessage = message
             }
         }
     }
 
     private var claimChangeMessage: String {
-        let names = editingSplit.map { draft.claimImpact(comparedTo: $0).itemNamesRequiringConfirmation } ?? []
+        let names = editBaseline.map { draft.claimImpact(comparedTo: $0).itemNamesRequiringConfirmation } ?? []
         let summary = names.isEmpty ? "the changed or removed items" : names.joined(separator: ", ")
         return summary + " already have claims. Saving these financial changes will clear only those claims so everyone can claim the corrected bill again. Cancel keeps the current draft and claims."
     }
 
     private func submitEdit(clearClaimsFor: Set<String>) {
-        guard let editingSplit else { return }
+        guard let editBaseline else { return }
         normalizeCardPaymentState()
         let bodyDraft = submissionDraft
         guard network.isOnline else {
-            errorMessage = "Editing needs an internet connection."
+            submissionErrorMessage = "Editing needs an internet connection."
             return
         }
         guard let openedEditVersion else {
-            errorMessage = "Reload this split before editing."
+            submissionErrorMessage = "Reload this split before editing."
             return
         }
-        errorMessage = nil
+        submissionErrorMessage = nil
         isSubmitting = true
         Task {
             defer { isSubmitting = false }
             let saved = await vm.updateDraft(
                 workspaceId: workspaceId,
-                splitId: editingSplit.id,
+                splitId: editBaseline.id,
                 body: bodyDraft.makeEditBody(version: openedEditVersion, clearClaimsFor: clearClaimsFor)
             )
             if saved, let updated = vm.detail {
                 onSaved(.created(updated))
                 if dismissOnSave { dismiss() }
+            } else if vm.errorMessage == BillSplitPaymentConflictPresentation.message(didRefresh: true),
+                      let refreshed = vm.detail,
+                      refreshed.id == editBaseline.id,
+                      refreshed.version != openedEditVersion {
+                adoptRefreshedEdit(refreshed)
             } else {
-                errorMessage = vm.errorMessage
+                submissionErrorMessage = vm.errorMessage
+                if vm.errorMessage == BillSplitPaymentConflictPresentation.message(didRefresh: true)
+                    || vm.errorMessage == BillSplitPaymentConflictPresentation.message(didRefresh: false) {
+                    self.openedEditVersion = nil
+                }
             }
         }
+    }
+
+    private func adoptRefreshedEdit(_ refreshed: BillSplit) {
+        draft = SplitDraft(split: refreshed)
+        editBaseline = refreshed
+        openedEditVersion = refreshed.version
+        totalEdited = true
+        pendingClaimClearIDs = []
+        validationIssue = nil
+        itemFilter = .all
+        presentedEditor = nil
+        submissionErrorMessage = nil
+        setupErrorMessage = vm.errorMessage
+            ?? "The split changed elsewhere. Review the refreshed details before saving again."
+        normalizeCardPaymentState()
+        initialSnapshot = GuidedSplitSubmissionSnapshot(draft: draft, totalEdited: totalEdited)
+        path.removeAll()
     }
 }
