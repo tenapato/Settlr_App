@@ -35,4 +35,33 @@ final class GuidedSplitPresentationTests: XCTestCase {
         draft.participants[1].name = "   "
         XCTAssertEqual(draft.participants[1].name, "   ")
     }
+
+    func testItemsPresentationSeparatesReviewLinesWithoutInventingClaims() {
+        var draft = SplitDraft()
+        draft.participants.append(.init(id: nil, name: "Ana", isOrganizer: false))
+        draft.items = [
+            .init(name: "Soda", quantity: 1, unitPriceCents: 8_300, verification: .unverified),
+            .init(name: "Soup", quantity: 2, unitPriceCents: 10_000, allocationMode: "units")
+        ]
+
+        let value = SplitItemsPresentation(draft: draft)
+
+        XCTAssertEqual(value.itemCount, 2)
+        XCTAssertEqual(value.participantCount, 2)
+        XCTAssertEqual(value.reviewCount, 1)
+        XCTAssertEqual(value.subtotalCents, 28_300)
+        XCTAssertEqual(SplitItemFilter.allCases, [.needsReview, .all])
+    }
+
+    func testItemsPresentationFallsBackToAllWhenNoItemsNeedReview() {
+        var draft = SplitDraft()
+        draft.items = [.init(name: "Soup", quantity: 1, unitPriceCents: 10_000)]
+
+        let value = SplitItemsPresentation(draft: draft)
+
+        XCTAssertEqual(value.availableFilters, [.all])
+        XCTAssertEqual(value.normalizedFilter(.needsReview), .all)
+        XCTAssertEqual(value.items(for: .needsReview).count, 0)
+        XCTAssertEqual(value.items(for: .all).map(\.name), ["Soup"])
+    }
 }
