@@ -426,6 +426,12 @@ grep -Fq 'NavigationStack(path: navigationPath)' "$split_editor"
 grep -Fq 'onFieldChanged(.payer)' "$split_setup"
 grep -Fq 'onFieldChanged(.division)' "$split_setup"
 grep -Fq 'onFieldChanged(.paymentMethod)' "$split_setup"
+grep -Fq 'private var byItemButton: some View' "$split_setup"
+grep -Fq 'divisionButton(value: "by_item"' "$split_setup"
+if grep -Fq 'SegmentedToggle(' "$split_setup"; then
+    echo "Guided division focus must target an actual segment button, not the SegmentedToggle container." >&2
+    exit 1
+fi
 for step_view in "$split_setup" "$split_items" "$split_confirm"; do
     if grep -Fq 'SplitStickyAction' "$step_view"; then
         echo "Guided step content must not embed the coordinator-owned sticky action: $step_view" >&2

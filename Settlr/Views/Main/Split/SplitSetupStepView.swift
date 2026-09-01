@@ -47,14 +47,10 @@ struct SplitSetupStepView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 SectionEyebrow("How should it be divided?")
-                SegmentedToggle(
+                SplitDivisionControl(
                     selection: divisionSelection,
-                    options: [
-                        ToggleOption(value: "by_item", label: "By item", icon: "list.bullet"),
-                        ToggleOption(value: "even", label: "Evenly", icon: "equal")
-                    ]
+                    accessibilityFocus: accessibilityFocus
                 )
-                .accessibilityFocused(accessibilityFocus, equals: .division)
             }
 
             FormCard {
@@ -159,5 +155,61 @@ struct SplitSetupStepView: View {
     private func cardLabel(_ card: CreditCard) -> String {
         guard let lastFour = card.lastFour, !lastFour.isEmpty else { return card.label }
         return "\(card.label) •••• \(lastFour)"
+    }
+}
+
+private struct SplitDivisionControl: View {
+    @Binding var selection: String
+    let accessibilityFocus: AccessibilityFocusState<GuidedSplitField?>.Binding
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        HStack(spacing: 6) {
+            byItemButton
+            divisionButton(value: "even", label: "Evenly", icon: "equal")
+        }
+        .padding(5)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Theme.surface)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14)
+                        .strokeBorder(Theme.line, lineWidth: 1)
+                }
+        )
+    }
+
+    private var byItemButton: some View {
+        divisionButton(value: "by_item", label: "By item", icon: "list.bullet")
+            .accessibilityFocused(accessibilityFocus, equals: .division)
+    }
+
+    private func divisionButton(value: String, label: String, icon: String) -> some View {
+        let isSelected = selection == value
+        return Button {
+            if reduceMotion {
+                selection = value
+            } else {
+                withAnimation(.spring(duration: 0.22)) { selection = value }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                Text(label)
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .foregroundStyle(isSelected ? Theme.buttonInk : Theme.muted)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(isSelected ? Theme.accent : Theme.surface2)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }
