@@ -51,6 +51,8 @@ final class GuidedSplitPresentationTests: XCTestCase {
         XCTAssertEqual(value.reviewCount, 1)
         XCTAssertEqual(value.subtotalCents, 28_300)
         XCTAssertEqual(SplitItemFilter.allCases, [.needsReview, .all])
+        XCTAssertEqual(value.items(for: .needsReview).map(\.name), ["Soda"])
+        XCTAssertEqual(value.items(for: .all).map(\.name), ["Soda", "Soup"])
     }
 
     func testItemsPresentationFallsBackToAllWhenNoItemsNeedReview() {

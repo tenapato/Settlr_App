@@ -7,7 +7,7 @@ enum SplitItemFilter: CaseIterable, Hashable {
     var title: String {
         switch self {
         case .needsReview: "Needs review"
-        case .all: "All items"
+        case .all: "All"
         }
     }
 }
@@ -109,7 +109,7 @@ struct SplitItemsStepView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            SplitStickyAction(title: "Continue", action: onContinue)
+            SplitStickyAction(title: "Check total", action: onContinue)
         }
         .onAppear(perform: normalizeFilter)
         .onChange(of: presentation.reviewCount) { _, _ in normalizeFilter() }
@@ -121,7 +121,7 @@ struct SplitItemsStepView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(filter == option ? Theme.buttonInk : Theme.muted)
                 .padding(.horizontal, 12)
-                .frame(minHeight: 34)
+                .frame(minHeight: 44)
                 .background(filter == option ? Theme.accent : Theme.surface2)
                 .clipShape(Capsule())
         }
