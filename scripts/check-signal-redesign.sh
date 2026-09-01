@@ -119,6 +119,12 @@ fi
 grep -Fq 'var availableCents: Int' Settlr/Models/DashboardSummary.swift
 grep -Fq 'savingsNetCents' Settlr/Models/DashboardSummary.swift
 grep -Fq 'SpendingInsights.build' Settlr/Views/Main/Dashboard/SpendingInsightsStrip.swift
+grep -Fq 'DashboardFallbackSignals.build' Settlr/Views/Main/Dashboard/SpendingInsightsStrip.swift
+grep -Fq 'var onTap: (() -> Void)?' Settlr/Views/Main/Dashboard/SpendingInsightsStrip.swift
+if grep -Fq 'secondary.isEmpty ? insights : secondary' Settlr/Views/Main/Dashboard/SpendingInsightsStrip.swift; then
+    echo "Dashboard must not duplicate its only real insight in the ticker." >&2
+    exit 1
+fi
 grep -Fq 'SignalTraceLoadingView' Settlr/Views/Main/Dashboard/DashboardView.swift
 grep -Fq 'SettlrPulseLoadingView' Settlr/Views/Main/Dashboard/DashboardView.swift
 grep -Fq 'lastUpdated' Settlr/ViewModels/DashboardVM.swift
