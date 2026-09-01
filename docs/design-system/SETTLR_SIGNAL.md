@@ -215,7 +215,7 @@ Home uses the exact recovery promise `Saved Home data is still visible and may b
 
 ### Home
 
-Workspace/profile, available amount, three-part summary, preserved insight ticker, recent activity.
+Compact branded workspace switcher, available amount, money-flow trace, monthly signal with the preserved insight ticker, and a compact movement count.
 
 ### Activity
 

@@ -114,27 +114,35 @@ private struct DashboardWorkspaceHeader: View {
     let onSwitchWorkspace: () -> Void
 
     var body: some View {
-        HStack(alignment: .center, spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                SectionEyebrow("WORKSPACE", color: Theme.faint)
-                Text(name)
-                    .font(.headline)
-                    .foregroundStyle(Theme.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-
+        HStack {
             Button(action: onSwitchWorkspace) {
-                Image(systemName: "arrow.left.arrow.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Theme.muted)
-                    .frame(width: 32, height: 32)
-                    .background(Circle().fill(Theme.surface2))
-                    .overlay(Circle().strokeBorder(Theme.line, lineWidth: 1))
+                HStack(spacing: 10) {
+                    Image("SettlrLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 24, height: 24)
+                        .accessibilityHidden(true)
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        SectionEyebrow("WORKSPACE", color: Theme.faint)
+                        Text(name)
+                            .font(.headline)
+                            .foregroundStyle(Theme.ink)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.faint)
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .frame(width: 44, height: 44)
-            .accessibilityLabel("Switch workspace")
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(name) workspace")
+            .accessibilityHint("Switches to another workspace")
 
             Spacer(minLength: 0)
         }
