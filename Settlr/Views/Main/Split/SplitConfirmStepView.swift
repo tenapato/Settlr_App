@@ -31,6 +31,7 @@ struct SplitConfirmPresentation: Equatable {
     let paymentLabel: String
     let evenShareCents: Int?
     let offlineStatus: String?
+    let requiresConnectionCheck: Bool
     let reconciliation: SplitDraft.Reconciliation
 
     init(draft: SplitDraft, totalEdited: Bool, isOnline: Bool = true, isEditing: Bool = false) {
@@ -49,6 +50,7 @@ struct SplitConfirmPresentation: Equatable {
         }
         paymentLabel = draft.paymentChannel == "credit_card" ? "Credit card" : "Cash / debit"
         offlineStatus = isOnline ? nil : (isEditing ? "Reconnect to save changes" : "Will save on this phone")
+        requiresConnectionCheck = isEditing && !isOnline
 
         let people = max(1, draft.participants.count)
         if draft.splitMode == "even" {
@@ -71,6 +73,7 @@ struct SplitConfirmStepView: View {
     let onEditMoney: (SplitMoneyField) -> Void
     let onKeepReceiptTotal: () -> Void
     let onUseCalculatedTotal: () -> Void
+    let onCheckConnection: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -98,7 +101,6 @@ struct SplitConfirmStepView: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Theme.warning)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityFocused(accessibilityFocus, equals: .onlineEdit)
             }
         }
     }
@@ -196,7 +198,11 @@ struct SplitConfirmStepView: View {
             summaryRow("Paid with", presentation.paymentLabel, field: .paymentMethod)
             if let offlineStatus = presentation.offlineStatus {
                 FormRowDivider()
-                staticSummaryRow("Status", offlineStatus)
+                if presentation.requiresConnectionCheck {
+                    connectionSummaryRow(offlineStatus)
+                } else {
+                    staticSummaryRow("Status", offlineStatus)
+                }
             }
         }
     }
@@ -239,6 +245,27 @@ struct SplitConfirmStepView: View {
 
     private func staticSummaryRow(_ label: String, _ value: String) -> some View {
         summaryRowContent(label, value, editable: false)
+    }
+
+    private func connectionSummaryRow(_ status: String) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Status")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.muted)
+                Text(status)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+            }
+            Spacer(minLength: 12)
+            Button("Check connection", action: onCheckConnection)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.accentText)
+                .frame(minHeight: 44)
+                .accessibilityFocused(accessibilityFocus, equals: .onlineEdit)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
     }
 
     private func summaryRowContent(_ label: String, _ value: String, editable: Bool) -> some View {

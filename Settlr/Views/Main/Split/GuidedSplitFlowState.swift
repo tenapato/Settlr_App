@@ -8,23 +8,47 @@ enum GuidedSplitStep: Hashable {
 
 enum GuidedSplitField: Hashable {
     case merchant
+    case participants
     case payer
     case division
     case paymentMethod
     case total
     case items
+    case item(UUID)
     case reconciliation
     case onlineEdit
 
     var owningStep: GuidedSplitStep {
         switch self {
-        case .merchant, .payer, .division, .paymentMethod:
+        case .merchant, .participants, .payer, .division, .paymentMethod:
             .setup
-        case .items:
+        case .items, .item:
             .items
         case .total, .reconciliation, .onlineEdit:
             .confirm
         }
+    }
+}
+
+struct GuidedSplitFocusRequest: Equatable {
+    let field: GuidedSplitField
+    fileprivate let generation: UInt
+}
+
+struct GuidedSplitFocusRequestState: Equatable {
+    private var generation: UInt = 0
+
+    mutating func request(_ field: GuidedSplitField) -> GuidedSplitFocusRequest {
+        generation &+= 1
+        return .init(field: field, generation: generation)
+    }
+
+    mutating func invalidate() {
+        generation &+= 1
+    }
+
+    func isCurrent(_ request: GuidedSplitFocusRequest) -> Bool {
+        request.generation == generation
     }
 }
 
@@ -79,12 +103,18 @@ enum GuidedSplitFlowPolicy {
             if draft.selectedTotalCents <= 0 {
                 return .init(step: .setup, field: .total, message: "Add a total greater than zero.")
             }
-        } else if draft.filledItems.isEmpty || draft.filledItems.contains(where: { $0.lineTotalCents <= 0 }) {
+        } else if draft.filledItems.isEmpty {
             return .init(step: .items, field: .items, message: "Add at least one item.")
+        } else if let invalidItem = draft.filledItems.first(where: { $0.lineTotalCents <= 0 }) {
+            return .init(
+                step: .items,
+                field: .item(invalidItem.id),
+                message: "Add a price greater than zero for this item."
+            )
         }
 
         if draft.participants.isEmpty {
-            return .init(step: .setup, field: .payer, message: "Add at least one participant.")
+            return .init(step: .setup, field: .participants, message: "Add at least one participant.")
         }
 
         if BillSplitPayerMode(persistedValue: draft.payer) == .unavailable {

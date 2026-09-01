@@ -94,23 +94,101 @@ final class GuidedSplitPresentationTests: XCTestCase {
 
     func testConfirmPresentationDisclosesOfflineSaveStatus() {
         let value = SplitConfirmPresentation(draft: SplitDraft(), totalEdited: false, isOnline: false)
+        let offlineEdit = SplitConfirmPresentation(
+            draft: SplitDraft(),
+            totalEdited: false,
+            isOnline: false,
+            isEditing: true
+        )
 
         XCTAssertEqual(value.offlineStatus, "Will save on this phone")
+        XCTAssertFalse(value.requiresConnectionCheck)
         XCTAssertNil(SplitConfirmPresentation(draft: SplitDraft(), totalEdited: false, isOnline: true).offlineStatus)
-        XCTAssertEqual(
-            SplitConfirmPresentation(draft: SplitDraft(), totalEdited: false, isOnline: false, isEditing: true).offlineStatus,
-            "Reconnect to save changes"
-        )
+        XCTAssertEqual(offlineEdit.offlineStatus, "Reconnect to save changes")
+        XCTAssertTrue(offlineEdit.requiresConnectionCheck)
     }
 
     func testGuidedFieldsMapToStableOwningSteps() {
         XCTAssertEqual(GuidedSplitField.merchant.owningStep, .setup)
+        XCTAssertEqual(GuidedSplitField.participants.owningStep, .setup)
         XCTAssertEqual(GuidedSplitField.payer.owningStep, .setup)
         XCTAssertEqual(GuidedSplitField.division.owningStep, .setup)
         XCTAssertEqual(GuidedSplitField.paymentMethod.owningStep, .setup)
         XCTAssertEqual(GuidedSplitField.items.owningStep, .items)
+        XCTAssertEqual(GuidedSplitField.item(UUID()).owningStep, .items)
         XCTAssertEqual(GuidedSplitField.total.owningStep, .confirm)
         XCTAssertEqual(GuidedSplitField.reconciliation.owningStep, .confirm)
         XCTAssertEqual(GuidedSplitField.onlineEdit.owningStep, .confirm)
+    }
+
+    func testMissingParticipantsTargetsPeopleEditor() {
+        var draft = SplitDraft()
+        draft.merchant = "Cafe"
+        draft.splitMode = "even"
+        draft.selectedTotalCents = 1_000
+        draft.participants = []
+
+        let issue = GuidedSplitFlowPolicy.firstIssue(
+            on: .confirm,
+            draft: draft,
+            totalEdited: true,
+            isEditing: false,
+            isOnline: true
+        )
+
+        XCTAssertEqual(issue?.field, .participants)
+        XCTAssertEqual(issue?.step, .setup)
+    }
+
+    func testInvalidExistingItemTargetsItsEditorRow() {
+        let invalidID = UUID()
+        var draft = SplitDraft()
+        draft.merchant = "Cafe"
+        draft.items = [.init(localID: invalidID, name: "Soup", quantity: 1, unitPriceCents: 0)]
+
+        let issue = GuidedSplitFlowPolicy.firstIssue(
+            on: .confirm,
+            draft: draft,
+            totalEdited: false,
+            isEditing: false,
+            isOnline: true
+        )
+
+        XCTAssertEqual(issue?.field, .item(invalidID))
+        XCTAssertEqual(issue?.step, .items)
+    }
+
+    func testEmptyItemListTargetsAddItemControl() {
+        var draft = SplitDraft()
+        draft.merchant = "Cafe"
+        draft.items = [.init()]
+
+        let issue = GuidedSplitFlowPolicy.firstIssue(
+            on: .confirm,
+            draft: draft,
+            totalEdited: false,
+            isEditing: false,
+            isOnline: true
+        )
+
+        XCTAssertEqual(issue?.field, .items)
+    }
+
+    func testFocusRequestInvalidationRejectsDeferredRequest() {
+        var state = GuidedSplitFocusRequestState()
+        let participants = state.request(.participants)
+        XCTAssertTrue(state.isCurrent(participants))
+
+        state.invalidate()
+        XCTAssertFalse(state.isCurrent(participants))
+    }
+
+    func testNewFocusRequestSupersedesPreviousRequest() {
+        var state = GuidedSplitFocusRequestState()
+        let firstItem = state.request(.item(UUID()))
+        let payer = state.request(.payer)
+
+        XCTAssertFalse(state.isCurrent(firstItem))
+        XCTAssertTrue(state.isCurrent(payer))
     }
 }

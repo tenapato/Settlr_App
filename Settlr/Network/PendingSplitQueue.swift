@@ -223,12 +223,23 @@ final class NetworkMonitor {
             let reachable = path.status == .satisfied
             Task { @MainActor in
                 guard let self else { return }
-                let wasOnline = self.isOnline
-                self.isOnline = reachable
-                if !wasOnline && reachable { self.onBecameReachable?() }
+                self.updateReachability(reachable)
             }
         }
         monitor.start(queue: DispatchQueue(label: "settlr.network-monitor"))
+    }
+
+    @discardableResult
+    func refreshStatus() -> Bool {
+        let reachable = monitor.currentPath.status == .satisfied
+        updateReachability(reachable)
+        return reachable
+    }
+
+    private func updateReachability(_ reachable: Bool) {
+        let wasOnline = isOnline
+        isOnline = reachable
+        if !wasOnline && reachable { onBecameReachable?() }
     }
 }
 

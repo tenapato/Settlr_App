@@ -82,6 +82,7 @@ struct SplitItemsStepView: View {
                         itemRow(item)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityFocused(accessibilityFocus, equals: .item(item.id))
                     if item.id != presentation.items(for: filter).last?.id {
                         FormRowDivider()
                     }

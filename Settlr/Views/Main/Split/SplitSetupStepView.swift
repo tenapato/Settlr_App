@@ -12,6 +12,7 @@ struct SplitSetupStepView: View {
     let onScanAgain: () -> Void
     let onOpenParserSettings: () -> Void
     let onRetryCards: () -> Void
+    let onFieldChanged: (GuidedSplitField) -> Void
 
     private var paymentOptions: [ToggleOption] {
         var options = [ToggleOption(value: "cash", label: "Cash / debit", icon: "banknote")]
@@ -47,7 +48,7 @@ struct SplitSetupStepView: View {
             VStack(alignment: .leading, spacing: 8) {
                 SectionEyebrow("How should it be divided?")
                 SegmentedToggle(
-                    selection: $draft.splitMode,
+                    selection: divisionSelection,
                     options: [
                         ToggleOption(value: "by_item", label: "By item", icon: "list.bullet"),
                         ToggleOption(value: "even", label: "Evenly", icon: "equal")
@@ -62,17 +63,25 @@ struct SplitSetupStepView: View {
                         .font(.system(size: 15, weight: .semibold, design: .monospaced))
                         .foregroundStyle(Theme.ink)
                 }
+                .accessibilityFocused(accessibilityFocus, equals: .participants)
                 SignalFormRow(label: "Paid with") {
                     Menu {
                         Button("Cash / debit") {
+                            onFieldChanged(.paymentMethod)
                             draft.paymentChannel = "cash"
                             draft.creditCardId = nil
                         }
                         if paymentOptions.contains(where: { $0.value == "credit_card" }) {
-                            Button("Credit card") { draft.paymentChannel = "credit_card" }
+                            Button("Credit card") {
+                                onFieldChanged(.paymentMethod)
+                                draft.paymentChannel = "credit_card"
+                            }
                             if draft.paymentChannel == "credit_card" {
                                 ForEach(cards) { card in
-                                    Button(cardLabel(card)) { draft.creditCardId = card.id }
+                                    Button(cardLabel(card)) {
+                                        onFieldChanged(.paymentMethod)
+                                        draft.creditCardId = card.id
+                                    }
                                 }
                             }
                         }
@@ -104,15 +113,13 @@ struct SplitSetupStepView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .onChange(of: draft.merchant) { _, _ in clearAccessibilityFocus(for: .merchant) }
-        .onChange(of: draft.payer) { _, _ in clearAccessibilityFocus(for: .payer) }
-        .onChange(of: draft.splitMode) { _, _ in clearAccessibilityFocus(for: .division) }
-        .onChange(of: draft.paymentChannel) { _, _ in clearAccessibilityFocus(for: .paymentMethod) }
-        .onChange(of: draft.creditCardId) { _, _ in clearAccessibilityFocus(for: .paymentMethod) }
     }
 
     private func payerRow(value: String, title: String, detail: String, icon: String) -> some View {
-        Button { draft.payer = value } label: {
+        Button {
+            onFieldChanged(.payer)
+            draft.payer = value
+        } label: {
             HStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(.system(size: 15, weight: .semibold))
@@ -139,14 +146,18 @@ struct SplitSetupStepView: View {
         .accessibilityAddTraits(draft.payer == value ? .isSelected : [])
     }
 
+    private var divisionSelection: Binding<String> {
+        Binding(
+            get: { draft.splitMode },
+            set: { value in
+                onFieldChanged(.division)
+                draft.splitMode = value
+            }
+        )
+    }
+
     private func cardLabel(_ card: CreditCard) -> String {
         guard let lastFour = card.lastFour, !lastFour.isEmpty else { return card.label }
         return "\(card.label) •••• \(lastFour)"
-    }
-
-    private func clearAccessibilityFocus(for field: GuidedSplitField) {
-        if accessibilityFocus.wrappedValue == field {
-            accessibilityFocus.wrappedValue = nil
-        }
     }
 }

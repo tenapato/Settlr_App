@@ -71,6 +71,8 @@ struct SplitCreateSheet: View {
     @State private var path: [GuidedSplitStep] = []
     @State private var validationIssue: GuidedSplitValidationIssue?
     @State private var pendingAccessibilityFocus: GuidedSplitField?
+    @State private var focusRequestState = GuidedSplitFocusRequestState()
+    @State private var deferredFocusTask: Task<Void, Never>?
     @AccessibilityFocusState private var accessibilityFocus: GuidedSplitField?
     @State private var itemFilter: SplitItemFilter = .all
     @State private var presentedEditor: SplitPresentedEditor?
@@ -105,7 +107,7 @@ struct SplitCreateSheet: View {
     private var scannerImportedReceipt: Bool { onBackToReview != nil }
 
     var body: some View {
-        NavigationStack(path: $path) {
+        NavigationStack(path: navigationPath) {
             guidedScreen(.setup)
                 .navigationDestination(for: GuidedSplitStep.self) { step in
                     guidedScreen(step)
@@ -178,10 +180,10 @@ struct SplitCreateSheet: View {
                 clearValidationAndFocus()
             }
         }
-        .onChange(of: path) { _, _ in
-            if pendingAccessibilityFocus == nil { accessibilityFocus = nil }
+        .onDisappear {
+            cancelDeferredAccessibilityFocus()
+            photoRecovery.clear()
         }
-        .onDisappear { photoRecovery.clear() }
         .interactiveDismissDisabled(isScanning || isSubmitting)
     }
 
@@ -241,11 +243,12 @@ struct SplitCreateSheet: View {
                 cardLoadState: canUseCreditCards ? cardLoadState : .idle,
                 accessibilityFocus: $accessibilityFocus,
                 validationIssue: validationIssue,
-                onEditReceipt: { presentedEditor = .receipt },
-                onEditPeople: { presentedEditor = .people },
+                onEditReceipt: { presentEditor(.receipt) },
+                onEditPeople: { presentEditor(.people) },
                 onScanAgain: beginScan,
-                onOpenParserSettings: { showReceiptSettings = true },
-                onRetryCards: { Task { await loadCards() } }
+                onOpenParserSettings: openParserSettings,
+                onRetryCards: retryCards,
+                onFieldChanged: handleDirectFieldChange
             )
         case .items:
             SplitItemsStepView(
@@ -253,8 +256,8 @@ struct SplitCreateSheet: View {
                 filter: $itemFilter,
                 accessibilityFocus: $accessibilityFocus,
                 validationIssue: validationIssue,
-                onEditItem: { presentedEditor = .item($0.id) },
-                onAddItem: { presentedEditor = .newItem(SplitDraft.Item()) }
+                onEditItem: { presentEditor(.item($0.id)) },
+                onAddItem: { presentEditor(.newItem(SplitDraft.Item())) }
             )
         case .confirm:
             SplitConfirmStepView(
@@ -269,13 +272,14 @@ struct SplitCreateSheet: View {
                 ),
                 validationIssue: validationIssue,
                 onEditSetupValue: editSetupValue,
-                onEditMoney: { presentedEditor = .money($0) },
-                onKeepReceiptTotal: { showKeepMismatchConfirmation = true },
+                onEditMoney: { presentEditor(.money($0)) },
+                onKeepReceiptTotal: requestKeepReceiptTotal,
                 onUseCalculatedTotal: {
                     draft.useCalculatedTotal()
                     totalEdited = true
                     clearValidationAndFocus()
-                }
+                },
+                onCheckConnection: checkConnection
             )
         }
     }
@@ -427,7 +431,7 @@ struct SplitCreateSheet: View {
             return .init(step: .setup, field: .merchant, message: "Add a merchant name.")
         }
         if draft.participants.isEmpty {
-            return .init(step: .setup, field: .payer, message: "Add at least one participant.")
+            return .init(step: .setup, field: .participants, message: "Add at least one participant.")
         }
         if BillSplitPayerMode(persistedValue: draft.payer) == .unavailable {
             return .init(step: .setup, field: .payer, message: "Choose who paid.")
@@ -453,9 +457,9 @@ struct SplitCreateSheet: View {
     }
 
     private func present(_ issue: GuidedSplitValidationIssue) {
+        cancelDeferredAccessibilityFocus()
         validationIssue = issue
-        pendingAccessibilityFocus = issue.field
-        accessibilityFocus = nil
+        if case .item = issue.field { itemFilter = .all }
         switch issue.step {
         case .setup:
             path.removeAll()
@@ -464,11 +468,17 @@ struct SplitCreateSheet: View {
         case .confirm:
             if path.last != .confirm { path.append(.confirm) }
         }
-        Task { @MainActor in
+        let request = focusRequestState.request(issue.field)
+        pendingAccessibilityFocus = issue.field
+        deferredFocusTask = Task { @MainActor in
             await Task.yield()
-            guard validationIssue == issue, pendingAccessibilityFocus == issue.field else { return }
+            guard !Task.isCancelled,
+                  focusRequestState.isCurrent(request),
+                  validationIssue == issue,
+                  pendingAccessibilityFocus == issue.field else { return }
             accessibilityFocus = issue.field
             pendingAccessibilityFocus = nil
+            deferredFocusTask = nil
         }
     }
 
@@ -484,6 +494,7 @@ struct SplitCreateSheet: View {
 
     private func backToReview() {
         guard !isScanning, !isSubmitting else { return }
+        cancelDeferredAccessibilityFocus()
         photoRecovery.clear()
         onBackToReview?(draft, totalEdited)
     }
@@ -562,6 +573,59 @@ struct SplitCreateSheet: View {
 
     private func clearValidationAndFocus() {
         validationIssue = nil
+        cancelDeferredAccessibilityFocus()
+    }
+
+    private var navigationPath: Binding<[GuidedSplitStep]> {
+        Binding(
+            get: { path },
+            set: { newPath in
+                guard newPath != path else { return }
+                clearValidationAndFocus()
+                path = newPath
+            }
+        )
+    }
+
+    private func handleDirectFieldChange(_ field: GuidedSplitField) {
+        cancelDeferredAccessibilityFocus()
+        if validationIssue?.field == field { validationIssue = nil }
+    }
+
+    private func presentEditor(_ editor: SplitPresentedEditor) {
+        cancelDeferredAccessibilityFocus()
+        presentedEditor = editor
+    }
+
+    private func requestKeepReceiptTotal() {
+        cancelDeferredAccessibilityFocus()
+        showKeepMismatchConfirmation = true
+    }
+
+    private func openParserSettings() {
+        cancelDeferredAccessibilityFocus()
+        showReceiptSettings = true
+    }
+
+    private func retryCards() {
+        cancelDeferredAccessibilityFocus()
+        Task { await loadCards() }
+    }
+
+    private func checkConnection() {
+        cancelDeferredAccessibilityFocus()
+        if network.refreshStatus() {
+            submissionErrorMessage = nil
+            validationIssue = nil
+        } else if let issue = submissionIssue().map(issueOwnedByItsEditor) {
+            present(issue)
+        }
+    }
+
+    private func cancelDeferredAccessibilityFocus() {
+        focusRequestState.invalidate()
+        deferredFocusTask?.cancel()
+        deferredFocusTask = nil
         pendingAccessibilityFocus = nil
         accessibilityFocus = nil
     }
@@ -574,6 +638,7 @@ struct SplitCreateSheet: View {
     // MARK: - Scan recovery
 
     private func beginScan() {
+        cancelDeferredAccessibilityFocus()
         scanNotice = nil
         setupErrorMessage = nil
         showScanner = true

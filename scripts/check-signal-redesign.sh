@@ -411,8 +411,21 @@ grep -Fq 'AccessibilityFocusState<GuidedSplitField?>.Binding' "$split_items"
 grep -Fq 'AccessibilityFocusState<GuidedSplitField?>.Binding' "$split_confirm"
 grep -Fq 'accessibilityFocus: accessibilityFocus' "$split_setup"
 grep -Fq '.accessibilityFocused(accessibilityFocus, equals: .merchant)' "$split_guided"
+grep -Fq '.accessibilityFocused(accessibilityFocus, equals: .participants)' "$split_setup"
 grep -Fq '.accessibilityFocused(accessibilityFocus, equals: .items)' "$split_items"
+grep -Fq '.accessibilityFocused(accessibilityFocus, equals: .item(item.id))' "$split_items"
 grep -Fq '.accessibilityFocused(accessibilityFocus, equals: .total)' "$split_confirm"
+grep -Fq '.accessibilityFocused(accessibilityFocus, equals: .onlineEdit)' "$split_confirm"
+grep -Fq 'Button("Check connection"' "$split_confirm"
+grep -Fq 'network.refreshStatus()' "$split_editor"
+grep -Fq 'func refreshStatus() -> Bool' Settlr/Network/PendingSplitQueue.swift
+grep -Fq '@State private var deferredFocusTask: Task<Void, Never>?' "$split_editor"
+grep -Fq 'focusRequestState.isCurrent(request)' "$split_editor"
+grep -Fq 'deferredFocusTask?.cancel()' "$split_editor"
+grep -Fq 'NavigationStack(path: navigationPath)' "$split_editor"
+grep -Fq 'onFieldChanged(.payer)' "$split_setup"
+grep -Fq 'onFieldChanged(.division)' "$split_setup"
+grep -Fq 'onFieldChanged(.paymentMethod)' "$split_setup"
 for step_view in "$split_setup" "$split_items" "$split_confirm"; do
     if grep -Fq 'SplitStickyAction' "$step_view"; then
         echo "Guided step content must not embed the coordinator-owned sticky action: $step_view" >&2
