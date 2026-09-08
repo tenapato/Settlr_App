@@ -387,6 +387,27 @@ final class GuidedSplitPresentationTests: XCTestCase {
         XCTAssertEqual(route, .resubmit(entry.id))
     }
 
+    func testSplitCompletionRendersResultBeforeNotifyingPresenter() {
+        let entry = makePendingSplit()
+        var events: [String] = []
+        var renderedEntryID: UUID?
+
+        SplitScanCompletionCoordinator.complete(
+            .queued(entry),
+            apply: { split, pending, stage in
+                XCTAssertNil(split)
+                renderedEntryID = pending?.id
+                if case .result = stage { events.append("render") }
+            },
+            notify: { _ in
+                XCTAssertEqual(renderedEntryID, entry.id)
+                events.append("notify")
+            }
+        )
+
+        XCTAssertEqual(events, ["render", "notify"])
+    }
+
     private func makePendingSplit() -> PendingSplit {
         let id = UUID(uuidString: "12345678-1234-1234-1234-123456789ABC")!
         return PendingSplit(

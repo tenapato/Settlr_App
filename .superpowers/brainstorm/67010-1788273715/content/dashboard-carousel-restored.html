@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dashboard carousel restoration</title>
+  <style>
+    :root{--bg:#070909;--surface:#121616;--line:#292e2e;--ink:#f4f6f4;--muted:#858d8d;--faint:#626969;--lime:#baff29;--green:#4bdd8a;--red:#ff6468}
+    *{box-sizing:border-box} body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% -10%,#1d260c 0,transparent 34%),var(--bg);color:var(--ink);font:14px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif}
+    main{max-width:980px;margin:0 auto;padding:46px 24px 70px;display:grid;grid-template-columns:minmax(360px,420px) 1fr;gap:54px;align-items:center}
+    .phone{border:1px solid #353b3b;border-radius:42px;background:#080a0a;padding:23px 21px 26px;box-shadow:inset 0 0 0 6px #111414,0 24px 70px #000;min-height:760px;overflow:hidden}
+    .status{display:flex;justify-content:space-between;margin:0 13px 24px;font-weight:700}.workspace{display:flex;align-items:center;gap:11px}.logo{width:22px;height:22px;border-radius:6px;background:#161b16;color:var(--lime);display:grid;place-items:center;font-weight:900}.eyebrow{font-size:10px;font-weight:800;letter-spacing:.17em;color:#777f7f;text-transform:uppercase}.workspace b{font-size:16px}.chev{color:#747c7c;margin-left:3px}.month{margin-top:29px;display:flex;align-items:center;justify-content:space-between;font-size:17px;font-weight:650}.month span{color:#818989;font-size:28px;font-weight:300}.hero{margin-top:21px}.hero .amount{font-size:44px;font-weight:750;letter-spacing:-.045em;margin:5px 0}.after{color:#939b9b;font-size:15px}.after i{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--lime);margin-right:8px}
+    .flow{margin-top:23px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:15px 0}.flowrow{display:grid;grid-template-columns:9px 1fr auto;gap:9px;min-height:49px;align-items:center}.trace{width:8px;height:8px;border:2px solid;border-radius:50%}.income{color:var(--green)}.expense{color:var(--red)}.saving{color:var(--lime)}.flowrow small{display:block;color:#666e6e;margin-top:2px}.value{font-size:15px;font-weight:650}.signal{margin:19px -21px 0;padding:0 21px}.signalhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}.signalhead span:last-child{font-size:10px;color:#626969}.ticker{height:52px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;align-items:center;overflow:hidden;white-space:nowrap;position:relative}.ticker:before,.ticker:after{content:"";position:absolute;top:0;bottom:0;width:28px;z-index:2}.ticker:before{left:0;background:linear-gradient(90deg,var(--bg),transparent)}.ticker:after{right:0;background:linear-gradient(-90deg,var(--bg),transparent)}.track{display:flex;gap:17px;align-items:center;animation:scroll 13s linear infinite;font-size:13px;font-weight:650}.track i{width:6px;height:6px;border-radius:50%;background:var(--lime)}.track .dot{color:#545c5c}.track .number{color:var(--green)}.track .quiet{color:#9aa2a2}@keyframes scroll{to{transform:translateX(-50%)}}@media(prefers-reduced-motion:reduce){.track{animation:none;transform:none}}
+    .count{display:flex;justify-content:space-between;margin-top:18px;color:#777f7f;font-size:11px}.count b{color:#dce0de}.copy .accent{color:var(--lime);font-size:11px;font-weight:850;letter-spacing:.18em;text-transform:uppercase}.copy h1{font-size:44px;line-height:1.02;letter-spacing:-.05em;margin:12px 0 15px}.copy p{color:#a1a9a9;font-size:16px;max-width:480px}.rules{margin-top:27px;border-left:2px solid var(--lime);padding-left:18px;display:grid;gap:15px}.rules b{display:block;font-size:14px}.rules span{display:block;color:#7f8787;margin-top:3px;font-size:13px}.note{margin-top:27px;border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:14px 15px;color:#9aa2a2;font-size:12px}
+    @media(max-width:800px){main{grid-template-columns:1fr;max-width:470px}.copy{order:-1}.phone{min-height:720px}.copy h1{font-size:36px}}
+  </style>
+</head>
+<body><main>
+  <div class="phone">
+    <div class="status"><span>8:38</span><span>● ◒ ▰</span></div>
+    <div class="workspace"><span class="logo">≡</span><div><div class="eyebrow">Workspace</div><b>Personal</b></div><span class="chev">⌄</span></div>
+    <div class="month"><span>‹</span><b>September 2026</b><span>›</span></div>
+    <div class="hero"><div class="eyebrow">Available this month</div><div class="amount">MXN $1,000.00</div><div class="after"><i></i>After savings</div></div>
+    <div class="flow"><div class="eyebrow">Money flow</div>
+      <div class="flowrow"><i class="trace income"></i><div><b>Came in</b><small>Income</small></div><span class="value income">+MXN $1,000.00</span></div>
+      <div class="flowrow"><i class="trace expense"></i><div><b>Went out</b><small>Spending</small></div><span class="value expense">MXN $0.00</span></div>
+      <div class="flowrow"><i class="trace saving"></i><div><b>Moved aside</b><small>Savings</small></div><span class="value saving">MXN $0.00</span></div>
+    </div>
+    <div class="signal">
+      <div class="signalhead"><span class="eyebrow">This month's signal</span><span>Swipe for more</span></div>
+      <div class="ticker"><div class="track">
+        <i></i><span>Income landed <span class="number">MXN $1,000</span></span><span class="dot">·</span><span class="quiet">No spending yet</span><span class="dot">·</span><span>Available <span class="number">MXN $1,000</span></span><span class="dot">·</span><span class="quiet">1 movement this month</span><span class="dot">·</span>
+        <i></i><span>Income landed <span class="number">MXN $1,000</span></span><span class="dot">·</span><span class="quiet">No spending yet</span><span class="dot">·</span><span>Available <span class="number">MXN $1,000</span></span><span class="dot">·</span><span class="quiet">1 movement this month</span><span class="dot">·</span>
+      </div></div>
+    </div>
+    <div class="count"><span><b>1 movement</b>&nbsp; this month</span><span>0 out · 1 in</span></div>
+  </div>
+  <section class="copy"><div class="accent">Carousel restored</div><h1>The signal stays alive—even at zero spending.</h1><p>The custom ticker remains in the same Dashboard position. It uses the data that exists now, then switches naturally to category and comparison insights as spending appears.</p>
+    <div class="rules"><div><b>Never disappears</b><span>Zero-spend months get useful income, availability, savings, and movement signals.</span></div><div><b>No fake categories</b><span>Category insights appear only when the server actually returns spending data.</span></div><div><b>Same behavior</b><span>30 pt/s loop, drag, pause, delayed resume, tap, and Reduce Motion remain unchanged.</span></div></div>
+    <div class="note">Root cause: the current ticker has an explicit zero-expense / empty-category gate that returns an empty view. The Dashboard redesign exposed that old empty-state rule.</div>
+  </section>
+</main></body></html>

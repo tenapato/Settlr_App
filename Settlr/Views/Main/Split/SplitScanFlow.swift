@@ -4,6 +4,29 @@ enum SplitScanStage {
     case capture, review, split, result
 }
 
+/// Commits the result screen before an ancestor reacts to the save. The root
+/// presenter may queue another sheet when notified; doing that first can make
+/// SwiftUI resolve two presentation changes in the same update and leave the
+/// create flow showing its stale Confirm screen.
+enum SplitScanCompletionCoordinator {
+    static func complete(
+        _ outcome: SplitSaveOutcome,
+        apply: (_ split: BillSplit?, _ pending: PendingSplit?, _ stage: SplitScanStage) -> Void,
+        notify: (SplitSaveOutcome) -> Void
+    ) {
+        switch outcome {
+        case .created(let split):
+            apply(split, nil, .result)
+            notify(outcome)
+        case .queued(let entry), .needsAttention(let entry):
+            apply(nil, entry, .result)
+            notify(outcome)
+        case .rejected:
+            break
+        }
+    }
+}
+
 struct SplitPendingResultPresentation: Equatable {
     let title: String
     let reason: String?
@@ -147,26 +170,18 @@ struct SplitScanFlow: View {
             onCancelFlow: { dismiss() },
             dismissOnSave: false
         ) { outcome in
-            switch outcome {
-            case .created(let split):
-                resultSplit = split
-                pendingResult = nil
-                editorContinuation = nil
-                onSaved(outcome)
-                stage = .result
-            case .queued(let entry), .needsAttention(let entry):
-                resultSplit = nil
-                pendingResult = entry
-                // SplitCreateSheet only forwards non-fixable needs-attention
-                // outcomes; fixable ones stay in the editor with their ID.
-                editorContinuation = nil
-                onSaved(outcome)
-                stage = .result
-            case .rejected:
-                // SplitCreateSheet keeps rejected requests inline so every
-                // draft field remains available for correction.
-                break
-            }
+            SplitScanCompletionCoordinator.complete(
+                outcome,
+                apply: { split, pending, nextStage in
+                    resultSplit = split
+                    pendingResult = pending
+                    // SplitCreateSheet only forwards non-fixable needs-attention
+                    // outcomes; fixable ones stay in the editor with their ID.
+                    editorContinuation = nil
+                    stage = nextStage
+                },
+                notify: onSaved
+            )
         }
     }
 
