@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Compact, non-nested shared-item toggle. The containing item row owns the
 /// tap action so the whole row can be interactive without embedding a Button.
@@ -16,11 +17,11 @@ struct CompactSharedClaimControl: View {
             } else {
                 Image(systemName: presentation.isSelected ? "checkmark" : "circle")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(presentation.isSelected ? Theme.accent : Theme.muted)
+                    .foregroundStyle(presentation.isSelected ? Theme.accentText : Theme.muted)
             }
             Text(isLoading ? "Updating…" : presentation.title)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(presentation.isSelected ? Theme.accent : Theme.muted)
+                .foregroundStyle(presentation.isSelected ? Theme.accentText : Theme.muted)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
@@ -40,6 +41,7 @@ struct CompactSharedClaimControl: View {
                 : presentation.accessibilityLabel(isEnabled: isEnabled)
         )
         .accessibilityAddTraits(isEnabled && !isLoading ? .isButton : [])
+        .accessibilityAddTraits(presentation.isSelected ? .isSelected : [])
     }
 }
 
@@ -50,7 +52,7 @@ struct ClaimSelectionCircle: View {
     var body: some View {
         Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
             .font(.system(size: 18, weight: .semibold))
-            .foregroundStyle(isSelected ? Theme.accent : Theme.muted)
+            .foregroundStyle(isSelected ? Theme.accentText : Theme.muted)
             .opacity(isEnabled ? 1 : 0.45)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(isEnabled ? (isSelected ? "Included" : "Add me") : "Item unavailable")
@@ -70,11 +72,11 @@ struct CompactUnitClaimStepper: View {
             Button(action: decrement) {
                 Image(systemName: "minus")
                     .font(.system(size: 10, weight: .bold))
-                    .frame(width: 23, height: 23)
+                    .frame(width: 44, height: 44)
             }
             .disabled(!canDecrement)
             .accessibilityLabel("Remove one")
-            .foregroundStyle(canDecrement ? Theme.accent : Theme.faint)
+            .foregroundStyle(canDecrement ? Theme.accentText : Theme.faint)
 
             Text("\(quantity)")
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
@@ -85,11 +87,11 @@ struct CompactUnitClaimStepper: View {
             Button(action: increment) {
                 Image(systemName: "plus")
                     .font(.system(size: 10, weight: .bold))
-                    .frame(width: 23, height: 23)
+                    .frame(width: 44, height: 44)
             }
             .disabled(!canIncrement)
             .accessibilityLabel("Add one")
-            .foregroundStyle(canIncrement ? Theme.accent : Theme.faint)
+            .foregroundStyle(canIncrement ? Theme.accentText : Theme.faint)
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 2)
@@ -101,29 +103,80 @@ struct CompactUnitClaimStepper: View {
 
 // MARK: - Theme tokens
 //
-// Single source of truth for Settlr's palette. `Color(hex:)` is defined app-wide
-// in FloatingTabBar.swift. Adopt `Theme.*` in new/redesigned UI; existing screens
-// keep their inline hex calls (no app-wide migration).
+// Single source of truth for Settlr's palette. Colors resolve against the active
+// interface style so screens can follow the app-level appearance preference.
+
+private extension UIColor {
+    convenience init(hex: UInt32) {
+        self.init(
+            red: CGFloat((hex >> 16) & 0xFF) / 255,
+            green: CGFloat((hex >> 8) & 0xFF) / 255,
+            blue: CGFloat(hex & 0xFF) / 255,
+            alpha: 1
+        )
+    }
+}
+
+private extension Color {
+    static func settlr(
+        light: UInt32,
+        dark: UInt32,
+        highContrastLight: UInt32? = nil,
+        highContrastDark: UInt32? = nil
+    ) -> Color {
+        Color(uiColor: UIColor { traits in
+            let isDark = traits.userInterfaceStyle == .dark
+            let isHighContrast = traits.accessibilityContrast == .high
+            let value: UInt32
+            if isHighContrast {
+                value = isDark ? (highContrastDark ?? dark) : (highContrastLight ?? light)
+            } else {
+                value = isDark ? dark : light
+            }
+            return UIColor(hex: value)
+        })
+    }
+}
 
 enum Theme {
-    static let bg        = Color(hex: "#0e0f11") // page background
-    static let surface   = Color(hex: "#15171a") // cards, fields
-    static let surface2  = Color(hex: "#1c1f23") // raised fills
-    static let line      = Color(hex: "#2a2d32") // hairline borders / dividers
-    static let ink       = Color(hex: "#ecedee") // primary text
-    static let muted     = Color(hex: "#8e9197") // secondary text
-    static let faint     = Color(hex: "#5a5d63") // tertiary / placeholder
-    static let accent    = Color(hex: "#c8ff5a") // lime brand
-    static let income    = Color(hex: "#5ddf8a") // positive
-    static let expense   = Color(hex: "#ff6b6b") // negative
-    static let warning   = Color(hex: "#ffb547") // caution
+    static let bg        = Color.settlr(light: 0xF3F3ED, dark: 0x090A0B)
+    static let surface   = Color.settlr(light: 0xFFFFFF, dark: 0x15181B)
+    static let surface2  = Color.settlr(light: 0xE9EBE4, dark: 0x1D2124)
+    static let line      = Color.settlr(
+        light: 0xDADDD6,
+        dark: 0x2D3135,
+        highContrastLight: 0xAEB4AA,
+        highContrastDark: 0x596065
+    )
+    static let ink       = Color.settlr(light: 0x141614, dark: 0xF4F5EF)
+    static let muted     = Color.settlr(
+        light: 0x69706A,
+        dark: 0x898F92,
+        highContrastLight: 0x4C524D,
+        highContrastDark: 0xB3B8BA
+    )
+    static let faint     = Color.settlr(
+        light: 0x7A817B,
+        dark: 0x6F7578,
+        highContrastLight: 0x5F665F,
+        highContrastDark: 0x9DA3A5
+    )
+    static let accent    = Color.settlr(light: 0xA8D522, dark: 0xCAFF3A)
+    static let accentText = Color.settlr(light: 0x597500, dark: 0xCAFF3A)
+    static let buttonInk = Color.settlr(light: 0x11140A, dark: 0x080A08)
+    static let scrim     = Color.settlr(light: 0x141614, dark: 0x000000)
+    static let income    = Color.settlr(light: 0x2F7A4A, dark: 0x65D98A)
+    static let expense   = Color.settlr(light: 0xB52F3A, dark: 0xFF7070)
+    static let destructiveButtonInk = Color.settlr(light: 0xFFFFFF, dark: 0x080A08)
+    static let warning   = Color.settlr(light: 0x9A6500, dark: 0xFFB547)
 
     /// Categorical palette for charts, ordered by rank.
     static let categoryPalette: [Color] = [
-        Color(hex: "#ff6b6b"), Color(hex: "#ffb547"), Color(hex: "#c8ff5a"),
-        Color(hex: "#5ddf8a"), Color(hex: "#4db8ff"), Color(hex: "#b47ef5"),
+        expense, warning, accent, income,
+        Color.settlr(light: 0x2879A8, dark: 0x4DB8FF),
+        Color.settlr(light: 0x7543A8, dark: 0xB47EF5),
     ]
-    static let categoryOther = Color(hex: "#3a3d43") // the "Otros" remainder segment
+    static let categoryOther = Color.settlr(light: 0xC0C4BC, dark: 0x3A3D43) // the "Otros" remainder segment
 }
 
 // MARK: - Form field surface
@@ -200,17 +253,18 @@ struct PrimaryButtonStyle: ButtonStyle {
     struct PrimaryButtonBody: View {
         let configuration: ButtonStyleConfiguration
         @Environment(\.isEnabled) private var isEnabled
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
         var body: some View {
             configuration.label
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Theme.bg)
+                .foregroundStyle(Theme.buttonInk)
                 .frame(maxWidth: .infinity)
                 .frame(height: 52)
                 .background(RoundedRectangle(cornerRadius: 14).fill(Theme.accent))
                 .opacity(isEnabled ? (configuration.isPressed ? 0.85 : 1) : 0.4)
-                .scaleEffect(configuration.isPressed ? 0.99 : 1)
-                .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+                .scaleEffect(configuration.isPressed && !reduceMotion ? 0.99 : 1)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: configuration.isPressed)
         }
     }
 }

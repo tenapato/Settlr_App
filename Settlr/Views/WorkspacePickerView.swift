@@ -6,28 +6,31 @@ struct WorkspacePickerView: View {
 
     var body: some View {
         ZStack {
-            Color(hex: "#0e0f11").ignoresSafeArea()
+            Theme.bg.ignoresSafeArea()
 
             VStack(alignment: .leading, spacing: 0) {
-                // Header
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Your Workspaces")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(Color(hex: "#ecedee"))
-                    Text("Select a workspace to continue")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Color(hex: "#8e9197"))
+                    Image("SettlrLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 48, height: 48)
+                        .accessibilityHidden(true)
+                    Text("Your workspaces")
+                        .font(.largeTitle.bold())
+                        .foregroundStyle(Theme.ink)
+                    Text("Choose where you want to work.")
+                        .font(.body)
+                        .foregroundStyle(Theme.muted)
                 }
                 .padding(.horizontal, 24)
-                .padding(.top, 60)
-                .padding(.bottom, 32)
+                .padding(.top, 44)
+                .padding(.bottom, 24)
 
                 if vm.isLoading {
-                    Spacer()
-                    ProgressView()
-                        .tint(Color(hex: "#c8ff5a"))
-                        .frame(maxWidth: .infinity)
-                    Spacer()
+                    SettlrPulseLoadingView(message: "Loading your workspaces")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let error = vm.errorMessage, vm.workspaces.isEmpty {
+                    workspaceError(error)
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 10) {
@@ -36,41 +39,31 @@ struct WorkspacePickerView: View {
                                     appState.select(workspace)
                                 }
                             }
-
-                            Button {
-                                vm.showCreateSheet = true
-                            } label: {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "plus.circle.fill")
-                                        .font(.system(size: 22))
-                                        .foregroundStyle(Color(hex: "#c8ff5a"))
-                                    Text("New Workspace")
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundStyle(Color(hex: "#c8ff5a"))
-                                    Spacer()
-                                }
-                                .padding(18)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .strokeBorder(Color(hex: "#c8ff5a").opacity(0.3), lineWidth: 1)
-                                )
-                            }
                         }
                         .padding(.horizontal, 24)
-                        .padding(.bottom, 40)
+                        .padding(.bottom, 20)
                     }
                 }
 
-                // Sign out
-                Button {
+                if (vm.errorMessage == nil || !vm.workspaces.isEmpty) && !vm.isLoading {
+                    Button { vm.showCreateSheet = true } label: {
+                        Label("Create workspace", systemImage: "plus")
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .padding(.horizontal, 24)
+                    .padding(.top, 12)
+                }
+
+                Button(role: .destructive) {
                     Task { await appState.signOut() }
                 } label: {
-                    Text("Sign Out")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Color(hex: "#8e9197"))
+                    Text("Sign out")
+                        .font(.subheadline.weight(.medium))
                         .frame(maxWidth: .infinity)
-                        .padding(.bottom, 32)
+                        .frame(minHeight: 44)
                 }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 16)
             }
         }
         .task { await vm.load() }
@@ -79,7 +72,32 @@ struct WorkspacePickerView: View {
                 appState.select(workspace)
             }
         }
-        .preferredColorScheme(.dark)
+    }
+
+    private func workspaceError(_ message: String) -> some View {
+        VStack(spacing: 12) {
+            Spacer()
+            Image(systemName: "wifi.exclamationmark")
+                .font(.title)
+                .foregroundStyle(Theme.warning)
+            Text("Workspaces unavailable")
+                .font(.headline)
+                .foregroundStyle(Theme.ink)
+            Text("We couldn't load your workspaces. Your account is still signed in.")
+                .font(.subheadline)
+                .foregroundStyle(Theme.muted)
+                .multilineTextAlignment(.center)
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(Theme.faint)
+                .multilineTextAlignment(.center)
+            Button("Retry") { Task { await vm.load() } }
+                .buttonStyle(PrimaryButtonStyle())
+                .padding(.top, 4)
+            Spacer()
+        }
+        .padding(.horizontal, 32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -92,38 +110,41 @@ private struct WorkspaceRow: View {
             HStack(spacing: 14) {
                 ZStack {
                     Circle()
-                        .fill(Color(hex: "#c8ff5a").opacity(0.12))
+                        .fill(Theme.accent.opacity(0.12))
                         .frame(width: 44, height: 44)
                     Text(String(workspace.name.prefix(1)).uppercased())
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(Color(hex: "#c8ff5a"))
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(Theme.accentText)
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(workspace.name)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Color(hex: "#ecedee"))
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Theme.ink)
                     Text(workspace.role.capitalized)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color(hex: "#8e9197"))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
                 }
 
                 Spacer()
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#5a5d63"))
+                    .foregroundStyle(Theme.faint)
             }
             .padding(18)
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(hex: "#15171a"))
+                    .fill(Theme.surface)
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
-                            .strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1)
+                            .strokeBorder(Theme.line, lineWidth: 1)
                     )
             )
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(workspace.name), \(workspace.role)")
+        .accessibilityHint("Selects this workspace")
     }
 }
 
@@ -135,7 +156,7 @@ private struct CreateWorkspaceSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(hex: "#0e0f11").ignoresSafeArea()
+                Theme.bg.ignoresSafeArea()
 
                 VStack(spacing: 20) {
                     StyledTextField(placeholder: "Workspace name", text: $vm.newWorkspaceName)
@@ -144,8 +165,8 @@ private struct CreateWorkspaceSheet: View {
 
                     if let error = vm.errorMessage {
                         Text(error)
-                            .font(.system(size: 13))
-                            .foregroundStyle(Color(hex: "#ff6b6b"))
+                            .font(.footnote)
+                            .foregroundStyle(Theme.expense)
                             .padding(.horizontal, 28)
                     }
 
@@ -157,7 +178,7 @@ private struct CreateWorkspaceSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
-                        .foregroundStyle(Color(hex: "#8e9197"))
+                        .foregroundStyle(Theme.muted)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Create") {
@@ -167,11 +188,12 @@ private struct CreateWorkspaceSheet: View {
                             }
                         }
                     }
-                    .foregroundStyle(Color(hex: "#c8ff5a"))
-                    .disabled(vm.isCreating)
+                    .foregroundStyle(Theme.accentText)
+                    .disabled(vm.isCreating || vm.isLoading)
                 }
             }
         }
-        .preferredColorScheme(.dark)
+        .presentationBackground(Theme.bg)
+        .interactiveDismissDisabled(vm.isCreating)
     }
 }

@@ -89,8 +89,8 @@ struct APIServerError: LocalizedError {
     var isRetryable: Bool { status >= 500 || status == 429 }
 }
 
+@MainActor
 final class APIClient {
-    @MainActor
     static let shared = APIClient()
     private init() {}
 

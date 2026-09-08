@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 
+@MainActor
 @Observable
 final class ExpensesVM {
     var expenses: [Expense] = []
@@ -21,6 +22,8 @@ final class ExpensesVM {
     }()
 
     private let api = APIClient.shared
+    private var categoryLoadGeneration = 0
+    private var categoryWorkspaceID: String?
 
     var hasActiveFilter: Bool {
         !searchText.isEmpty || filterChannel != nil || filterCategoryId != nil || filterCardId != nil
@@ -58,6 +61,51 @@ final class ExpensesVM {
     }
 
     @MainActor
+    func resetCategoriesForWorkspace(_ workspaceId: String) {
+        categoryLoadGeneration += 1
+        categoryWorkspaceID = workspaceId
+        categories = []
+    }
+
+    /// Returns a token Activity can use to reject a save response that crosses
+    /// a workspace switch. Existing callers do not need to participate.
+    @MainActor
+    func workspaceMutationGeneration(for workspaceId: String) -> Int {
+        guard categoryWorkspaceID == workspaceId else { return -1 }
+        return categoryLoadGeneration
+    }
+
+    private func acceptsMutation(
+        workspaceId: String,
+        expectedGeneration: Int?
+    ) -> Bool {
+        guard let expectedGeneration else { return true }
+        return categoryWorkspaceID == workspaceId && categoryLoadGeneration == expectedGeneration
+    }
+
+    @MainActor
+    func loadCategories(workspaceId: String, categoriesEnabled: Bool) async {
+        if categoryWorkspaceID != workspaceId {
+            resetCategoriesForWorkspace(workspaceId)
+        }
+        guard categoriesEnabled else {
+            categories = []
+            return
+        }
+        let generation = categoryLoadGeneration
+        do {
+            let response: CategoriesResponse = try await api.fetch(
+                Endpoints.categories(workspaceId) + "?scope=expense"
+            )
+            guard generation == categoryLoadGeneration, categoryWorkspaceID == workspaceId else { return }
+            categories = response.categories
+        } catch {
+            guard generation == categoryLoadGeneration, categoryWorkspaceID == workspaceId else { return }
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
     func load(workspaceId: String) async {
         isLoading = true
         defer { isLoading = false }
@@ -81,44 +129,63 @@ final class ExpensesVM {
     }
 
     @MainActor
-    func create(workspaceId: String, body: CreateExpenseBody) async {
+    func create(
+        workspaceId: String,
+        body: CreateExpenseBody,
+        expectedGeneration: Int? = nil
+    ) async {
         do {
             let response: CreateExpenseResponse = try await api.fetch(
                 Endpoints.expenses(workspaceId),
                 method: "POST",
                 body: body
             )
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return }
             expenses.insert(response.expense, at: 0)
         } catch {
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return }
             errorMessage = error.localizedDescription
         }
     }
 
     @MainActor
     @discardableResult
-    func update(workspaceId: String, expenseId: String, body: CreateExpenseBody) async -> Expense? {
+    func update(
+        workspaceId: String,
+        expenseId: String,
+        body: CreateExpenseBody,
+        expectedGeneration: Int? = nil
+    ) async -> Expense? {
         do {
             let response: CreateExpenseResponse = try await api.fetch(
                 Endpoints.expense(workspaceId, expenseId),
                 method: "PATCH",
                 body: body
             )
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return nil }
             if let idx = expenses.firstIndex(where: { $0.id == expenseId }) {
                 expenses[idx] = response.expense
             }
             return response.expense
         } catch {
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return nil }
             errorMessage = error.localizedDescription
             return nil
         }
     }
 
     @MainActor
-    func delete(workspaceId: String, expenseId: String) async {
+    func delete(
+        workspaceId: String,
+        expenseId: String,
+        expectedGeneration: Int? = nil
+    ) async {
         do {
             try await api.send(Endpoints.expense(workspaceId, expenseId), method: "DELETE")
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return }
             expenses.removeAll { $0.id == expenseId }
         } catch {
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return }
             errorMessage = error.localizedDescription
         }
     }

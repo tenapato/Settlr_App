@@ -54,7 +54,6 @@ struct ExpenseSplitSection: View {
             NavigationStack {
                 SplitDetailView(workspaceId: workspaceId, splitId: splitId, vm: vm)
             }
-            .preferredColorScheme(.dark)
         }
         .task { await load() }
     }

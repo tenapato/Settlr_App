@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Settlr — Approved visual system</title>
+  <style>
+    * { box-sizing:border-box; }
+    :root { color-scheme:dark; }
+    body { margin:0; background:#090a0b; color:#f4f5ef; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif; -webkit-font-smoothing:antialiased; }
+    main { max-width:1320px; margin:0 auto; padding:52px 28px 72px; }
+    .eyebrow { color:#caff3a; font-size:10px; font-weight:820; letter-spacing:.16em; text-transform:uppercase; }
+    h1 { max-width:880px; margin:10px 0 12px; font-size:clamp(32px,5vw,56px); line-height:1; letter-spacing:-.045em; }
+    .intro { max-width:780px; margin:0 0 34px; color:#999da1; font-size:15px; line-height:1.55; }
+    .themes { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+    .theme-card { padding:12px; border:1px solid #292d31; border-radius:25px; background:#111316; }
+    .phone { min-height:610px; display:flex; flex-direction:column; padding:23px 18px 17px; overflow:hidden; border-radius:18px; }
+    .dark { background:#090a0b; color:#f4f5ef; border:1px solid #202327; }
+    .light { background:#f4f5ef; color:#101214; border:1px solid #d4d6d2; }
+    .top { display:flex; align-items:center; justify-content:space-between; }
+    .brand { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:820; letter-spacing:.06em; }
+    .logo { display:grid; gap:3px; width:21px; }
+    .logo i { display:block; height:3px; border-radius:2px; background:#caff3a; }
+    .light .logo i { background:#547800; }
+    .logo i:nth-child(2) { margin-left:5px; }
+    .avatar { width:31px; height:31px; display:grid; place-items:center; border-radius:50%; font-size:9px; font-weight:800; }
+    .dark .avatar { border:1px solid #2d3135; background:#191c1f; color:#969ba0; }
+    .light .avatar { border:1px solid #d4d6d2; background:#fff; color:#60666b; }
+    .micro { margin-top:32px; font-size:9px; font-weight:820; letter-spacing:.14em; text-transform:uppercase; }
+    .dark .micro { color:#caff3a; } .light .micro { color:#547800; }
+    .balance { margin-top:7px; font-size:42px; line-height:1; font-weight:790; letter-spacing:-.05em; font-variant-numeric:tabular-nums; }
+    .delta { margin-top:9px; font-size:10px; font-weight:700; }
+    .dark .delta { color:#858a8f; } .light .delta { color:#60666b; }
+    .summary { display:grid; grid-template-columns:repeat(2,1fr); gap:9px; margin-top:24px; }
+    .metric { padding:15px; border-radius:18px; }
+    .dark .metric { border:1px solid #2d3135; background:#15181b; }
+    .light .metric { border:1px solid #daddd8; background:#fff; }
+    .metric small,.metric strong { display:block; }
+    .metric small { font-size:9px; font-weight:760; text-transform:uppercase; letter-spacing:.09em; }
+    .dark .metric small { color:#7f8489; } .light .metric small { color:#6a7075; }
+    .metric strong { margin-top:8px; font-size:20px; font-variant-numeric:tabular-nums; }
+    .section { display:flex; align-items:baseline; justify-content:space-between; margin-top:26px; }
+    .section strong { font-size:15px; }
+    .section span { font-size:9px; font-weight:800; }
+    .dark .section span { color:#caff3a; } .light .section span { color:#547800; }
+    .row { display:grid; grid-template-columns:35px 1fr auto; gap:10px; align-items:center; padding:13px 0; }
+    .dark .row { border-bottom:1px solid #202327; } .light .row { border-bottom:1px solid #dfe1dd; }
+    .row-icon { width:35px; height:35px; display:grid; place-items:center; border-radius:10px; font-size:10px; font-weight:820; }
+    .dark .row-icon { background:#191c1f; color:#caff3a; } .light .row-icon { background:#e6eadf; color:#547800; }
+    .row-copy strong,.row-copy small { display:block; }
+    .row-copy strong { font-size:11px; }
+    .row-copy small { margin-top:3px; font-size:9px; }
+    .dark .row-copy small { color:#6c7176; } .light .row-copy small { color:#71777c; }
+    .amount { font-size:11px; font-weight:760; font-variant-numeric:tabular-nums; }
+    .bottom { display:flex; align-items:center; gap:11px; margin-top:auto; }
+    .tabs { height:58px; flex:1; display:grid; grid-template-columns:repeat(4,1fr); align-items:center; padding:6px; border-radius:999px; }
+    .dark .tabs { border:1px solid #2b2f33; background:#171a1d; }
+    .light .tabs { border:1px solid #d4d6d2; background:#fff; }
+    .tab { display:grid; gap:4px; place-items:center; font-size:7px; font-weight:720; }
+    .tab b { font-size:9px; }
+    .dark .tab { color:#73787c; } .light .tab { color:#7a8085; }
+    .dark .tab.active { color:#caff3a; } .light .tab.active { color:#547800; }
+    .fab-wrap { width:58px; height:58px; display:grid; place-items:center; flex:0 0 auto; border:1px solid; border-radius:50%; }
+    .dark .fab-wrap { border-color:#2b2f33; } .light .fab-wrap { border-color:#d4d6d2; }
+    .fab { width:52px; height:52px; display:grid; place-items:center; border-radius:50%; background:#caff3a; color:#090a0b; font-size:27px; font-weight:520; }
+    .theme-meta { padding:18px 9px 9px; }
+    .theme-meta h2 { margin:0; font-size:20px; letter-spacing:-.025em; }
+    .theme-meta p { margin:8px 0 0; color:#969a9e; font-size:12px; line-height:1.5; }
+    .system { display:grid; grid-template-columns:1.1fr .9fr; gap:18px; margin-top:18px; }
+    .panel { padding:22px; border:1px solid #2d3135; border-radius:20px; background:#111316; }
+    .panel h2 { margin:0 0 17px; font-size:20px; letter-spacing:-.025em; }
+    .swatches { display:grid; grid-template-columns:repeat(6,1fr); gap:9px; }
+    .swatch i { display:block; aspect-ratio:1; border:1px solid rgba(255,255,255,.15); border-radius:12px; }
+    .swatch b,.swatch small { display:block; }
+    .swatch b { margin-top:7px; font-size:9px; }
+    .swatch small { margin-top:2px; color:#73787c; font-size:8px; }
+    .rules { display:grid; gap:10px; }
+    .rule { display:grid; grid-template-columns:96px 1fr; gap:10px; padding-top:10px; border-top:1px solid #292d31; font-size:11px; line-height:1.45; }
+    .rule b { color:#f0f1ec; }.rule span { color:#969a9e; }
+    .motion { margin-top:18px; padding:18px 20px; border:1px solid #2d3135; border-radius:18px; color:#a2a6a9; font-size:12px; line-height:1.55; }
+    .motion b { color:#caff3a; }
+    @media(max-width:900px){ .themes,.system{grid-template-columns:1fr}.swatches{grid-template-columns:repeat(3,1fr)} }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">Approved direction · Visual system</div>
+    <h1>Signal Black by default. The same identity in daylight.</h1>
+    <p class="intro">One lime accent, one cool-neutral family, fixed geometry, and native iOS typography. Light mode changes tonal values—not the product’s personality.</p>
+    <section class="themes">
+      <article class="theme-card"><div class="phone dark"><div class="top"><div class="brand"><span class="logo"><i></i><i></i><i></i></span>SETTLR</div><div class="avatar">PT</div></div><div class="micro">Available this month</div><div class="balance">$18,420</div><div class="delta">12.4% ahead of July</div><div class="summary"><div class="metric"><small>Income</small><strong>$32,800</strong></div><div class="metric"><small>Spent</small><strong>$14,380</strong></div></div><div class="section"><strong>Latest activity</strong><span>VIEW ALL</span></div><div class="row"><div class="row-icon">−</div><div class="row-copy"><strong>Food & drink</strong><small>Today · BBVA</small></div><div class="amount">−$428</div></div><div class="row"><div class="row-icon">S</div><div class="row-copy"><strong>Savings</strong><small>Yesterday · Goal</small></div><div class="amount">+$1,200</div></div><div class="bottom"><div class="tabs"><div class="tab active"><b>⌂</b>Home</div><div class="tab"><b>≡</b>Activity</div><div class="tab"><b>S</b>Savings</div><div class="tab"><b>▭</b>Cards</div></div><div class="fab-wrap"><div class="fab">＋</div></div></div></div><div class="theme-meta"><h2>Signal Black</h2><p>Default on first launch. Deep black canvas, graphite hierarchy, lime reserved for actions and active state.</p></div></article>
+      <article class="theme-card"><div class="phone light"><div class="top"><div class="brand"><span class="logo"><i></i><i></i><i></i></span>SETTLR</div><div class="avatar">PT</div></div><div class="micro">Available this month</div><div class="balance">$18,420</div><div class="delta">12.4% ahead of July</div><div class="summary"><div class="metric"><small>Income</small><strong>$32,800</strong></div><div class="metric"><small>Spent</small><strong>$14,380</strong></div></div><div class="section"><strong>Latest activity</strong><span>VIEW ALL</span></div><div class="row"><div class="row-icon">−</div><div class="row-copy"><strong>Food & drink</strong><small>Today · BBVA</small></div><div class="amount">−$428</div></div><div class="row"><div class="row-icon">S</div><div class="row-copy"><strong>Savings</strong><small>Yesterday · Goal</small></div><div class="amount">+$1,200</div></div><div class="bottom"><div class="tabs"><div class="tab active"><b>⌂</b>Home</div><div class="tab"><b>≡</b>Activity</div><div class="tab"><b>S</b>Savings</div><div class="tab"><b>▭</b>Cards</div></div><div class="fab-wrap"><div class="fab">＋</div></div></div></div><div class="theme-meta"><h2>Signal Light</h2><p>Available through Light or System. Lime shifts to a deeper tonal role for readable text and active states.</p></div></article>
+    </section>
+    <section class="system">
+      <div class="panel"><h2>Semantic color roles</h2><div class="swatches"><div class="swatch"><i style="background:#090a0b"></i><b>Canvas</b><small>#090A0B</small></div><div class="swatch"><i style="background:#15181b"></i><b>Surface</b><small>#15181B</small></div><div class="swatch"><i style="background:#1d2124"></i><b>Raised</b><small>#1D2124</small></div><div class="swatch"><i style="background:#2d3135"></i><b>Separator</b><small>#2D3135</small></div><div class="swatch"><i style="background:#f4f5ef"></i><b>Ink</b><small>#F4F5EF</small></div><div class="swatch"><i style="background:#caff3a"></i><b>Signal</b><small>#CAFF3A</small></div></div></div>
+      <div class="panel"><h2>Locked system rules</h2><div class="rules"><div class="rule"><b>Typography</b><span>SF Pro system ramp; one display value per screen; tabular numerals for every amount.</span></div><div class="rule"><b>Geometry</b><span>Circles for actions, capsules for navigation, 18pt cards, 12pt fields, 10pt icon containers.</span></div><div class="rule"><b>Accent</b><span>Lime only for primary actions, active navigation, focus, and meaningful progress.</span></div><div class="rule"><b>Elevation</b><span>Only persistent navigation and temporary menus float. Content stays flat and structural.</span></div><div class="rule"><b>Themes</b><span>Settings: Dark (default), Light, System. Every state ships in both palettes.</span></div></div></div>
+    </section>
+    <div class="motion"><b>Motion language:</b> native push/pop and tab behavior; 100–150ms press feedback; Signature Scanner uses a restrained 300ms spring and one light haptic; no dashboard entrance choreography; Reduce Motion converts spatial transforms to fades.</div>
+  </main>
+</body>
+</html>

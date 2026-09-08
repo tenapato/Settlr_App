@@ -79,6 +79,61 @@ final class SplitDraftTests: XCTestCase {
         XCTAssertEqual(draft.unverifiedItems.map(\.name), ["TACO"])
     }
 
+    func testCreateBodyPreservesEveryPayerAndDivisionCombination() {
+        for payer in ["me", "each_own"] {
+            for splitMode in ["by_item", "even"] {
+                var draft = makeDraft(itemTotal: 1_000, selectedTotal: 1_000)
+                draft.payer = payer
+                draft.splitMode = splitMode
+
+                let body = draft.makeCreateBody()
+
+                XCTAssertEqual(body.payer, payer)
+                XCTAssertEqual(body.splitMode, splitMode)
+            }
+        }
+    }
+
+    func testEvenCreateBodyOmitsRetainedByItemDraftRows() {
+        var draft = makeDraft(itemTotal: 1_000, selectedTotal: 1_000)
+        let retainedItems = draft.items
+        draft.splitMode = "even"
+
+        let body = draft.makeCreateBody()
+
+        XCTAssertTrue(body.items.isEmpty)
+        XCTAssertEqual(draft.items, retainedItems)
+    }
+
+    func testEvenEditBodyOmitsRetainedByItemDraftRows() throws {
+        let split = try decodeSplit()
+        var draft = SplitDraft(split: split)
+        let retainedItems = draft.items
+        draft.splitMode = "even"
+
+        let body = draft.makeEditBody(version: split.version)
+
+        XCTAssertTrue(body.items.isEmpty)
+        XCTAssertEqual(draft.items, retainedItems)
+    }
+
+    func testManualFlowOriginDoesNotOfferReviewBack() {
+        XCTAssertFalse(SplitScanFlowMetadata(origin: .manual, totalEdited: false).canReturnToReview)
+        XCTAssertTrue(SplitScanFlowMetadata(origin: .capturedReceipt, totalEdited: false).canReturnToReview)
+    }
+
+    func testDerivedTotalRestorationKeepsTrackingItemTotals() {
+        let metadata = SplitScanFlowMetadata(origin: .capturedReceipt, totalEdited: false)
+        XCTAssertFalse(metadata.totalEdited)
+
+        var draft = makeDraft(itemTotal: 1_000, selectedTotal: 1_000)
+        draft.items[0].unitPriceCents = 1_500
+        draft.selectedTotalCents = draft.calculatedTotalCents
+
+        XCTAssertFalse(draft.reconciliation.requiresDecision)
+        XCTAssertEqual(draft.selectedTotalCents, 1_500)
+    }
+
     func testReconciliationUsesLargerOfOnePesoAndPointOnePercentTolerance() {
         // This catches rounding thresholds that mistakenly force a decision for
         // a one-peso receipt difference or ignore a material discrepancy.
@@ -93,6 +148,21 @@ final class SplitDraftTests: XCTestCase {
         draft.selectedTotalCents = 199_599
         XCTAssertEqual(draft.reconciliation.kind, .overshoot)
         XCTAssertEqual(draft.reconciliation.differenceCents, -201)
+    }
+
+    func testReconciliationAcknowledgementIsAsymmetricInsideRoundingTolerance() {
+        var draft = makeDraft(itemTotal: 10_000, selectedTotal: 10_050)
+        XCTAssertEqual(draft.reconciliation.kind, .rounding)
+        XCTAssertFalse(draft.reconciliation.requiresAcknowledgement)
+        XCTAssertFalse(draft.reconciliation.requiresDecision)
+
+        draft.selectedTotalCents = 9_950
+        XCTAssertEqual(draft.reconciliation.kind, .rounding)
+        XCTAssertTrue(draft.reconciliation.requiresAcknowledgement)
+        XCTAssertTrue(draft.reconciliation.requiresDecision)
+
+        draft.confirmKeepReceiptTotal()
+        XCTAssertFalse(draft.reconciliation.requiresDecision)
     }
 
     func testMismatchActionsNeverSilentlyReplaceSelectedTotal() {
@@ -166,6 +236,19 @@ final class SplitDraftTests: XCTestCase {
         XCTAssertEqual(plan.removedItemIDs, ["item-1"])
     }
 
+    func testSwitchingEditToEvenTreatsClaimedItemsAsRemoved() throws {
+        let split = try decodeSplit()
+        var draft = SplitDraft(split: split)
+        draft.splitMode = "even"
+
+        let plan = draft.claimImpact(comparedTo: split)
+
+        XCTAssertTrue(plan.requiresConfirmation)
+        XCTAssertEqual(plan.itemIDsRequiringConfirmation, ["item-1"])
+        XCTAssertEqual(plan.itemNamesRequiringConfirmation, ["Tacos 23"])
+        XCTAssertEqual(plan.removedItemIDs, ["item-1"])
+    }
+
     func testEditBodyClearsOnlyConfirmedFinancialChanges() throws {
         let split = try decodeSplit()
         var draft = SplitDraft(split: split)
@@ -176,6 +259,79 @@ final class SplitDraftTests: XCTestCase {
 
         XCTAssertEqual(body.items[0].clearClaims, true)
         XCTAssertNil(body.items[1].clearClaims)
+    }
+
+    func testReceiptReviewPresentationKeepsOnlyScanDerivedSummary() {
+        // This catches Review inventing setup metadata or treating an uncertain
+        // scan as ready to continue without drawing attention to it.
+        let scan = ScannedReceipt(
+            parser: .server,
+            merchant: nil,
+            items: [
+                ScannedReceiptItem(
+                    name: "Taco",
+                    quantity: 2,
+                    unitPriceCents: 350,
+                    verification: .unverified
+                )
+            ],
+            taxCents: 0,
+            tipCents: 0,
+            totalCents: 700,
+            warnings: ["Check the printed total"]
+        )
+
+        let presentation = ReceiptReviewPresentation(receipt: scan)
+
+        XCTAssertEqual(presentation.merchantName, "Merchant not found")
+        XCTAssertEqual(presentation.totalCents, 700)
+        XCTAssertEqual(presentation.statusText, "Review highlighted details")
+        XCTAssertTrue(presentation.needsAttention)
+    }
+
+    func testReceiptReviewPresentationMarksVerifiedScanReady() {
+        let scan = ScannedReceipt(
+            parser: .onDevice,
+            merchant: "Mercado Roma",
+            items: [
+                ScannedReceiptItem(
+                    name: "Lunch",
+                    quantity: 1,
+                    unitPriceCents: 1_250,
+                    verification: .verified
+                )
+            ],
+            taxCents: 0,
+            tipCents: 0,
+            totalCents: 1_250,
+            warnings: []
+        )
+
+        let presentation = ReceiptReviewPresentation(receipt: scan)
+
+        XCTAssertEqual(presentation.merchantName, "Mercado Roma")
+        XCTAssertEqual(presentation.statusText, "Scan looks ready")
+        XCTAssertFalse(presentation.needsAttention)
+    }
+
+    func testReceiptReviewPresentationFlagsMissingItemsAndBlankMerchant() {
+        // This catches an unusable scan receiving a green ready state or a
+        // normalized merchant fallback losing its warning treatment.
+        let scan = ScannedReceipt(
+            parser: .onDevice,
+            merchant: "   ",
+            items: [],
+            taxCents: 0,
+            tipCents: 0,
+            totalCents: 1_250,
+            warnings: []
+        )
+
+        let presentation = ReceiptReviewPresentation(receipt: scan)
+
+        XCTAssertTrue(presentation.needsAttention)
+        XCTAssertTrue(presentation.merchantNeedsAttention)
+        XCTAssertEqual(presentation.statusText, "Review highlighted details")
     }
 
     private func makeDraft(itemTotal: Int, selectedTotal: Int) -> SplitDraft {

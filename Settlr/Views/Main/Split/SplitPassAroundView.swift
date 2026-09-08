@@ -71,7 +71,6 @@ struct SplitPassAroundView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
         .onAppear { adoptCurrentParticipants() }
         .onChange(of: current.version) { _, _ in adoptCurrentParticipants() }
     }
@@ -130,9 +129,10 @@ struct SplitPassAroundView: View {
 
                             Button("Add") { addPerson() }
                                 .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Theme.bg)
+                                .foregroundStyle(Theme.buttonInk)
                                 .padding(.horizontal, 18)
                                 .padding(.vertical, 11)
+                                .frame(minHeight: 44)
                                 .background(Theme.accent)
                                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                 .disabled(vm.isSaving || !current.isOpen)
@@ -488,9 +488,10 @@ private extension View {
     func primaryPassButton() -> some View {
         self
             .font(.system(size: 16, weight: .semibold))
-            .foregroundStyle(Theme.bg)
+            .foregroundStyle(Theme.buttonInk)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
+            .frame(minHeight: 52)
             .background(Theme.accent)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
