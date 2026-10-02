@@ -1,3 +1,4 @@
+import AppIntents
 import SwiftUI
 
 struct ExpenseAutomationGuide: View {
@@ -40,22 +41,30 @@ struct ExpenseAutomationGuide: View {
                     step(5, "Connect the transaction", "Tap Amount and select the transaction’s Amount variable. Repeat for Merchant. Under the action’s additional options, you can also connect Card or Pass and Name. Use Select Variable and the transaction input if the variables aren’t visible.", icon: "slider.horizontal.3")
                     step(6, "Review, then save", "Tap Done. When the automation runs, Settlr opens an expense draft. Check the amount, workspace, category and payment method, then tap Add Expense. Missing Wallet details can be entered manually.", icon: "checkmark.circle")
                 } else {
-                    step(1, "Create a shortcut", "In Shortcuts, tap +, search for Settlr and add “Quick Expense”. Name and save the shortcut.", icon: "plus.circle")
-                    step(2, "Assign Back Tap", "Open iPhone Settings → Accessibility → Touch → Back Tap. Choose Double Tap or Triple Tap, then select your saved shortcut.", icon: "hand.tap")
+                    step(1, "Find Quick Expense", "The Quick Expense App Shortcut is available when Settlr is installed. Open Settlr’s page in Shortcuts to find it.", icon: "plus.circle")
+                    step(2, "Assign Back Tap", "Open iPhone Settings → Accessibility → Touch → Back Tap. Choose Double Tap or Triple Tap, then look for Quick Expense under Shortcuts. If it isn’t listed, create a personal shortcut containing the Quick Expense action in Shortcuts, then select that shortcut here.", icon: "hand.tap")
                     step(3, "Tap and log", "Tap the back of your iPhone to open Settlr. Enter the amount and description, choose a category and payment method, then save.", icon: "checkmark.circle")
                 }
 
-                Button {
-                    openURL(URL(string: "shortcuts://")!) { accepted in
-                        cannotOpenShortcuts = !accepted
-                    }
-                } label: {
-                    Label("Open Shortcuts", systemImage: "arrow.up.right.square")
+                if method == .backTap {
+                    ShortcutsLink()
                         .frame(maxWidth: .infinity)
+                        .accessibilityHint("Opens Settlr’s App Shortcuts page")
+                } else {
+                    Button {
+                        openURL(URL(string: "shortcuts://")!) { accepted in
+                            cannotOpenShortcuts = !accepted
+                        }
+                    } label: {
+                        Label("Open Shortcuts", systemImage: "arrow.up.right.square")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
                 }
-                .buttonStyle(PrimaryButtonStyle())
 
-                Text("Set up the automation yourself in Shortcuts. You may need to unlock your iPhone to open Settlr. Wallet details depend on the card and transaction; this does not import past purchases or save expenses without your review.")
+                Text(method == .wallet
+                     ? "Choose and configure the Wallet trigger yourself in Shortcuts. You may need to unlock your iPhone to open Settlr. Wallet details depend on the card and transaction; this does not import past purchases or save expenses without your review."
+                     : "Quick Expense is available with Settlr. Back Tap must be assigned in iPhone Settings. You may need to unlock your iPhone to open Settlr; no expense is saved without your review.")
                     .font(.footnote).foregroundStyle(Theme.muted)
             }
             .padding(20)
