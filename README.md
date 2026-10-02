@@ -137,7 +137,7 @@ upload has a newer build number without changing the Xcode project file.
 Settings → **Expense Shortcuts** contains setup instructions for both methods.
 The app exposes **Wallet Payment → Settlr** (Amount, Merchant, optional Card or
 Pass and Name) and **Quick Expense** (blank draft) as App Shortcuts, available
-when Settlr is installed. The app’s Back Tap guide opens its App Shortcuts page;
+when Settlr is installed. Both setup tabs link to Settlr’s App Shortcuts page;
 the user still assigns Back Tap in iPhone Settings and creates the Wallet
 transaction automation in Shortcuts.
 Connect Wallet transaction variables directly to the Wallet action; no

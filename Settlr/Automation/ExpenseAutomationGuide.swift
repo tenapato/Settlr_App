@@ -33,6 +33,18 @@ struct ExpenseAutomationGuide: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
+                SectionCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("READY IN SHORTCUTS", systemImage: "bolt.circle")
+                            .font(.caption.weight(.semibold)).foregroundStyle(Theme.accent)
+                        Text("Wallet Payment → Settlr and Quick Expense come with the app.")
+                            .foregroundStyle(Theme.muted)
+                        ShortcutsLink()
+                            .accessibilityHint("Opens Settlr’s App Shortcuts page")
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
                 if method == .wallet {
                     step(1, "Open Shortcuts", "Open Apple’s Shortcuts app and select the Automation tab.", icon: "square.grid.3x3")
                     step(2, "Create an automation", "Tap + (or New Automation). Choose Wallet or Transaction, depending on your iOS version.", icon: "plus.circle")
@@ -46,17 +58,13 @@ struct ExpenseAutomationGuide: View {
                     step(3, "Tap and log", "Tap the back of your iPhone to open Settlr. Enter the amount and description, choose a category and payment method, then save.", icon: "checkmark.circle")
                 }
 
-                if method == .backTap {
-                    ShortcutsLink()
-                        .frame(maxWidth: .infinity)
-                        .accessibilityHint("Opens Settlr’s App Shortcuts page")
-                } else {
+                if method == .wallet {
                     Button {
                         openURL(URL(string: "shortcuts://")!) { accepted in
                             cannotOpenShortcuts = !accepted
                         }
                     } label: {
-                        Label("Open Shortcuts", systemImage: "arrow.up.right.square")
+                        Label("Set up Wallet automation", systemImage: "arrow.up.right.square")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(PrimaryButtonStyle())
