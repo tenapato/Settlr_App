@@ -39,6 +39,10 @@ struct MainTabView: View {
         // A tab can disappear under the user: an admin turns a feature off and
         // the next `/api/me` drops it. Landing on Home beats rendering a tab
         // whose content no longer exists.
+        .onReceive(NotificationCenter.default.publisher(for: .expenseAutomationSaved)) { _ in
+            guard let workspace = appState.activeWorkspace else { return }
+            Task { await expensesVM.load(workspaceId: workspace.id) }
+        }
         .onAppear(perform: reconcileSelectedTab)
         .onChange(of: availableTabs) { _, _ in reconcileSelectedTab() }
         // Splitting starts at the camera, not at a form.

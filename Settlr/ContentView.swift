@@ -1,8 +1,27 @@
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.scenePhase) private var scenePhase
+    @State private var automationPresentation: AutomationPresentation?
+    @State private var presentedAutomationID: UUID?
+    private let automationInbox = ExpenseAutomationInbox.shared
+
+    private struct AutomationPresentation: Identifiable {
+        let draft: AutomationExpenseDraft
+        let workspace: WorkspaceWithRole
+        var id: UUID { draft.id }
+    }
+
+    private var nextAutomationID: UUID? {
+        guard !appState.isLoading, appState.isAuthenticated,
+              appState.deactivation == nil, appState.activeWorkspace != nil,
+              !appState.isRestoringWorkspace, appState.pendingSplitShareToken == nil,
+              scenePhase == .active else { return nil }
+        return automationInbox.drafts.first?.id
+    }
+
     private let network = NetworkMonitor.shared
 
     var body: some View {
@@ -28,6 +47,37 @@ struct ContentView: View {
             } else {
                 MainTabView()
             }
+        }
+        .fullScreenCover(item: $automationPresentation, onDismiss: {
+            if let id = presentedAutomationID { automationInbox.remove(id: id) }
+            presentedAutomationID = nil
+        }) { presentation in
+            AutomationExpenseReview(draft: presentation.draft, workspace: presentation.workspace)
+                .environment(appState)
+        }
+        .task(id: nextAutomationID) {
+            guard let id = nextAutomationID, automationPresentation == nil else { return }
+            // Preserve any form already being edited. SwiftUI cannot present a
+            // second modal from the same root while the first is still open.
+            while hasPresentedModal {
+                do { try await Task.sleep(for: .milliseconds(300)) }
+                catch { return }
+                guard !Task.isCancelled, nextAutomationID == id else { return }
+            }
+            guard !Task.isCancelled, nextAutomationID == id,
+                  let draft = automationInbox.drafts.first(where: { $0.id == id }),
+                  let workspace = appState.activeWorkspace else { return }
+            presentedAutomationID = id
+            automationPresentation = AutomationPresentation(draft: draft, workspace: workspace)
+        }
+        .onChange(of: appState.isAuthenticated) { _, authenticated in
+            if !authenticated {
+                automationPresentation = nil
+                automationInbox.removeAll()
+            }
+        }
+        .onChange(of: appState.deactivation != nil) { _, deactivated in
+            if deactivated { automationPresentation = nil }
         }
         .task {
             await appState.initialize()
@@ -65,6 +115,16 @@ struct ContentView: View {
                     .environment(appState)
             }
         }
+    }
+
+    @MainActor
+    private var hasPresentedModal: Bool {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .filter { $0.activationState == .foregroundActive }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)?
+            .rootViewController?.presentedViewController != nil
     }
 
     private func flushPendingSplits() {

@@ -57,6 +57,26 @@ struct SettingsView: View {
                             }
                         }
 
+                        if appState.currentUser?.has(.expenses) ?? false {
+                            NavigationLink {
+                                ExpenseAutomationGuide()
+                            } label: {
+                                SectionCard {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: "bolt.fill").foregroundStyle(Theme.accent)
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text("Expense Shortcuts").font(.headline)
+                                            Text("Apple Pay and Back Tap")
+                                                .font(.subheadline).foregroundStyle(Theme.muted)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right").foregroundStyle(Theme.muted)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+
                         // Workspace section
                         if let workspace = appState.activeWorkspace {
                             SectionCard {
@@ -301,5 +321,9 @@ struct SettingsView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .onChange(of: ExpenseAutomationInbox.shared.drafts.count) { _, count in
+            // Settings has no unsaved form; make room for the incoming draft.
+            if count > 0 { dismiss() }
+        }
     }
 }
