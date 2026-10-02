@@ -81,6 +81,13 @@ struct DashboardView: View {
             let year = Int(vm.selectedMonth.prefix(4)) ?? Calendar.current.component(.year, from: .now)
             await annualVM.load(workspaceId: workspaceId, year: year)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .expenseAutomationSaved)) { _ in
+            Task {
+                await vm.load(workspaceId: workspaceId)
+                let year = Int(vm.selectedMonth.prefix(4)) ?? Calendar.current.component(.year, from: .now)
+                await annualVM.load(workspaceId: workspaceId, year: year)
+            }
+        }
         .onChange(of: vm.selectedMonth) { _, _ in
             Task {
                 await vm.load(workspaceId: workspaceId)
