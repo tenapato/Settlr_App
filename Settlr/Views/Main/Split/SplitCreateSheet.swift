@@ -61,7 +61,6 @@ struct SplitCreateSheet: View {
     @State private var showReceiptSettings = false
     @State private var photoRecovery = ReceiptPhotoRecovery()
     @State private var showPhotoRecovery = false
-    @State private var showKeepMismatchConfirmation = false
     @State private var showClaimChangeConfirmation = false
     @State private var pendingClaimClearIDs: Set<String> = []
     @State private var hasInitialized = false
@@ -145,12 +144,6 @@ struct SplitCreateSheet: View {
         }
         .sheet(item: $presentedEditor) { editor in
             editorSheet(editor)
-        }
-        .alert("Keep the receipt total?", isPresented: $showKeepMismatchConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Keep receipt total", action: confirmKeepReceiptTotal)
-        } message: {
-            Text("Keep this total only after checking the receipt for missing or duplicated rows.")
         }
         .alert("Clear existing claims?", isPresented: $showClaimChangeConfirmation) {
             Button("Cancel", role: .cancel) { pendingClaimClearIDs = [] }
@@ -281,7 +274,7 @@ struct SplitCreateSheet: View {
                 onKeepReceiptTotal: requestKeepReceiptTotal,
                 onUseCalculatedTotal: {
                     draft.useCalculatedTotal()
-                    totalEdited = true
+                    totalEdited = false
                     clearValidationAndFocus()
                 },
                 onCheckConnection: checkConnection
@@ -604,7 +597,10 @@ struct SplitCreateSheet: View {
 
     private func requestKeepReceiptTotal() {
         cancelDeferredAccessibilityFocus()
-        showKeepMismatchConfirmation = true
+        // The visible Keep receipt total action is the confirmation. Attaching
+        // another alert to the stack root can leave this pushed step unchanged.
+        totalEdited = true
+        confirmKeepReceiptTotal()
     }
 
     private func openParserSettings() {

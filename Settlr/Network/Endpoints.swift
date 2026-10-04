@@ -66,5 +66,7 @@ enum Endpoints {
     // Bill splits — public share link (no session; see APIClient.publicSplit*)
     static func publicSplit(_ shareToken: String) -> String { "/api/split/\(shareToken)" }
     static func publicSplitJoin(_ shareToken: String) -> String { "/api/split/\(shareToken)/join" }
+    static func billSplitGroupPayment(_ wsId: String, _ id: String) -> String { "/api/workspaces/\(wsId)/bill-splits/\(id)/group-payments" }
+    static func publicSplitPaymentReport(_ token: String) -> String { "/api/split/\(token)/payment-reports" }
     static func publicSplitClaims(_ shareToken: String) -> String { "/api/split/\(shareToken)/claims" }
 }

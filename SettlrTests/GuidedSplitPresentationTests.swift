@@ -439,6 +439,41 @@ final class GuidedSplitPresentationTests: XCTestCase {
         XCTAssertEqual(result.id, entry.id)
     }
 
+    func testSharedBottleKeepsPurchaseQuantitySeparateFromPeopleCount() {
+        let item = SplitDraft.Item(name: "Bottle", quantity: 1, unitPriceCents: 250_000)
+        let edited = SplitItemEditDraft(item: item).committed(
+            name: "Bottle", quantity: 1, unitPriceCents: 250_000, allocationMode: "shared"
+        )
+        XCTAssertEqual(edited.quantity, 1)
+        XCTAssertEqual(edited.lineTotalCents, 250_000)
+        XCTAssertEqual(edited.allocationMode, "shared")
+        var draft = SplitDraft()
+        draft.items = [edited]
+        XCTAssertEqual(draft.makeCreateBody().items.first?.allocationMode, "shared")
+    }
+
+    func testItemMoneyRejectsInvalidAndOverflowingInput() {
+        XCTAssertEqual(SplitItemEditorSheet.validMoney("2500.00"), 250_000)
+        XCTAssertEqual(SplitItemEditorSheet.validMoney("12,34"), 1234)
+        for input in ["", "abc", "-1", "nan", "inf", "1e100"] {
+            XCTAssertNil(SplitItemEditorSheet.validMoney(input), input)
+        }
+    }
+
+    func testReceiptConfirmationPreservesPrintedTotalAndAllowsSubmission() {
+        var draft = SplitDraft()
+        draft.items = [.init(name: "Lunch", quantity: 1, unitPriceCents: 1000)]
+        draft.selectedTotalCents = 1500
+        XCTAssertTrue(draft.reconciliation.requiresDecision)
+        draft.confirmKeepReceiptTotal()
+        XCTAssertEqual(draft.makeCreateBody().totalCents, 1500)
+        XCTAssertTrue(draft.makeCreateBody().mismatchAcknowledged == true)
+        XCTAssertFalse(draft.reconciliation.requiresDecision)
+        draft.useCalculatedTotal()
+        XCTAssertEqual(draft.selectedTotalCents, 1000)
+        XCTAssertFalse(draft.mismatchAcknowledged)
+    }
+
     private func makePendingSplit() -> PendingSplit {
         let id = UUID(uuidString: "12345678-1234-1234-1234-123456789ABC")!
         return PendingSplit(

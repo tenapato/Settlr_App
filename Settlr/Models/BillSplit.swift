@@ -531,16 +531,22 @@ struct BillSplit: Codable, Identifiable {
     let unallocatedExtrasCents: Int
     let outstandingCents: Int
 
+    let groupPaymentsAvailable: Bool
+    let paymentRequests: [SplitPaymentReport]
+
     private enum CodingKeys: String, CodingKey {
         case id, shareToken, shareUrl, merchant, currency, occurredAt, subtotalCents
         case taxCents, tipCents, feeCents, totalCents, status, version
         case mismatchAcknowledged, payer, splitMode, paymentChannel, creditCardId
         case categoryId, expenseId, createdAt, items, participants, unclaimedItemsCents
+        case groupPaymentsAvailable, paymentRequests
         case unallocatedExtrasCents, outstandingCents
     }
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
+        groupPaymentsAvailable = try values.decodeIfPresent(Bool.self, forKey: .groupPaymentsAvailable) ?? false
+        paymentRequests = try values.decodeIfPresent([SplitPaymentReport].self, forKey: .paymentRequests) ?? []
         id = try values.decode(String.self, forKey: .id)
         shareToken = try values.decode(String.self, forKey: .shareToken)
         shareUrl = try values.decodeIfPresent(String.self, forKey: .shareUrl)
@@ -1065,6 +1071,9 @@ struct PublicSplit: Codable {
     let unclaimedItemsCents: Int
     let viewerParticipantId: String?
 
+    let groupPaymentsAvailable: Bool?
+    let paymentRequests: [SplitPaymentReport]?
+
     var isOpen: Bool { status == "open" }
     var payerMode: BillSplitPayerMode { BillSplitPayerMode(persistedValue: payer) }
     var isEachOwn: Bool { payerMode == .eachOwn }
@@ -1098,5 +1107,31 @@ enum SplitGuestStore {
 
     static func clear(for shareToken: String) {
         UserDefaults.standard.removeObject(forKey: key(shareToken))
+    }
+}
+
+struct SplitPaymentReport: Codable, Identifiable {
+    let id: String
+    let paidByParticipantId: String
+    let participantIds: [String]
+    let amountCents: Int
+}
+
+struct SplitGroupPaymentBody: Encodable {
+    let participantIds: [String]
+    let paidByParticipantId: String
+    let version: Int?
+    let requestId: String?
+}
+
+extension SplitGuestStore {
+    static func people(for shareToken: String) -> [String: String] {
+        (UserDefaults.standard.dictionary(forKey: "settlr.split.people.\(shareToken)") as? [String: String]) ?? [:]
+    }
+
+    static func remember(secret: String, participantId: String, shareToken: String) {
+        var group = people(for: shareToken)
+        group[participantId] = secret
+        UserDefaults.standard.set(group, forKey: "settlr.split.people.\(shareToken)")
     }
 }
