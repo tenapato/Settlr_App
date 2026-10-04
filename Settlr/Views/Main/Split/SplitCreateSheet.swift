@@ -68,6 +68,7 @@ struct SplitCreateSheet: View {
     @State private var editBaseline: BillSplit?
     @State private var openedEditVersion: Int?
     @State private var isSubmitting = false
+    @State private var hasCompletedSave = false
     /// A server-rejected create remains durable while this draft is corrected.
     /// Saving again updates that same queue entry so its replay key survives.
     @State private var blockedEntryID: UUID?
@@ -232,7 +233,7 @@ struct SplitCreateSheet: View {
         .toolbar { navigationToolbar(for: step) }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             stickyAction(for: step)
-                .disabled(isScanning || isSubmitting || editRetryBlocked)
+                .disabled(isScanning || isSubmitting || hasCompletedSave || editRetryBlocked)
         }
     }
 
@@ -789,6 +790,7 @@ struct SplitCreateSheet: View {
     // MARK: - Submission
 
     private func save() {
+        guard !isSubmitting, !hasCompletedSave else { return }
         normalizeCardPaymentState()
         guard canSave else {
             if let issue = submissionIssue().map(issueOwnedByItsEditor) { present(issue) }
@@ -843,8 +845,7 @@ struct SplitCreateSheet: View {
             switch outcome {
             case .created, .queued:
                 blockedEntryID = nil
-                onSaved(outcome)
-                if dismissOnSave { dismiss() }
+                finishSaving(outcome)
             case .needsAttention(let entry):
                 guard let reason = entry.blockedReason else {
                     submissionErrorMessage = entry.lastErrorMessage ?? "This split needs attention."
@@ -857,8 +858,7 @@ struct SplitCreateSheet: View {
                     submissionErrorMessage = reason.message
                 } else {
                     blockedEntryID = nil
-                    onSaved(outcome)
-                    if dismissOnSave { dismiss() }
+                    finishSaving(outcome)
                 }
             case .rejected(let message):
                 submissionErrorMessage = message
@@ -872,7 +872,15 @@ struct SplitCreateSheet: View {
         return summary + " already have claims. Saving these financial changes will clear only those claims so everyone can claim the corrected bill again. Cancel keeps the current draft and claims."
     }
 
+    private func finishSaving(_ outcome: SplitSaveOutcome) {
+        guard !hasCompletedSave else { return }
+        hasCompletedSave = true
+        onSaved(outcome)
+        if dismissOnSave { dismiss() }
+    }
+
     private func submitEdit(clearClaimsFor: Set<String>) {
+        guard !isSubmitting, !hasCompletedSave else { return }
         guard let editBaseline else { return }
         normalizeCardPaymentState()
         let bodyDraft = submissionDraft
@@ -894,8 +902,7 @@ struct SplitCreateSheet: View {
                 body: bodyDraft.makeEditBody(version: openedEditVersion, clearClaimsFor: clearClaimsFor)
             )
             if saved, let updated = vm.detail {
-                onSaved(.created(updated))
-                if dismissOnSave { dismiss() }
+                finishSaving(.created(updated))
             } else if vm.errorMessage == BillSplitPaymentConflictPresentation.message(didRefresh: true),
                       let refreshed = vm.detail,
                       refreshed.id == editBaseline.id,

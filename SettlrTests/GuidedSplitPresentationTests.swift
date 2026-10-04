@@ -408,6 +408,37 @@ final class GuidedSplitPresentationTests: XCTestCase {
         XCTAssertEqual(events, ["render", "notify"])
     }
 
+    func testSaveHandoffIsConsumedOnceAfterDismissal() {
+        var handoff = SplitScanHandoff()
+        let entry = makePendingSplit()
+        handoff.receive(.queued(entry))
+        guard case .queued(let result)? = handoff.takeAfterDismissal() else {
+            return XCTFail("A durable save must be handed back after dismissal")
+        }
+        XCTAssertEqual(result.id, entry.id)
+        XCTAssertNil(handoff.takeAfterDismissal())
+    }
+
+    func testRejectedOrCancelledCreationDoesNotNavigateParent() {
+        var handoff = SplitScanHandoff()
+        XCTAssertNil(handoff.takeAfterDismissal())
+        handoff.receive(.rejected("Try again"))
+        XCTAssertNil(handoff.takeAfterDismissal())
+        handoff.receive(.queued(makePendingSplit()))
+        XCTAssertNotNil(handoff.takeAfterDismissal())
+    }
+
+    func testDuplicateCallbackDoesNotReplaceSuccessfulHandoff() {
+        var handoff = SplitScanHandoff()
+        let entry = makePendingSplit()
+        handoff.receive(.queued(entry))
+        handoff.receive(.rejected("Late failure"))
+        guard case .queued(let result)? = handoff.takeAfterDismissal() else {
+            return XCTFail("A later callback must not overwrite the saved outcome")
+        }
+        XCTAssertEqual(result.id, entry.id)
+    }
+
     private func makePendingSplit() -> PendingSplit {
         let id = UUID(uuidString: "12345678-1234-1234-1234-123456789ABC")!
         return PendingSplit(

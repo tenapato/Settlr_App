@@ -110,7 +110,7 @@ grep -Fq '.accessibilityAddTraits(draft.payer == value ? .isSelected : [])' "$sp
 # normalization window opened by the claims confirmation dialog.
 grep -Fq '.onChange(of: canUseCreditCards)' Settlr/Views/Main/Expenses/ExpenseFormSheet.swift
 grep -Fq 'normalizeCardPaymentState()' Settlr/Views/Main/Expenses/ExpenseFormSheet.swift
-if ! rg -U -q 'private func submitEdit\(clearClaimsFor: Set<String>\) \{\n[[:space:]]+guard let editBaseline else \{ return \}\n[[:space:]]+normalizeCardPaymentState\(\)\n[[:space:]]+let bodyDraft = submissionDraft' Settlr/Views/Main/Split/SplitCreateSheet.swift; then
+if ! rg -U -q 'private func submitEdit\(clearClaimsFor: Set<String>\) \{\n[[:space:]]+guard !isSubmitting, !hasCompletedSave else \{ return \}\n[[:space:]]+guard let editBaseline else \{ return \}\n[[:space:]]+normalizeCardPaymentState\(\)\n[[:space:]]+let bodyDraft = submissionDraft' Settlr/Views/Main/Split/SplitCreateSheet.swift; then
     echo "Split submitEdit must normalize gated card state immediately before building its request draft." >&2
     exit 1
 fi

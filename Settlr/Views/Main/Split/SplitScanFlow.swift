@@ -4,10 +4,26 @@ enum SplitScanStage {
     case capture, review, split, result
 }
 
+/// Holds a save result without changing the presenting screen. Consume only
+/// from the scanner cover's onDismiss, after SwiftUI releases that presenter.
+struct SplitScanHandoff {
+    private var outcome: SplitSaveOutcome?
+
+    mutating func receive(_ outcome: SplitSaveOutcome) {
+        guard self.outcome == nil else { return }
+        if case .rejected = outcome { return }
+        self.outcome = outcome
+    }
+
+    mutating func takeAfterDismissal() -> SplitSaveOutcome? {
+        defer { outcome = nil }
+        return outcome
+    }
+}
+
 /// Commits the result screen before an ancestor reacts to the save. The root
-/// presenter may queue another sheet when notified; doing that first can make
-/// SwiftUI resolve two presentation changes in the same update and leave the
-/// create flow showing its stale Confirm screen.
+/// presenter stores this outcome in SplitScanHandoff and waits until the cover
+/// dismisses before opening another sheet or pushing a detail screen.
 enum SplitScanCompletionCoordinator {
     static func complete(
         _ outcome: SplitSaveOutcome,
@@ -98,9 +114,7 @@ struct SplitScanFlow: View {
     }
 
     var body: some View {
-        NavigationStack {
-            stageView
-        }
+        stageView
             .confirmationDialog(
                 "Photo parsing failed",
                 isPresented: $showPhotoRecovery,
@@ -123,30 +137,34 @@ struct SplitScanFlow: View {
     private var stageView: some View {
         switch stage {
         case .capture:
-            ReceiptCaptureView(
-                onCapture: handleCapture,
-                onManualEntry: { enterManually() },
-                onOpenSplits: { showList = true },
-                busyMessage: busyMessage,
-                busyImage: busyImage,
-                busyPrivacyLegend: vm.scanPrivacyLegend,
-                errorMessage: errorMessage
-            )
+            NavigationStack {
+                ReceiptCaptureView(
+                    onCapture: handleCapture,
+                    onManualEntry: { enterManually() },
+                    onOpenSplits: { showList = true },
+                    busyMessage: busyMessage,
+                    busyImage: busyImage,
+                    busyPrivacyLegend: vm.scanPrivacyLegend,
+                    errorMessage: errorMessage
+                )
+            }
         case .review:
             if let prefill {
+                NavigationStack {
                     ReceiptReviewView(
                         receipt: prefill,
                         onBack: { stage = .capture },
                         onRetake: resetCapture,
                         onContinue: { stage = .split }
-                )
+                    )
+                }
             } else {
                 splitEditor
             }
         case .split:
             splitEditor
         case .result:
-            resultView
+            NavigationStack { resultView }
         }
     }
 
