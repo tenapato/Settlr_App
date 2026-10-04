@@ -3,93 +3,87 @@ import SwiftUI
 
 struct SignupView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.colorScheme) private var colorScheme
     @State private var vm = AuthViewModel()
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ZStack {
-            Color(hex: "#0e0f11").ignoresSafeArea()
+            Theme.bg.ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                Spacer()
-
-                VStack(spacing: 8) {
-                    Text("Create account")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(Color(hex: "#ecedee"))
-                    Text("Start tracking your finances.")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Color(hex: "#8e9197"))
-                }
-                .padding(.bottom, 40)
-
-                VStack(spacing: 14) {
-                    StyledTextField(placeholder: "Full name", text: $vm.name)
-                    StyledTextField(placeholder: "Email", text: $vm.email, keyboardType: .emailAddress)
-                    StyledTextField(placeholder: "Password", text: $vm.password, isSecure: true)
-
-                    if let error = vm.errorMessage {
-                        Text(error)
-                            .font(.system(size: 13))
-                            .foregroundStyle(Color(hex: "#ff6b6b"))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 4)
+            ScrollView {
+                VStack(spacing: 32) {
+                    VStack(spacing: 8) {
+                        Image("SettlrLogo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 64, height: 64)
+                            .accessibilityHidden(true)
+                        Text("Create account")
+                            .font(.largeTitle.bold())
+                            .foregroundStyle(Theme.ink)
+                        Text("Start tracking your finances.")
+                            .font(.body)
+                            .foregroundStyle(Theme.muted)
                     }
 
-                    Button {
-                        Task { await vm.signUp(appState: appState) }
-                    } label: {
-                        Group {
+                    VStack(spacing: 14) {
+                        StyledTextField(placeholder: "Full name", text: $vm.name)
+                        StyledTextField(placeholder: "Email", text: $vm.email, keyboardType: .emailAddress)
+                        StyledTextField(placeholder: "Password", text: $vm.password, isSecure: true)
+
+                        if let error = vm.errorMessage {
+                            Text(error)
+                                .font(.footnote)
+                                .foregroundStyle(Theme.expense)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 4)
+                                .accessibilityLabel("Account creation failed. \(error)")
+                        }
+
+                        Button {
+                            Task { await vm.signUp(appState: appState) }
+                        } label: {
                             if vm.isLoading {
-                                ProgressView().tint(Color(hex: "#0e0f11"))
+                                ProgressView().tint(Theme.buttonInk)
                             } else {
-                                Text("Create Account")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(Color(hex: "#0e0f11"))
+                                Text("Create account")
                             }
                         }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(Color(hex: "#c8ff5a"))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                    }
-                    .disabled(vm.isLoading)
+                        .buttonStyle(PrimaryButtonStyle())
+                        .disabled(vm.isLoading)
 
-                    HStack(spacing: 12) {
-                        Rectangle()
-                            .fill(Color(hex: "#2a2d32"))
-                            .frame(height: 1)
-                        Text("or")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(Color(hex: "#5a5d63"))
-                        Rectangle()
-                            .fill(Color(hex: "#2a2d32"))
-                            .frame(height: 1)
+                        HStack(spacing: 12) {
+                            Rectangle().fill(Theme.line).frame(height: 1)
+                            Text("or").font(.footnote.weight(.medium)).foregroundStyle(Theme.faint)
+                            Rectangle().fill(Theme.line).frame(height: 1)
+                        }
+
+                        SignInWithAppleButton(.signUp) { request in
+                            request.requestedScopes = [.fullName, .email]
+                        } onCompletion: { result in
+                            Task { await vm.signInWithApple(result: result, appState: appState) }
+                        }
+                        .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                        .frame(height: 52)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .disabled(vm.isLoading)
                     }
 
-                    SignInWithAppleButton(.signUp) { request in
-                        request.requestedScopes = [.fullName, .email]
-                    } onCompletion: { result in
-                        Task { await vm.signInWithApple(result: result, appState: appState) }
+                    HStack(spacing: 4) {
+                        Text("Already have an account?").foregroundStyle(Theme.muted)
+                        Button("Sign in") { dismiss() }
+                            .foregroundStyle(Theme.accentText)
+                            .frame(minHeight: 44)
                     }
-                    .signInWithAppleButtonStyle(.white)
-                    .frame(height: 50)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .disabled(vm.isLoading)
+                    .font(.subheadline)
                 }
+                .frame(maxWidth: 480)
                 .padding(.horizontal, 24)
-
-                Spacer()
-
-                HStack(spacing: 4) {
-                    Text("Already have an account?")
-                        .foregroundStyle(Color(hex: "#8e9197"))
-                    Button("Sign In") { dismiss() }
-                        .foregroundStyle(Color(hex: "#c8ff5a"))
-                }
-                .font(.system(size: 14))
-                .padding(.bottom, 32)
+                .padding(.vertical, 48)
+                .frame(maxWidth: .infinity)
             }
+            .scrollDismissesKeyboard(.interactively)
         }
         .navigationBarBackButtonHidden()
         .toolbar {
@@ -98,10 +92,11 @@ struct SignupView: View {
                     dismiss()
                 } label: {
                     Image(systemName: "chevron.left")
-                        .foregroundStyle(Color(hex: "#8e9197"))
+                        .foregroundStyle(Theme.muted)
+                        .frame(width: 44, height: 44)
                 }
+                .accessibilityLabel("Back to sign in")
             }
         }
-        .preferredColorScheme(.dark)
     }
 }

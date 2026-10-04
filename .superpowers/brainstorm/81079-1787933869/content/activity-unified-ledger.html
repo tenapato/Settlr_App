@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Settlr — Unified activity ledger</title>
+  <style>
+    *{box-sizing:border-box}:root{color-scheme:dark}body{margin:0;background:#090a0b;color:#f4f5ef;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif;-webkit-font-smoothing:antialiased}main{max-width:1080px;margin:0 auto;padding:50px 28px 72px}.eyebrow{color:#caff3a;font-size:10px;font-weight:820;letter-spacing:.16em;text-transform:uppercase}h1{max-width:830px;margin:10px 0 12px;font-size:clamp(32px,5vw,56px);line-height:1;letter-spacing:-.045em}.intro{max-width:790px;margin:0 0 34px;color:#999da1;font-size:15px;line-height:1.55}.layout{display:grid;grid-template-columns:420px 1fr;gap:18px;align-items:start}.frame{padding:11px;border:1px solid #292d31;border-radius:26px;background:#111316}.phone{height:760px;display:flex;flex-direction:column;overflow:hidden;padding:22px 18px 15px;border:1px solid #202327;border-radius:18px;background:#090a0b}.top{display:flex;align-items:center;justify-content:space-between}.title{font-size:26px;font-weight:790;letter-spacing:-.04em}.filter{width:32px;height:32px;display:grid;place-items:center;border:1px solid #2d3135;border-radius:50%;background:#171a1d;color:#caff3a;font-size:12px}.search{height:38px;display:flex;align-items:center;gap:8px;margin-top:17px;padding:0 12px;border:1px solid #292d31;border-radius:12px;background:#15181b;color:#6f7479;font-size:9px}.attention{margin-top:15px;padding:13px;border:1px solid #465020;border-radius:15px;background:#151a12}.attn-top{display:flex;align-items:center;justify-content:space-between}.attn-top span{color:#caff3a;font-size:8px;font-weight:820;letter-spacing:.1em;text-transform:uppercase}.badge{padding:4px 6px;border-radius:99px;background:#283211;color:#caff3a;font-size:7px;font-weight:820}.attention b{display:block;margin-top:8px;font-size:11px}.attention p{margin:4px 0 0;color:#8f977a;font-size:8px}.month{display:flex;align-items:center;justify-content:space-between;margin-top:19px}.month strong{font-size:12px}.month span{color:#7c8186;font-size:9px}.chips{display:flex;gap:6px;margin-top:11px}.chip{padding:7px 9px;border:1px solid #292d31;border-radius:99px;background:#121416;color:#777c81;font-size:8px;font-weight:750}.chip.active{border-color:#caff3a;background:#20270f;color:#caff3a}.day{margin-top:17px;color:#686d72;font-size:8px;font-weight:820;letter-spacing:.1em;text-transform:uppercase}.row{display:grid;grid-template-columns:36px 1fr auto;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid #202327}.icon{width:36px;height:36px;display:grid;place-items:center;border-radius:10px;background:#191c1f;color:#caff3a;font-size:10px;font-weight:820}.copy b,.copy small{display:block}.copy b{font-size:10px}.copy small{display:flex;align-items:center;gap:5px;margin-top:4px;color:#686d72;font-size:8px}.split{padding:3px 5px;border-radius:99px;background:#262d15;color:#b9df47;font-size:6px;font-weight:820;text-transform:uppercase}.amount{text-align:right;font-size:10px;font-weight:790;font-variant-numeric:tabular-nums}.amount small{display:block;margin-top:4px;color:#62676c;font-size:7px;font-weight:650}.positive{color:#caff3a}.bottom{display:flex;align-items:center;gap:9px;margin-top:auto}.tabs{height:53px;flex:1;display:grid;grid-template-columns:repeat(4,1fr);align-items:center;padding:5px;border:1px solid #2b2f33;border-radius:999px;background:#171a1d}.tab{display:grid;gap:3px;place-items:center;color:#73787c;font-size:6px;font-weight:720}.tab b{font-size:8px}.tab.active{color:#caff3a}.fab-wrap{width:53px;height:53px;display:grid;place-items:center;border:1px solid #2b2f33;border-radius:50%}.fab{width:47px;height:47px;display:grid;place-items:center;border-radius:50%;background:#caff3a;color:#090a0b;font-size:24px}.notes{display:grid;gap:12px}.note{padding:18px;border:1px solid #2d3135;border-radius:18px;background:#111316}.note .n{color:#caff3a;font-size:9px;font-weight:820;letter-spacing:.1em}.note h2{margin:7px 0;font-size:17px}.note p{margin:0;color:#92969a;font-size:11px;line-height:1.55}.rule{margin-top:18px;padding:18px;border:1px solid #465020;border-radius:17px;background:#151a12;color:#9fa889;font-size:11px;line-height:1.6}.rule b{color:#caff3a}@media(max-width:800px){.layout{grid-template-columns:1fr}.frame{max-width:430px;margin:0 auto}}
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">Activity root · Navigation clarification</div>
+    <h1>One ledger for money. One lane for unfinished work.</h1>
+    <p class="intro">Activity stops behaving like several feature lists stitched together. Completed financial events live in one chronological stream; active bill splits sit above it until they become ledger entries.</p>
+    <section class="layout">
+      <div class="frame"><div class="phone">
+        <div class="top"><div class="title">Activity</div><div class="filter">≡</div></div>
+        <div class="search">⌕&nbsp;&nbsp;Search activity</div>
+        <article class="attention"><div class="attn-top"><span>Needs attention</span><div class="badge">1 active</div></div><b>Kuma Sushi · $2,840</b><p>2 people still need to claim items</p></article>
+        <div class="month"><strong>August 2026</strong><span>‹ &nbsp; ›</span></div>
+        <div class="chips"><div class="chip active">All</div><div class="chip">Expenses</div><div class="chip">Income</div><div class="chip">Savings</div></div>
+        <div class="day">Today</div>
+        <div class="row"><div class="icon">−</div><div class="copy"><b>Mercado Roma</b><small>Food & drink <i class="split">Split</i></small></div><div class="amount">−$428<small>BBVA</small></div></div>
+        <div class="row"><div class="icon">＋</div><div class="copy"><b>Freelance project</b><small>Income · 10:20</small></div><div class="amount positive">+$8,500<small>MXN</small></div></div>
+        <div class="day">Yesterday</div>
+        <div class="row"><div class="icon">S</div><div class="copy"><b>Emergency fund</b><small>Savings deposit</small></div><div class="amount positive">+$1,200<small>Goal 69%</small></div></div>
+        <div class="row"><div class="icon">−</div><div class="copy"><b>Uber</b><small>Transport · 21:42</small></div><div class="amount">−$186<small>Cash</small></div></div>
+        <div class="bottom"><div class="tabs"><div class="tab"><b>⌂</b>Home</div><div class="tab active"><b>≡</b>Activity</div><div class="tab"><b>S</b>Savings</div><div class="tab"><b>▭</b>Cards</div></div><div class="fab-wrap"><div class="fab">＋</div></div></div>
+      </div></div>
+      <div class="notes">
+        <article class="note"><span class="n">01 · NO DUPLICATES</span><h2>Completed splits become expenses</h2><p>The expense appears once in the ledger with a Split marker. Tapping it opens transaction detail with a route into the associated split.</p></article>
+        <article class="note"><span class="n">02 · ATTENTION LANE</span><h2>Open splits stay actionable</h2><p>Pending claims and queued offline work sit above the ledger. They disappear from this module after completion instead of creating a second history row.</p></article>
+        <article class="note"><span class="n">03 · FILTERING</span><h2>Fast filters stay visible</h2><p>Type chips cover everyday scanning. The circular filter button opens a native sheet for category, card, verified state, split status, and custom date range.</p></article>
+        <article class="note"><span class="n">04 · NAVIGATION</span><h2>Rows open the right depth</h2><p>Transactions use a detail sheet for quick inspection and editing. Active splits push into their collaborative flow so back reliably returns to Activity.</p></article>
+        <div class="rule"><b>Data rule:</b> each enabled feature contributes its list response to the selected month. The app merges and sorts locally, while feature access prevents calls that would return 403.</div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

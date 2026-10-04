@@ -50,7 +50,6 @@ struct PublicSplitClaimView: View {
                 if let split, let me { shareFooter(split: split, me: me) }
             }
         }
-        .preferredColorScheme(.dark)
         .task { await load() }
     }
 
@@ -269,13 +268,14 @@ struct PublicSplitClaimView: View {
 
             Button(action: join) {
                 HStack {
-                    if isJoining { ProgressView().tint(Theme.bg) }
+                    if isJoining { ProgressView().tint(Theme.buttonInk) }
                     Text(split.isOpen ? "Join this split" : "This split is closed")
                         .font(.system(size: 15, weight: .semibold))
                 }
-                .foregroundStyle(Theme.bg)
+                .foregroundStyle(Theme.buttonInk)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
+                .frame(minHeight: 52)
                 .background(split.isOpen ? Theme.accent : Theme.faint)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }

@@ -4,6 +4,7 @@ import SwiftUI
 
 // MARK: - ViewModel
 
+@MainActor
 @Observable
 final class CategoriesVM {
     var categories: [Category] = []
@@ -129,7 +130,6 @@ struct CategoriesView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
         .task { await vm.load(workspaceId: workspaceId) }
         .onChange(of: vm.selectedMonth) { _, _ in
             Task { await vm.load(workspaceId: workspaceId) }
@@ -138,7 +138,7 @@ struct CategoriesView: View {
 
     private var categoriesBody: some View {
         ZStack {
-            Color(hex: "#0e0f11").ignoresSafeArea()
+            Theme.bg.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 CatMonthPicker(selectedMonth: $vm.selectedMonth) {
@@ -148,18 +148,17 @@ struct CategoriesView: View {
                 .padding(.bottom, 8)
 
                 ZStack {
-                    if vm.isLoading {
-                        ProgressView()
-                            .tint(Color(hex: "#c8ff5a"))
+                    if vm.isLoading && vm.categories.isEmpty {
+                        SettlrPulseLoadingView(message: "Getting your categories")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .transition(.opacity)
-                    } else if let err = vm.errorMessage {
+                    } else if let err = vm.errorMessage, vm.categories.isEmpty {
                         CatErrorView(message: err) {
                             Task { await vm.load(workspaceId: workspaceId) }
                         }
                         .transition(.opacity)
                     } else if vm.categories.isEmpty {
-                        CatEmptyView()
+                        CatEmptyView { vm.showCreateSheet = true }
                             .transition(.opacity)
                     } else {
                         categoryList
@@ -177,7 +176,8 @@ struct CategoriesView: View {
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color(hex: "#c8ff5a"))
+                        .foregroundStyle(Theme.accentText)
+                        .frame(width: 44, height: 44)
                 }
             }
         }
@@ -189,6 +189,16 @@ struct CategoriesView: View {
     private var categoryList: some View {
         ScrollView {
             VStack(spacing: 20) {
+                if vm.isLoading {
+                    SignalTraceLoadingView(lastUpdated: nil)
+                        .padding(.horizontal, 24)
+                }
+                if vm.errorMessage != nil {
+                    SignalRefreshWarning(message: "Showing saved category data. It may be from another month because refresh failed.") {
+                        Task { await vm.load(workspaceId: workspaceId) }
+                    }
+                    .padding(.horizontal, 24)
+                }
                 if let summary = vm.summary {
                     SpendingBreakdownCard(summary: summary)
                         .padding(.horizontal, 24)
@@ -201,16 +211,16 @@ struct CategoriesView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Total spent")
                                 .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(Color(hex: "#8e9197"))
+                                .foregroundStyle(Theme.muted)
                                 .tracking(1.2)
                                 .textCase(.uppercase)
                             AmountLabel(cents: total, font: .system(size: 26, weight: .bold, design: .rounded))
-                                .foregroundStyle(Color(hex: "#ecedee"))
+                                .foregroundStyle(Theme.ink)
                         }
                         Spacer()
                         Text("\(vm.merged.count) categor\(vm.merged.count == 1 ? "y" : "ies")")
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(Color(hex: "#8e9197"))
+                            .foregroundStyle(Theme.muted)
                     }
                     .padding(.horizontal, 24)
                 }
@@ -229,16 +239,16 @@ struct CategoriesView: View {
 
                         if idx < vm.merged.count - 1 {
                             Divider()
-                                .background(Color(hex: "#2a2d32"))
+                                .background(Theme.line)
                                 .padding(.horizontal, 20)
                         }
                     }
                 }
-                .background(Color(hex: "#15171a"))
+                .background(Theme.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
-                        .strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1)
+                        .strokeBorder(Theme.line, lineWidth: 1)
                 )
                 .padding(.horizontal, 24)
 
@@ -257,6 +267,7 @@ private struct CatRow: View {
     let maxCents: Int
     let rank: Int
     @State private var animatedRatio: Double = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var targetRatio: Double {
         guard maxCents > 0 else { return 0 }
@@ -268,18 +279,18 @@ private struct CatRow: View {
             HStack {
                 Text(cat.name)
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Color(hex: "#ecedee"))
+                    .foregroundStyle(Theme.ink)
                 Spacer()
                 AmountLabel(cents: cat.totalCents, font: .system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#8e9197"))
+                    .foregroundStyle(Theme.muted)
                     .contentTransition(.numericText(countsDown: true))
             }
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Color(hex: "#2a2d32")).frame(height: 4)
+                    Capsule().fill(Theme.line).frame(height: 4)
                     Capsule()
-                        .fill(Color(hex: "#ff6b6b").opacity(0.8))
+                        .fill(Theme.expense.opacity(0.8))
                         .frame(width: max(6, geo.size.width * animatedRatio), height: 4)
                 }
             }
@@ -287,16 +298,18 @@ private struct CatRow: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
-        .background(Color(hex: "#15171a"))
+        .background(Theme.surface)
         .onAppear {
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.1 + Double(rank) * 0.06)) {
-                animatedRatio = targetRatio
+            if reduceMotion { animatedRatio = targetRatio }
+            else {
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.1 + Double(rank) * 0.06)) {
+                    animatedRatio = targetRatio
+                }
             }
         }
         .onChange(of: targetRatio) { _, new in
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                animatedRatio = new
-            }
+            if reduceMotion { animatedRatio = new }
+            else { withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { animatedRatio = new } }
         }
     }
 }
@@ -307,17 +320,18 @@ private struct CreateCategorySheet: View {
     let vm: CategoriesVM
     let workspaceId: String
     @FocusState private var focused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(hex: "#0e0f11").ignoresSafeArea()
+                Theme.bg.ignoresSafeArea()
 
                 VStack(spacing: 20) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Name")
                             .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#8e9197"))
+                            .foregroundStyle(Theme.muted)
                             .tracking(1)
                             .textCase(.uppercase)
 
@@ -327,38 +341,41 @@ private struct CreateCategorySheet: View {
                         ))
                         .focused($focused)
                         .font(.system(size: 16))
-                        .foregroundStyle(Color(hex: "#ecedee"))
+                        .foregroundStyle(Theme.ink)
                         .padding(14)
                         .background(
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(Color(hex: "#15171a"))
-                                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1))
+                                .fill(Theme.surface)
+                                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.line, lineWidth: 1))
                         )
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Type")
                             .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#8e9197"))
+                            .foregroundStyle(Theme.muted)
                             .tracking(1)
                             .textCase(.uppercase)
 
                         HStack(spacing: 10) {
                             ForEach([("expense", "Expense"), ("income", "Income")], id: \.0) { val, label in
                                 Button {
-                                    withAnimation(.snappy(duration: 0.2)) { vm.newScope = val }
+                                    if reduceMotion { vm.newScope = val }
+                                    else { withAnimation(.snappy(duration: 0.2)) { vm.newScope = val } }
                                 } label: {
                                     Text(label)
                                         .font(.system(size: 14, weight: .semibold))
-                                        .foregroundStyle(vm.newScope == val ? Color(hex: "#0e0f11") : Color(hex: "#8e9197"))
+                                        .foregroundStyle(vm.newScope == val ? Theme.buttonInk : Theme.muted)
                                         .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 12)
+                                        .frame(minHeight: 44)
                                         .background(
                                             RoundedRectangle(cornerRadius: 10)
-                                                .fill(vm.newScope == val ? Color(hex: "#c8ff5a") : Color(hex: "#15171a"))
+                                                .fill(vm.newScope == val ? Theme.accent : Theme.surface)
                                         )
                                 }
                                 .buttonStyle(.plain)
+                                .accessibilityValue(vm.newScope == val ? "Selected" : "Not selected")
+                                .accessibilityAddTraits(vm.newScope == val ? .isSelected : [])
                             }
                         }
                     }
@@ -368,18 +385,18 @@ private struct CreateCategorySheet: View {
                     } label: {
                         HStack {
                             if vm.isCreating {
-                                ProgressView().tint(Color(hex: "#0e0f11"))
+                                ProgressView().tint(Theme.buttonInk)
                             } else {
                                 Text("Create Category")
                                     .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(Color(hex: "#0e0f11"))
+                                    .foregroundStyle(Theme.buttonInk)
                             }
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
                         .background(
                             RoundedRectangle(cornerRadius: 14)
-                                .fill(Color(hex: "#c8ff5a"))
+                                .fill(Theme.accent)
                         )
                     }
                     .disabled(vm.newName.trimmingCharacters(in: .whitespaces).isEmpty || vm.isCreating)
@@ -394,12 +411,12 @@ private struct CreateCategorySheet: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { vm.showCreateSheet = false }
-                        .foregroundStyle(Color(hex: "#8e9197"))
+                        .foregroundStyle(Theme.muted)
                 }
             }
         }
         .presentationDetents([.height(320)])
-        .presentationBackground(Color(hex: "#0e0f11"))
+        .presentationBackground(Theme.bg)
         .presentationCornerRadius(24)
         .onAppear { focused = true }
     }
@@ -408,14 +425,23 @@ private struct CreateCategorySheet: View {
 // MARK: - Empty / Error
 
 private struct CatEmptyView: View {
+    let onCreate: () -> Void
+
     var body: some View {
         VStack(spacing: 14) {
             Image(systemName: "tag")
                 .font(.system(size: 40))
-                .foregroundStyle(Color(hex: "#5a5d63"))
+                .foregroundStyle(Theme.faint)
             Text("No expenses this month")
                 .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(Color(hex: "#8e9197"))
+                .foregroundStyle(Theme.muted)
+            Text("Create a category to organize new transactions.")
+                .font(.subheadline)
+                .foregroundStyle(Theme.faint)
+                .multilineTextAlignment(.center)
+            Button("Create category", action: onCreate)
+                .buttonStyle(PrimaryButtonStyle())
+                .padding(.horizontal, 32)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -429,14 +455,15 @@ private struct CatErrorView: View {
         VStack(spacing: 14) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 32))
-                .foregroundStyle(Color(hex: "#ffb547"))
+                .foregroundStyle(Theme.warning)
             Text(message)
                 .font(.system(size: 14))
-                .foregroundStyle(Color(hex: "#8e9197"))
+                .foregroundStyle(Theme.muted)
                 .multilineTextAlignment(.center)
             Button("Retry", action: onRetry)
-                .foregroundStyle(Color(hex: "#c8ff5a"))
+                .foregroundStyle(Theme.accentText)
                 .font(.system(size: 15, weight: .semibold))
+                .frame(minWidth: 44, minHeight: 44)
         }
         .padding(.horizontal, 32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -454,7 +481,8 @@ private struct CatMonthPicker: View {
             Button { change(by: -1) } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#8e9197"))
+                    .foregroundStyle(Theme.muted)
+                    .frame(width: 44, height: 44)
             }
             Spacer()
             Button {
@@ -464,7 +492,8 @@ private struct CatMonthPicker: View {
             } label: {
                 Text(displayLabel)
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#ecedee"))
+                    .foregroundStyle(Theme.ink)
+                    .frame(minHeight: 44)
                     .contentTransition(.numericText())
                     .animation(.snappy(duration: 0.2), value: selectedMonth)
             }
@@ -473,7 +502,8 @@ private struct CatMonthPicker: View {
             Button { change(by: 1) } label: {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#8e9197"))
+                    .foregroundStyle(Theme.muted)
+                    .frame(width: 44, height: 44)
             }
         }
         .padding(.vertical, 12)

@@ -14,6 +14,7 @@ enum BillSplitPaymentConflictPresentation {
 /// create flow. Every number shown comes back from the server — the app never
 /// does share math of its own, so the app, the web link and the ledger can't
 /// disagree about who owes what.
+@MainActor
 @Observable
 final class BillSplitVM {
     enum ClaimMutationResult: Equatable {
@@ -32,6 +33,25 @@ final class BillSplitVM {
     var hasLoaded = false
 
     private let api = APIClient.shared
+    private var detailResponseGate = BillSplitDetailResponseGate()
+
+    /// A conflict is server-authoritative: replace the local split before
+    /// presenting the retry message. Editor drafts remain sheet-local, so a
+    /// safe pending selection is retained while the fresh version is adopted.
+    @MainActor
+    private func adoptConflict(workspaceId: String, splitId: String, mutation: Int) async {
+        let response: BillSplitResponse? = try? await api.fetch(
+            Endpoints.billSplit(workspaceId, splitId)
+        )
+        if let response {
+            guard detailResponseGate.commitMutation(mutation) else { return }
+            detail = response.split
+            errorMessage = BillSplitPaymentConflictPresentation.message(didRefresh: true)
+            isSaving = false
+        } else if detailResponseGate.shouldAdopt(mutation: mutation) {
+            errorMessage = BillSplitPaymentConflictPresentation.message(didRefresh: false)
+        }
+    }
 
     // MARK: - List
 
@@ -56,16 +76,22 @@ final class BillSplitVM {
     ///   chrome at someone who is just watching claims arrive.
     @MainActor
     func loadDetail(workspaceId: String, splitId: String, silent: Bool = false) async {
+        let token = detailResponseGate.beginLoad()
         if !silent {
             isLoading = true
             errorMessage = nil
         }
-        defer { if !silent { isLoading = false } }
+        defer {
+            if detailResponseGate.shouldAdopt(load: token) { isLoading = false }
+        }
         do {
             let resp: BillSplitResponse = try await api.fetch(Endpoints.billSplit(workspaceId, splitId))
+            guard detailResponseGate.shouldAdopt(load: token) else { return }
             detail = resp.split
         } catch {
-            if !silent { errorMessage = error.localizedDescription }
+            if !silent, detailResponseGate.shouldAdopt(load: token) {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -74,22 +100,33 @@ final class BillSplitVM {
     /// server's view of the claims.
     @MainActor
     private func mutate(
-        onConflict: ((APIServerError) async -> Void)? = nil,
+        onConflict: ((APIServerError, Int) async -> Void)? = nil,
         errorDescription: ((Error) -> String)? = nil,
         _ block: () async throws -> BillSplitResponse
     ) async -> Bool {
+        let mutation = detailResponseGate.beginMutation()
+        isLoading = false
         isSaving = true
         errorMessage = nil
-        defer { isSaving = false }
+        defer {
+            if detailResponseGate.shouldAdopt(mutation: mutation) { isSaving = false }
+        }
         do {
-            detail = try await block().split
+            let response = try await block()
+            guard detailResponseGate.commitMutation(mutation) else { return false }
+            detail = response.split
+            isSaving = false
             return true
         } catch let error as APIServerError where error.status == 409 && onConflict != nil {
-            await onConflict?(error)
-            if errorMessage == nil { errorMessage = error.localizedDescription }
+            await onConflict?(error, mutation)
+            if detailResponseGate.shouldAdopt(mutation: mutation), errorMessage == nil {
+                errorMessage = error.localizedDescription
+            }
             return false
         } catch {
-            errorMessage = errorDescription?(error) ?? error.localizedDescription
+            if detailResponseGate.shouldAdopt(mutation: mutation) {
+                errorMessage = errorDescription?(error) ?? error.localizedDescription
+            }
             return false
         }
     }
@@ -101,16 +138,8 @@ final class BillSplitVM {
         body: BillSplitPaymentMethodBody
     ) async -> Bool {
         await mutate(
-            onConflict: { _ in
-                let response: BillSplitResponse? = try? await self.api.fetch(
-                    Endpoints.billSplit(workspaceId, splitId)
-                )
-                if let response {
-                    self.detail = response.split
-                    self.errorMessage = BillSplitPaymentConflictPresentation.message(didRefresh: true)
-                } else {
-                    self.errorMessage = BillSplitPaymentConflictPresentation.message(didRefresh: false)
-                }
+            onConflict: { _, mutation in
+                await self.adoptConflict(workspaceId: workspaceId, splitId: splitId, mutation: mutation)
             },
             errorDescription: { error in
                 APIError.isOffline(error)
@@ -136,9 +165,13 @@ final class BillSplitVM {
         quantity: Int,
         participantId: String? = nil
     ) async -> ClaimMutationResult {
+        let mutation = detailResponseGate.beginMutation()
+        isLoading = false
         isSaving = true
         errorMessage = nil
-        defer { isSaving = false }
+        defer {
+            if detailResponseGate.shouldAdopt(mutation: mutation) { isSaving = false }
+        }
         do {
             let response: BillSplitResponse = try await api.fetch(
                 Endpoints.billSplitClaims(workspaceId, splitId),
@@ -149,7 +182,9 @@ final class BillSplitVM {
                     participantId: participantId
                 )
             )
+            guard detailResponseGate.commitMutation(mutation) else { return .failed }
             detail = response.split
+            isSaving = false
             return .saved
         } catch let error as APIServerError where error.status == 409 {
             // A 409 response carries a fresh DTO, but APIClient deliberately
@@ -158,20 +193,29 @@ final class BillSplitVM {
             let response: BillSplitResponse? = try? await api.fetch(
                 Endpoints.billSplit(workspaceId, splitId)
             )
-            if let response { detail = response.split }
+            guard detailResponseGate.shouldAdopt(mutation: mutation) else { return .failed }
+            if let response {
+                guard detailResponseGate.commitMutation(mutation) else { return .failed }
+                detail = response.split
+                isSaving = false
+            }
             errorMessage = error.code == "claim_capacity_changed"
                 ? "Someone else just claimed the remaining quantity. The item has been refreshed."
                 : error.localizedDescription
             return error.code == "claim_capacity_changed" ? .capacityChanged : .failed
         } catch {
-            errorMessage = error.localizedDescription
+            if detailResponseGate.shouldAdopt(mutation: mutation) {
+                errorMessage = error.localizedDescription
+            }
             return .failed
         }
     }
 
     @MainActor
     func setStatus(workspaceId: String, splitId: String, status: String) async -> Bool {
-        await mutate {
+        await mutate(onConflict: { _, mutation in
+            await self.adoptConflict(workspaceId: workspaceId, splitId: splitId, mutation: mutation)
+        }) {
             try await api.fetch(
                 Endpoints.billSplit(workspaceId, splitId),
                 method: "PATCH",
@@ -187,7 +231,9 @@ final class BillSplitVM {
         participantId: String,
         settled: Bool
     ) async {
-        _ = await mutate {
+        _ = await mutate(onConflict: { _, mutation in
+            await self.adoptConflict(workspaceId: workspaceId, splitId: splitId, mutation: mutation)
+        }) {
             try await api.fetch(
                 Endpoints.billSplitSettle(workspaceId, splitId, participantId),
                 method: settled ? "POST" : "DELETE"
@@ -203,26 +249,39 @@ final class BillSplitVM {
         method: String,
         body: (any Encodable)? = nil
     ) async -> Bool {
+        let mutation = detailResponseGate.beginMutation()
+        isLoading = false
         isSaving = true
         errorMessage = nil
-        defer { isSaving = false }
+        defer {
+            if detailResponseGate.shouldAdopt(mutation: mutation) { isSaving = false }
+        }
         do {
             let response: BillSplitResponse = try await api.fetch(
                 endpoint,
                 method: method,
                 body: body
             )
+            guard detailResponseGate.commitMutation(mutation) else { return false }
             detail = response.split
+            isSaving = false
             return true
         } catch let error as APIServerError where error.status == 409 {
             let response: BillSplitResponse? = try? await api.fetch(
                 Endpoints.billSplit(workspaceId, splitId)
             )
-            if let response { detail = response.split }
+            guard detailResponseGate.shouldAdopt(mutation: mutation) else { return false }
+            if let response {
+                guard detailResponseGate.commitMutation(mutation) else { return false }
+                detail = response.split
+                isSaving = false
+            }
             errorMessage = "The table changed on another screen. It has been refreshed; try again."
             return false
         } catch {
-            errorMessage = error.localizedDescription
+            if detailResponseGate.shouldAdopt(mutation: mutation) {
+                errorMessage = error.localizedDescription
+            }
             return false
         }
     }
@@ -282,7 +341,9 @@ final class BillSplitVM {
         splitId: String,
         body: EditBillSplitBody
     ) async -> Bool {
-        await mutate {
+        await mutate(onConflict: { _, mutation in
+            await self.adoptConflict(workspaceId: workspaceId, splitId: splitId, mutation: mutation)
+        }) {
             try await api.fetch(
                 Endpoints.billSplitDraft(workspaceId, splitId),
                 method: "PUT",
@@ -293,11 +354,19 @@ final class BillSplitVM {
 
     @MainActor
     func delete(workspaceId: String, splitId: String) async -> Bool {
+        let mutation = detailResponseGate.beginMutation()
+        isLoading = false
+        isSaving = true
         errorMessage = nil
+        defer {
+            if detailResponseGate.shouldAdopt(mutation: mutation) { isSaving = false }
+        }
         do {
             try await api.send(Endpoints.billSplit(workspaceId, splitId), method: "DELETE")
+            guard detailResponseGate.commitMutation(mutation) else { return false }
             splits.removeAll { $0.id == splitId }
             if detail?.id == splitId { detail = nil }
+            isSaving = false
             return true
         } catch {
             errorMessage = error.localizedDescription

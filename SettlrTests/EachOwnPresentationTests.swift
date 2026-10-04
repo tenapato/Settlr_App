@@ -142,6 +142,50 @@ final class EachOwnPresentationTests: XCTestCase {
         }
     }
 
+    func testResultPresentationKeepsSettlementCopyPayerCorrect() {
+        let organizerPaid = SplitResultPresentation(payerMode: .organizerPaid)
+        XCTAssertEqual(organizerPaid.statusHeadline, "Ready to settle.")
+        XCTAssertEqual(organizerPaid.organizerShareLabel, "Your share")
+        XCTAssertEqual(organizerPaid.amountToCollectLabel, "Amount to collect")
+        XCTAssertEqual(organizerPaid.participantStatus(isOrganizer: true, isSettled: false), "Paid the bill")
+        XCTAssertEqual(organizerPaid.participantStatus(isOrganizer: false, isSettled: false), "Owes you")
+        XCTAssertEqual(organizerPaid.participantStatus(isOrganizer: false, isSettled: true), "Settled")
+
+        let eachOwn = SplitResultPresentation(payerMode: .eachOwn)
+        XCTAssertEqual(eachOwn.statusHeadline, "Everyone paid their own share")
+        XCTAssertEqual(eachOwn.organizerShareLabel, "Your share")
+        XCTAssertEqual(eachOwn.otherSharesLabel, "Everyone else's shares")
+        XCTAssertNil(eachOwn.amountToCollectLabel)
+        XCTAssertEqual(eachOwn.participantStatus(isOrganizer: false, isSettled: false), "Paid their own")
+    }
+
+    func testResultPresentationOnlySettlesClosedOrganizerPaidSplits() {
+        let presentation = SplitResultPresentation(payerMode: .organizerPaid)
+
+        XCTAssertFalse(presentation.showsSettlementControls(isOpen: true, hasOwnerContext: true))
+        XCTAssertTrue(presentation.showsSettlementControls(isOpen: false, hasOwnerContext: true))
+        XCTAssertFalse(presentation.showsSettlementControls(isOpen: false, hasOwnerContext: false))
+        XCTAssertEqual(presentation.statusHeadline(isOpen: true), "Finish claiming to settle.")
+    }
+
+    func testEachOwnOtherSharesAggregateExcludesUnclaimedAmount() {
+        // Guest shares are the only amount shown as "everyone else's shares";
+        // an unclaimed remainder must not be presented as another person's share.
+        let totalCents = 8_000
+        let organizerShareCents = 2_200
+        let unclaimedCents = 2_000
+        let guestShares = [2_200, 1_600]
+        XCTAssertEqual(
+            SplitResultPresentation.aggregateOtherShares(participantShares: guestShares),
+            totalCents - organizerShareCents - unclaimedCents
+        )
+    }
+
+    func testUnavailableResultDoesNotShowParticipantBalances() {
+        let presentation = SplitResultPresentation(payerMode: .unavailable)
+        XCTAssertFalse(presentation.showsParticipantBalances)
+    }
+
     func testMissingLegacyPayerRequiresReviewInsteadOfChoosingReimbursement() throws {
         // This catches a missing/unknown payer taking the historical fallback
         // branch that portrayed the organizer as having fronted the whole bill.

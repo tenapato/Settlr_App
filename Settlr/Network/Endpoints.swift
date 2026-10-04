@@ -26,6 +26,7 @@ enum Endpoints {
     static func creditCards(_ wsId: String) -> String { "/api/workspaces/\(wsId)/credit-cards" }
     static func creditCard(_ wsId: String, _ id: String) -> String { "/api/workspaces/\(wsId)/credit-cards/\(id)" }
     static func cardPaymentsSummary(_ wsId: String) -> String { "/api/workspaces/\(wsId)/card-payments/summary" }
+    static func monthlyCardPayments(_ wsId: String) -> String { "/api/workspaces/\(wsId)/card-payments/monthly-payments" }
     static func markCardPaid(_ wsId: String, _ cardId: String) -> String { "/api/workspaces/\(wsId)/card-payments/cards/\(cardId)/mark-paid" }
     static func unmarkCardPaid(_ wsId: String, _ cardId: String) -> String { "/api/workspaces/\(wsId)/card-payments/cards/\(cardId)/unmark-paid" }
 

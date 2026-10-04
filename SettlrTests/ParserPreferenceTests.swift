@@ -20,6 +20,62 @@ final class ParserPreferenceTests: XCTestCase {
         XCTAssertFalse(serverCalled)
     }
 
+    func testAutomaticUsesMeaningfulUnverifiedOnDeviceRowsWithoutCallingServer() async throws {
+        var serverCalled = false
+        let unverified = receipt(
+            parser: .onDevice,
+            items: [
+                ScannedReceiptItem(
+                    name: "TACO",
+                    quantity: 1,
+                    unitPriceCents: 5_000,
+                    verification: .unverified
+                )
+            ]
+        )
+        let router = ReceiptParserRouter(
+            onDevice: { _ in unverified },
+            server: { _ in
+                serverCalled = true
+                return self.receipt(parser: .server)
+            }
+        )
+
+        let result = try await router.parse("1 TACO 50.00", preference: .automatic)
+
+        XCTAssertEqual(result.parser, .onDevice)
+        XCTAssertEqual(result.items.first?.verification, .unverified)
+        XCTAssertFalse(serverCalled)
+    }
+
+    func testExplicitOnDeviceUsesMeaningfulUnverifiedRowsWithoutCallingServer() async throws {
+        var serverCalled = false
+        let router = ReceiptParserRouter(
+            onDevice: {
+                _ in self.receipt(
+                    parser: .onDevice,
+                    items: [
+                        ScannedReceiptItem(
+                            name: "TACO",
+                            quantity: 1,
+                            unitPriceCents: 5_000,
+                            verification: .unverified
+                        )
+                    ]
+                )
+            },
+            server: { _ in
+                serverCalled = true
+                return self.receipt(parser: .server)
+            }
+        )
+
+        let result = try await router.parse("1 TACO 50.00", preference: .onDevice)
+
+        XCTAssertEqual(result.parser, .onDevice)
+        XCTAssertFalse(serverCalled)
+    }
+
     func testAutomaticFallsBackToServerWhenDeviceHasNoUsableRows() async throws {
         var serverCalled = false
         let empty = receipt(parser: .onDevice, items: [])

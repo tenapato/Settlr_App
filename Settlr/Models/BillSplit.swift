@@ -1,5 +1,46 @@
 import Foundation
 
+/// Orders detail reads against writes without coupling the rule to networking.
+/// A mutation invalidates reads that began before it, while a successful
+/// mutation also invalidates reads that overlapped the write and may have
+/// observed the server just before it committed.
+struct BillSplitDetailResponseGate {
+    struct LoadToken: Equatable {
+        fileprivate let revision: Int
+        fileprivate let generation: Int
+    }
+
+    private var revision = 0
+    private var loadGeneration = 0
+
+    mutating func beginLoad() -> LoadToken {
+        loadGeneration += 1
+        return LoadToken(revision: revision, generation: loadGeneration)
+    }
+
+    mutating func beginMutation() -> Int {
+        revision += 1
+        loadGeneration += 1
+        return revision
+    }
+
+    func shouldAdopt(load token: LoadToken) -> Bool {
+        token.revision == revision && token.generation == loadGeneration
+    }
+
+    func shouldAdopt(mutation token: Int) -> Bool {
+        token == revision
+    }
+
+    @discardableResult
+    mutating func commitMutation(_ token: Int) -> Bool {
+        guard shouldAdopt(mutation: token) else { return false }
+        revision += 1
+        loadGeneration += 1
+        return true
+    }
+}
+
 // MARK: - Organizer-facing models (workspace-scoped API)
 
 struct BillSplitSummary: Codable, Identifiable {
@@ -951,6 +992,29 @@ struct ScannedReceipt: Decodable {
             totalCents: totalCents,
             warnings: warnings
         )
+    }
+}
+
+/// The scan-derived facts shown at the Review checkpoint. Setup-only fields
+/// such as date, category, and payment method intentionally do not belong here.
+struct ReceiptReviewPresentation {
+    let merchantName: String
+    let totalCents: Int
+    let statusText: String
+    let needsAttention: Bool
+    let merchantNeedsAttention: Bool
+
+    init(receipt: ScannedReceipt) {
+        let trimmedMerchant = receipt.merchant?.trimmingCharacters(in: .whitespacesAndNewlines)
+        merchantName = trimmedMerchant.flatMap { $0.isEmpty ? nil : $0 } ?? "Merchant not found"
+        totalCents = receipt.totalCents
+        merchantNeedsAttention = trimmedMerchant?.isEmpty != false
+        needsAttention = merchantNeedsAttention
+            || receipt.totalCents <= 0
+            || receipt.items.isEmpty
+            || receipt.items.contains { $0.verification == .unverified }
+            || !receipt.warnings.isEmpty
+        statusText = needsAttention ? "Review highlighted details" : "Scan looks ready"
     }
 }
 

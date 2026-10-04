@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Settlr — Server compatibility review</title>
+  <style>
+    *{box-sizing:border-box}:root{color-scheme:dark}body{margin:0;background:#090a0b;color:#f4f5ef;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif;-webkit-font-smoothing:antialiased}main{max-width:1160px;margin:0 auto;padding:50px 28px 72px}.eyebrow{color:#caff3a;font-size:10px;font-weight:820;letter-spacing:.16em;text-transform:uppercase}h1{max-width:860px;margin:10px 0 12px;font-size:clamp(32px,5vw,56px);line-height:1;letter-spacing:-.045em}.intro{max-width:800px;margin:0 0 30px;color:#999da1;font-size:15px;line-height:1.55}.score{display:grid;grid-template-columns:1.4fr repeat(3,1fr);gap:10px;margin-bottom:24px}.score>div{padding:17px;border:1px solid #2d3135;border-radius:18px;background:#111316}.score b,.score span{display:block}.score b{font-size:25px;letter-spacing:-.035em}.score span{margin-top:5px;color:#858a8f;font-size:9px;font-weight:760;letter-spacing:.08em;text-transform:uppercase}.score .hero{border-color:#465020;background:#151a12}.score .hero b{color:#caff3a}.matrix{overflow:hidden;border:1px solid #2d3135;border-radius:20px}.head,.row{display:grid;grid-template-columns:150px 1fr 1.15fr 120px;gap:0}.head{background:#171a1d;color:#797e83;font-size:9px;font-weight:820;letter-spacing:.1em;text-transform:uppercase}.head div,.row>div{padding:13px 15px}.row{border-top:1px solid #25292d;background:#111316;align-items:start}.area{font-size:12px;font-weight:820}.design,.api{font-size:10px;line-height:1.5}.design{color:#c6c9c5}.api{color:#878c91;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.status{justify-self:start;padding:6px 8px!important;border-radius:999px;font-size:8px;font-weight:850;letter-spacing:.06em;text-transform:uppercase}.direct{background:#213010;color:#caff3a}.compose{background:#302a16;color:#f2cf5b}.adjust{background:#341f22;color:#ff9797}.notes{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px}.note{padding:18px;border:1px solid #2d3135;border-radius:18px;background:#111316}.note .n{color:#caff3a;font-size:9px;font-weight:820;letter-spacing:.1em}.note h2{margin:7px 0;font-size:16px}.note p{margin:0;color:#92969a;font-size:11px;line-height:1.55}.revision{margin-top:20px;padding:19px;border:1px solid #465020;border-radius:18px;background:#151a12}.revision b{color:#caff3a}.revision p{margin:7px 0 0;color:#a3aa94;font-size:12px;line-height:1.55}@media(max-width:850px){.score{grid-template-columns:1fr 1fr}.head{display:none}.row{grid-template-columns:1fr}.row>div{padding:7px 15px}.row .area{padding-top:16px}.row .status{margin:4px 15px 15px}.notes{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">Architecture check · Current Worker contract</div>
+    <h1>The redesign fits the current API—with one screen corrected.</h1>
+    <p class="intro">No new server endpoint is required for the approved navigation, dashboard, ledger, cards, or signature split flow. A few surfaces combine existing responses on-device. Savings is revised to avoid inventing goal data the server does not store.</p>
+    <section class="score">
+      <div class="hero"><b>Compatible</b><span>Overall result</span></div>
+      <div><b>6</b><span>Directly supported</span></div>
+      <div><b>3</b><span>Client-composed</span></div>
+      <div><b>1</b><span>Design correction</span></div>
+    </section>
+    <section class="matrix">
+      <div class="head"><div>Surface</div><div>Approved experience</div><div>Current contract</div><div>Status</div></div>
+      <div class="row"><div class="area">Home</div><div class="design">Monthly money summary, annual context, existing insight carousel</div><div class="api">GET /summary<br/>GET /annual-summary</div><div class="status direct">Direct</div></div>
+      <div class="row"><div class="area">Available</div><div class="design">Money remaining after spending and savings</div><div class="api">netCents − savingsNetCents<br/>both returned by /summary</div><div class="status compose">Compose</div></div>
+      <div class="row"><div class="area">Latest activity</div><div class="design">Short mixed feed on Home</div><div class="api">Merge expense, income, savings entry lists; omit unavailable features</div><div class="status compose">Compose</div></div>
+      <div class="row"><div class="area">Activity</div><div class="design">Unified ledger with split markers and filters</div><div class="api">GET /expenses + /income + /savings/entries; billSplitId prevents duplicates</div><div class="status compose">Compose</div></div>
+      <div class="row"><div class="area">Expense + income</div><div class="design">Create, edit, inspect, delete</div><div class="api">Full CRUD under /expenses and /income; category/card filters supported</div><div class="status direct">Direct</div></div>
+      <div class="row"><div class="area">Savings</div><div class="design">Accounts, balances, monthly movement, recurring contributions</div><div class="api">/savings/accounts<br/>/savings/entries<br/>/savings/recurring</div><div class="status direct">Direct</div></div>
+      <div class="row"><div class="area">Goal targets</div><div class="design">Earlier mockup used funded progress and target dates</div><div class="api">No target amount, deadline, or funded state exists on SavingsAccount</div><div class="status adjust">Remove</div></div>
+      <div class="row"><div class="area">Cards</div><div class="design">Balances, due status, usage history, payments</div><div class="api">/credit-cards<br/>/card-payments/summary<br/>/credit-usage-series<br/>/monthly-payments</div><div class="status direct">Direct</div></div>
+      <div class="row"><div class="area">Scan + split</div><div class="design">Capture → review → split → result</div><div class="api">Scan, items, claims, participants, status, settlement, public share routes</div><div class="status direct">Direct</div></div>
+      <div class="row"><div class="area">Theme + navigation</div><div class="design">Signal Black, four tabs, global circular launcher</div><div class="api">Local presentation state; feature flags determine visible destinations</div><div class="status direct">Direct</div></div>
+    </section>
+    <section class="notes">
+      <article class="note"><span class="n">01 · FEATURE SAFETY</span><h2>Never call a disabled module</h2><p>Tabs and feed sources derive from workspace feature access. Cards payment data appears only when both credit cards and card payments are enabled.</p></article>
+      <article class="note"><span class="n">02 · SPLIT INTEGRITY</span><h2>One financial event, one row</h2><p>A completed split already creates or links an expense. Activity shows that expense once with a Split marker; open splits live in a separate attention module.</p></article>
+      <article class="note"><span class="n">03 · OPTIONAL FUTURE API</span><h2>Unified feed can wait</h2><p>A paginated activity endpoint would reduce requests at scale, but it is an optimization. The current month can be assembled safely from existing list routes.</p></article>
+    </section>
+    <div class="revision"><b>Savings correction for the final design:</b><p>Replace goal completion bars and deadlines with account balance, share of total, this-month movement, and recurring contribution status. This preserves the visual hierarchy while making every number traceable to the current server.</p></div>
+  </main>
+</body>
+</html>

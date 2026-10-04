@@ -2,6 +2,26 @@ import XCTest
 @testable import Settlr
 
 final class SplitPaymentMethodTests: XCTestCase {
+    func testOlderDetailLoadCannotOverwriteNewerMutation() {
+        var gate = BillSplitDetailResponseGate()
+        let oldLoad = gate.beginLoad()
+        let mutation = gate.beginMutation()
+
+        XCTAssertFalse(gate.shouldAdopt(load: oldLoad))
+        XCTAssertTrue(gate.shouldAdopt(mutation: mutation))
+        XCTAssertTrue(gate.commitMutation(mutation))
+        XCTAssertFalse(gate.shouldAdopt(mutation: mutation))
+    }
+
+    func testOlderOverlappingDetailLoadCannotOverwriteNewerRefresh() {
+        var gate = BillSplitDetailResponseGate()
+        let oldLoad = gate.beginLoad()
+        let newLoad = gate.beginLoad()
+
+        XCTAssertFalse(gate.shouldAdopt(load: oldLoad))
+        XCTAssertTrue(gate.shouldAdopt(load: newLoad))
+    }
+
     func testConflictCopyDistinguishesSuccessfulAndFailedRefresh() {
         XCTAssertEqual(
             BillSplitPaymentConflictPresentation.message(didRefresh: true),

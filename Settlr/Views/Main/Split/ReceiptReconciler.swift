@@ -438,7 +438,7 @@ struct ReceiptParserRouter {
                 throw ReceiptParserRoutingError.serverReturnedNoUsableRows
             }
             let result = reconciled(raw, parser: raw.parser, ocrText: ocrText)
-            guard result.items.contains(where: { $0.quantity > 0 && $0.unitPriceCents > 0 }) else {
+            guard hasUsableRows(result) else {
                 throw ReceiptParserRoutingError.serverReturnedNoUsableRows
             }
             return result
@@ -453,7 +453,7 @@ struct ReceiptParserRouter {
         let result = reconciled(raw, parser: raw.parser, ocrText: ocrText)
         // An unverified server row still belongs in the editable review form;
         // only a completely empty/invalid response blocks the scan.
-        guard result.items.contains(where: { $0.quantity > 0 && $0.unitPriceCents > 0 }) else {
+        guard hasUsableRows(result) else {
             throw ReceiptParserRoutingError.serverReturnedNoUsableRows
         }
         return result
@@ -469,7 +469,9 @@ struct ReceiptParserRouter {
 
     private func hasUsableRows(_ receipt: ScannedReceipt) -> Bool {
         receipt.items.contains {
-            $0.verification == .verified && $0.quantity > 0 && $0.unitPriceCents > 0
+            !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && $0.quantity > 0
+                && $0.unitPriceCents > 0
         }
     }
 }

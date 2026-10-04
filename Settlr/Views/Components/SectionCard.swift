@@ -12,10 +12,10 @@ struct SectionCard<Content: View>: View {
             .padding(16)
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(hex: "#15171a"))
+                    .fill(Theme.surface)
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
-                            .strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1)
+                            .strokeBorder(Theme.line, lineWidth: 1)
                     )
             )
     }

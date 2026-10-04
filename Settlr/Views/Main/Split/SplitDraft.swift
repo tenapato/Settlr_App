@@ -1,10 +1,24 @@
 import Foundation
 
+enum SplitScanFlowOrigin: Equatable {
+    case capturedReceipt
+    case manual
+}
+
+struct SplitScanFlowMetadata {
+    let origin: SplitScanFlowOrigin
+    let totalEdited: Bool
+
+    var canReturnToReview: Bool {
+        origin == .capturedReceipt
+    }
+}
+
 /// Complete, reusable state for both composing and editing a split.
 ///
 /// Money stays in integer cents here. Text-field formatting belongs to the
 /// view, while this type owns the server contract and reconciliation rules.
-struct SplitDraft {
+struct SplitDraft: Equatable {
     struct ClaimImpact: Equatable {
         let itemIDsRequiringConfirmation: [String]
         let itemNamesRequiringConfirmation: [String]
@@ -84,7 +98,10 @@ struct SplitDraft {
         let mismatchAcknowledged: Bool
 
         var isMaterial: Bool { kind == .shortfall || kind == .overshoot }
-        var requiresDecision: Bool { isMaterial && !mismatchAcknowledged }
+        /// The server accepts a small positive receipt remainder as rounding,
+        /// but any item overage requires the user to confirm the receipt total.
+        var requiresAcknowledgement: Bool { isMaterial || differenceCents < 0 }
+        var requiresDecision: Bool { requiresAcknowledgement && !mismatchAcknowledged }
     }
 
     var merchant: String
@@ -169,8 +186,13 @@ struct SplitDraft {
     var itemSubtotalCents: Int { filledItems.reduce(0) { $0 + $1.lineTotalCents } }
     var calculatedTotalCents: Int { itemSubtotalCents + taxCents + tipCents + feeCents }
     var guestParticipants: [Participant] { participants.filter { !$0.isOrganizer } }
+    private var requestItems: [Item] { splitMode == "even" ? [] : filledItems }
 
     var reconciliation: Reconciliation {
+        reconciliation(selectedTotalCents: selectedTotalCents)
+    }
+
+    func reconciliation(selectedTotalCents: Int) -> Reconciliation {
         let difference = selectedTotalCents - calculatedTotalCents
         let tolerance = max(100, Int(Double(max(0, selectedTotalCents)) * 0.001))
         let kind: Reconciliation.Kind
@@ -195,7 +217,7 @@ struct SplitDraft {
     }
 
     mutating func confirmKeepReceiptTotal() {
-        guard reconciliation.isMaterial else { return }
+        guard reconciliation.requiresAcknowledgement else { return }
         mismatchAcknowledged = true
     }
 
@@ -209,7 +231,7 @@ struct SplitDraft {
         return CreateBillSplitBody(
             merchant: merchant.trimmingCharacters(in: .whitespacesAndNewlines),
             occurredAt: Self.string(from: occurredAt),
-            items: filledItems.map {
+            items: requestItems.map {
                 BillSplitItemBody(
                     name: $0.name.trimmingCharacters(in: .whitespacesAndNewlines),
                     quantity: max(1, $0.quantity),
@@ -240,7 +262,7 @@ struct SplitDraft {
     /// existing claims.
     func claimImpact(comparedTo split: BillSplit) -> ClaimImpact {
         let originalItems = split.items.sorted { $0.sortOrder < $1.sortOrder }
-        let currentByID = Dictionary(uniqueKeysWithValues: items.compactMap { item in
+        let currentByID = Dictionary(uniqueKeysWithValues: requestItems.compactMap { item in
             item.serverID.map { ($0, item) }
         })
         var affectedIDs: [String] = []
@@ -285,7 +307,7 @@ struct SplitDraft {
             tipCents: max(0, tipCents),
             feeCents: max(0, feeCents),
             totalCents: max(0, selectedTotalCents),
-            items: filledItems.map {
+            items: requestItems.map {
                 EditBillSplitItemBody(
                     id: $0.serverID,
                     name: $0.name.trimmingCharacters(in: .whitespacesAndNewlines),

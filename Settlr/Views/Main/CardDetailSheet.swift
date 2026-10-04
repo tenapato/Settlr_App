@@ -60,7 +60,7 @@ struct CardDetailSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(hex: "#0e0f11").ignoresSafeArea()
+                Theme.bg.ignoresSafeArea()
 
                 ScrollView {
                     VStack(spacing: 24) {
@@ -70,14 +70,14 @@ struct CardDetailSheet: View {
                             CardFormField(label: "Card Name *") {
                                 TextField("e.g. Amex Platinum", text: $label)
                                     .focused($focusedField, equals: .name)
-                                    .foregroundStyle(Color(hex: "#ecedee"))
+                                    .foregroundStyle(Theme.ink)
                             }
 
                             CardFormField(label: "Last 4 Digits") {
                                 TextField("1234", text: $lastFour)
                                     .keyboardType(.numberPad)
                                     .focused($focusedField, equals: .lastFour)
-                                    .foregroundStyle(Color(hex: "#ecedee"))
+                                    .foregroundStyle(Theme.ink)
                                     .onChange(of: lastFour) { _, newValue in
                                         lastFour = String(newValue.filter(\.isNumber).prefix(4))
                                     }
@@ -88,14 +88,14 @@ struct CardDetailSheet: View {
                             CardFormField(label: "Issuer (optional)") {
                                 TextField("e.g. American Express", text: $issuer)
                                     .focused($focusedField, equals: .issuer)
-                                    .foregroundStyle(Color(hex: "#ecedee"))
+                                    .foregroundStyle(Theme.ink)
                             }
 
                             CardFormField(label: "Credit Limit (optional)") {
                                 TextField("e.g. 50000", text: $limitStr)
                                     .keyboardType(.numberPad)
                                     .focused($focusedField, equals: .limit)
-                                    .foregroundStyle(Color(hex: "#ecedee"))
+                                    .foregroundStyle(Theme.ink)
                             }
 
                             HStack(spacing: 12) {
@@ -103,7 +103,7 @@ struct CardDetailSheet: View {
                                     TextField("1–31", text: $cutoffDayStr)
                                         .keyboardType(.numberPad)
                                         .focused($focusedField, equals: .cutoff)
-                                        .foregroundStyle(Color(hex: "#ecedee"))
+                                        .foregroundStyle(Theme.ink)
                                         .onChange(of: cutoffDayStr) { _, newValue in
                                             cutoffDayStr = String(newValue.filter(\.isNumber).prefix(2))
                                         }
@@ -113,7 +113,7 @@ struct CardDetailSheet: View {
                                     TextField("1–31", text: $dueDayStr)
                                         .keyboardType(.numberPad)
                                         .focused($focusedField, equals: .due)
-                                        .foregroundStyle(Color(hex: "#ecedee"))
+                                        .foregroundStyle(Theme.ink)
                                         .onChange(of: dueDayStr) { _, newValue in
                                             dueDayStr = String(newValue.filter(\.isNumber).prefix(2))
                                         }
@@ -124,13 +124,13 @@ struct CardDetailSheet: View {
                                 TextField("Optional notes", text: $notes, axis: .vertical)
                                     .focused($focusedField, equals: .notes)
                                     .lineLimit(3...5)
-                                    .foregroundStyle(Color(hex: "#ecedee"))
+                                    .foregroundStyle(Theme.ink)
                             }
 
                             if let errorMessage {
                                 Text(errorMessage)
                                     .font(.system(size: 13))
-                                    .foregroundStyle(Color(hex: "#ff6b6b"))
+                                    .foregroundStyle(Theme.expense)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
                         }
@@ -147,18 +147,18 @@ struct CardDetailSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
-                        .foregroundStyle(Color(hex: "#8e9197"))
+                        .foregroundStyle(Theme.muted)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
                         Task { await save() }
                     } label: {
                         if isSaving {
-                            ProgressView().tint(Color(hex: "#c8ff5a"))
+                            ProgressView().tint(Theme.accent)
                         } else {
                             Text("Save")
                                 .fontWeight(.semibold)
-                                .foregroundStyle(Color(hex: "#c8ff5a"))
+                                .foregroundStyle(Theme.accentText)
                         }
                     }
                     .disabled(isSaving || label.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -166,23 +166,22 @@ struct CardDetailSheet: View {
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button("Done") { focusedField = nil }
-                        .foregroundStyle(Color(hex: "#c8ff5a"))
+                        .foregroundStyle(Theme.accentText)
                         .fontWeight(.semibold)
                 }
             }
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(Color(hex: "#0e0f11"))
+        .presentationBackground(Theme.bg)
         .presentationCornerRadius(24)
-        .preferredColorScheme(.dark)
     }
 
     private var networkPicker: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Network")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color(hex: "#8e9197"))
+                .foregroundStyle(Theme.muted)
                 .tracking(1)
                 .textCase(.uppercase)
 
@@ -193,15 +192,17 @@ struct CardDetailSheet: View {
                     } label: {
                         Text(networkLabel)
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(network == val ? Color(hex: "#0e0f11") : Color(hex: "#8e9197"))
+                            .foregroundStyle(network == val ? Theme.buttonInk : Theme.muted)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
+                            .frame(minHeight: 44)
                             .background(
                                 RoundedRectangle(cornerRadius: 9)
-                                    .fill(network == val ? Color(hex: "#c8ff5a") : Color(hex: "#15171a"))
+                                    .fill(network == val ? Theme.accent : Theme.surface)
                             )
                     }
                     .buttonStyle(.plain)
+                    .accessibilityValue(network == val ? "Selected" : "Not selected")
+                    .accessibilityAddTraits(network == val ? .isSelected : [])
                 }
             }
         }
@@ -262,7 +263,7 @@ private struct CardFormField<Content: View>: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(label)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color(hex: "#8e9197"))
+                .foregroundStyle(Theme.muted)
                 .tracking(1)
                 .textCase(.uppercase)
             content()
@@ -271,10 +272,10 @@ private struct CardFormField<Content: View>: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(hex: "#15171a"))
+                        .fill(Theme.surface)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1)
+                                .strokeBorder(Theme.line, lineWidth: 1)
                         )
                 )
         }
