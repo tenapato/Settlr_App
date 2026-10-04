@@ -66,6 +66,34 @@ struct SplitResultView: View {
     var onFinish: (() -> Void)? = nil
 
     @State private var showQR = false
+    @State private var showGroupPayment = false
+    @State private var paymentReport: SplitPaymentReport?
+
+    @ViewBuilder
+    private var groupPayments: some View {
+        if hasOwnerSettlementContext, currentSplit.groupPaymentsAvailable,
+           currentSplit.payerMode == .organizerPaid, currentSplit.status == "locked" {
+            Button("Record a group payment") { paymentReport = nil; showGroupPayment = true }
+                .buttonStyle(.borderedProminent)
+                .disabled(vm?.isSaving == true)
+            ForEach(currentSplit.paymentRequests) { report in
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("\(currentSplit.participants.first { $0.id == report.paidByParticipantId }?.name ?? "Guest") reported \(formatSplitMoney(report.amountCents, currency: currentSplit.currency))")
+                    Text("For: " + currentSplit.participants.filter { report.participantIds.contains($0.id) }.map(\.name).joined(separator: ", "))
+                        .font(.footnote).foregroundStyle(Theme.muted)
+                    Button("Review payment report") { paymentReport = report; showGroupPayment = true }
+                        .disabled(vm?.isSaving == true)
+                    if let workspaceId, let splitId, let vm {
+                        Button("Dismiss report", role: .destructive) {
+                            Task { await vm.dismissPaymentReport(workspaceId: workspaceId, splitId: splitId, reportId: report.id) }
+                        }
+                        .disabled(vm.isSaving)
+                    }
+                }
+                .padding(12)
+            }
+        }
+    }
 
     private var currentSplit: BillSplit {
         guard let vm, let splitId, let detail = vm.detail, detail.id == splitId else { return split }
@@ -113,6 +141,7 @@ struct SplitResultView: View {
                         summaryCard
                         if presentation.showsParticipantBalances {
                             participantsSection
+                            groupPayments
                             unclaimedNotice
                             editingSafeguard
                         }
@@ -120,13 +149,36 @@ struct SplitResultView: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 16)
                 }
+                .refreshable {
+                    if let workspaceId, let splitId, let vm {
+                        await vm.loadDetail(workspaceId: workspaceId, splitId: splitId, silent: true)
+                    }
+                }
                 if presentation.showsParticipantBalances {
                     footer
                 }
             }
         }
+        .task {
+            if let workspaceId, let splitId, let vm {
+                await vm.loadDetail(workspaceId: workspaceId, splitId: splitId, silent: true)
+            }
+        }
         .navigationTitle("Split result")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showGroupPayment, onDismiss: { paymentReport = nil }) {
+            if let workspaceId, let splitId, let vm {
+                SplitGroupPaymentSheet(
+                    people: currentSplit.participants.filter { !$0.isOrganizer }.map {
+                        SplitGroupPaymentPerson(id: $0.id, name: $0.name, owedCents: $0.owedCents, settled: $0.isSettled)
+                    }, currency: currentSplit.currency, version: currentSplit.version, report: paymentReport
+                ) { body in
+                    guard await vm.recordGroupPayment(workspaceId: workspaceId, splitId: splitId, body: body) else {
+                        throw NSError(domain: "Settlr.GroupPayment", code: 1, userInfo: [NSLocalizedDescriptionKey: vm.errorMessage ?? "Could not record payment. Close this form, refresh, and try again."])
+                    }
+                }
+            }
+        }
         .sheet(isPresented: $showQR) {
             if let link = currentSplit.shareLink {
                 SplitQRSheet(link: link, merchant: currentSplit.merchant)
@@ -432,5 +484,94 @@ private extension View {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .strokeBorder(Theme.line, lineWidth: 1)
             )
+    }
+}
+
+struct SplitGroupPaymentPerson: Identifiable {
+    let id: String
+    let name: String
+    let owedCents: Int
+    let settled: Bool
+}
+
+struct SplitGroupPaymentSheet: View {
+    let people: [SplitGroupPaymentPerson]
+    let currency: String
+    let version: Int?
+    var report: SplitPaymentReport? = nil
+    var guestPayerId: String? = nil
+    let onSave: (SplitGroupPaymentBody) async throws -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var selected: Set<String> = []
+    @State private var payerId = ""
+    @State private var saving = false
+    @State private var errorMessage: String?
+
+    private var eligible: [SplitGroupPaymentPerson] { people.filter { !$0.settled && $0.owedCents > 0 } }
+    private var total: Int { eligible.filter { selected.contains($0.id) }.reduce(0) { $0 + $1.owedCents } }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Who paid?") {
+                    if let guestPayerId {
+                        Text(people.first { $0.id == guestPayerId }?.name ?? "You")
+                    } else {
+                        Picker("Paid by", selection: $payerId) {
+                            Text("Choose a person").tag("")
+                            ForEach(people) { Text($0.name).tag($0.id) }
+                        }
+                        .disabled(report != nil)
+                    }
+                }
+                Section("People covered by this payment") {
+                    ForEach(eligible) { person in
+                        Toggle(isOn: Binding(
+                            get: { selected.contains(person.id) },
+                            set: { if $0 { selected.insert(person.id) } else { selected.remove(person.id) } }
+                        )) {
+                            LabeledContent(person.name, value: formatSplitMoney(person.owedCents, currency: currency))
+                        }
+                        .disabled(report != nil)
+                    }
+                }
+                Section {
+                    LabeledContent("Total", value: formatSplitMoney(total, currency: currency))
+                    Text(guestPayerId == nil
+                        ? "Confirm only after receiving this payment. All selected balances are marked paid together."
+                        : "This records your report, not a money transfer. The organizer must confirm receipt before anyone is marked paid.")
+                        .font(.footnote).foregroundStyle(Theme.muted)
+                    if let errorMessage { Text(errorMessage).foregroundStyle(Theme.expense) }
+                    Button(saving ? "Saving…" : (guestPayerId == nil ? "Confirm payment received" : "Report payment sent")) {
+                        guard !saving else { return }
+                        saving = true
+                        errorMessage = nil
+                        Task { @MainActor in
+                            defer { saving = false }
+                            do {
+                                try await onSave(SplitGroupPaymentBody(
+                                    participantIds: selected.sorted(), paidByParticipantId: payerId,
+                                    version: version, requestId: report?.id
+                                ))
+                                dismiss()
+                            } catch { errorMessage = error.localizedDescription }
+                        }
+                    }
+                    .disabled(selected.isEmpty || payerId.isEmpty || total <= 0)
+                }
+            }
+            .disabled(saving)
+            .navigationTitle(guestPayerId == nil ? "Group payment" : "Report payment")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(saving) }
+            }
+        }
+        .interactiveDismissDisabled(saving)
+        .onAppear {
+            payerId = guestPayerId ?? report?.paidByParticipantId ?? ""
+            if let report { selected = Set(report.participantIds) }
+            else if let guestPayerId, eligible.contains(where: { $0.id == guestPayerId }) { selected = [guestPayerId] }
+        }
     }
 }

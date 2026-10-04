@@ -40,7 +40,7 @@ if ! rg -q 'SplitResultView\(split: current, onFinish:' "$pass_around"; then
   exit 1
 fi
 
-if ! rg -U -q 'else if queuedResult \{\n[[:space:]]+queuedResultView' "$scan_flow"; then
+if ! rg -U -q 'else if let pendingResult \{\n[[:space:]]+pendingResultView\(pendingResult\)' "$scan_flow"; then
   echo "Queued offline results must remain presentation-only." >&2
   exit 1
 fi
@@ -49,5 +49,18 @@ if ! rg -U -q 'VStack\(spacing: 10\) \{(?s).*Text\("Set up the split"\)(?s).*for
   echo "Scanner review actions must use the approved stacked, high-contrast hierarchy." >&2
   exit 1
 fi
+
+if rg -U -q 'NavigationStack \{\n[[:space:]]+stageView' "$scan_flow"; then
+  echo "The guided editor must not be nested in the scanner NavigationStack." >&2
+  exit 1
+fi
+
+for presenter in Settlr/Views/Main/MainTabView.swift Settlr/Views/Main/Split/SplitListView.swift; do
+  if ! rg -U -q 'SplitScanFlow\(workspaceId:.*\) \{ outcome in\n[[:space:]]+splitScanHandoff.receive\(outcome\)\n[[:space:]]+\}' "$presenter" ||
+     ! rg -U -q 'fullScreenCover\(isPresented:.*onDismiss: \{\n[[:space:]]+guard let outcome = splitScanHandoff.takeAfterDismissal\(\)' "$presenter"; then
+    echo "Split presenters must defer navigation until the scanner cover dismisses." >&2
+    exit 1
+  fi
+done
 
 echo "Scanner result settlement regression check passed."

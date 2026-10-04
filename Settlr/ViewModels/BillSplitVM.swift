@@ -242,6 +242,24 @@ final class BillSplitVM {
     }
 
     @MainActor
+    func recordGroupPayment(workspaceId: String, splitId: String, body: SplitGroupPaymentBody) async -> Bool {
+        await mutate(onConflict: { _, mutation in
+            await self.adoptConflict(workspaceId: workspaceId, splitId: splitId, mutation: mutation)
+        }) {
+            try await api.fetch(Endpoints.billSplitGroupPayment(workspaceId, splitId), method: "POST", body: body)
+        }
+    }
+
+    @MainActor
+    func dismissPaymentReport(workspaceId: String, splitId: String, reportId: String) async {
+        _ = await mutate(onConflict: { _, mutation in
+            await self.adoptConflict(workspaceId: workspaceId, splitId: splitId, mutation: mutation)
+        }) {
+            try await api.fetch("/api/workspaces/\(workspaceId)/bill-splits/\(splitId)/payment-reports/\(reportId)", method: "DELETE")
+        }
+    }
+
+    @MainActor
     private func mutateParticipant(
         workspaceId: String,
         splitId: String,

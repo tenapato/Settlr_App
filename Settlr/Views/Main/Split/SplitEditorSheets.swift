@@ -131,14 +131,24 @@ struct SplitItemEditorSheet: View {
             Form {
                 TextField("Item", text: $name)
                     .focused($focusedField, equals: .name)
-                Stepper("Quantity: \(quantity)", value: $quantity, in: 1...999)
-                TextField("Unit price", text: $priceText)
-                    .keyboardType(.decimalPad)
-                    .focused($focusedField, equals: .price)
+                Stepper("Units purchased: \(quantity)", value: $quantity, in: 1...999)
+                LabeledContent("Price per unit") {
+                    TextField("0.00", text: $priceText)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .focused($focusedField, equals: .price)
+                }
+                if let cents = Self.validMoney(priceText) {
+                    LabeledContent("Item total", value: formatSplitMoney(cents * quantity))
+                }
                 Picker("Allocation", selection: $allocationMode) {
-                    Text("Shared").tag("shared")
+                    Text("Share among people").tag("shared")
                     Text("By units").tag("units")
                 }
+                Text(allocationMode == "shared"
+                    ? "Everyone who selects this item shares its total equally, including through the shared link. For one bottle shared by five people, enter 1 unit and the bottle’s full price; all five people select it."
+                    : "Each person claims the number of units they ordered. Quantity is the number purchased, not the number of people.")
+                    .font(.footnote).foregroundStyle(Theme.muted)
                 if let onRemove {
                     Button("Remove item", role: .destructive) { onRemove(); dismiss() }
                 }
@@ -147,7 +157,7 @@ struct SplitItemEditorSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { commit() } }
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { commit() }.disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || Self.validMoney(priceText) == nil) }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button("Done") { focusedField = nil }
@@ -157,12 +167,15 @@ struct SplitItemEditorSheet: View {
     }
 
     private func commit() {
-        onCommit(SplitItemEditDraft(item: item).committed(name: name, quantity: quantity, unitPriceCents: Self.parseMoney(priceText), allocationMode: allocationMode))
+        guard let cents = Self.validMoney(priceText) else { return }
+        onCommit(SplitItemEditDraft(item: item).committed(name: name, quantity: quantity, unitPriceCents: cents, allocationMode: allocationMode))
         dismiss()
     }
 
-    private static func parseMoney(_ value: String) -> Int {
-        Int(((Double(value.replacingOccurrences(of: ",", with: ".")) ?? 0) * 100.0).rounded())
+    nonisolated static func validMoney(_ value: String) -> Int? {
+        guard let amount = Double(value.replacingOccurrences(of: ",", with: ".")),
+              amount.isFinite, amount >= 0, amount <= Double(Int.max / 100 / 999) else { return nil }
+        return Int((amount * 100).rounded())
     }
 
     private static func moneyText(_ cents: Int) -> String { String(format: "%.2f", Double(cents) / 100) }

@@ -18,6 +18,7 @@ struct MainTabView: View {
     @State private var showSplitList = false
     @State private var showSplitScan = false
     @State private var createdSplitId: String?
+    @State private var splitScanHandoff = SplitScanHandoff()
     @State private var launcherTask: Task<Void, Never>?
 
     var body: some View {
@@ -50,17 +51,19 @@ struct MainTabView: View {
         .onChange(of: launcherAccessSignature) { _, _ in reconcileFeaturePresenters() }
         .onDisappear { launcherTask?.cancel() }
         // Splitting starts at the camera, not at a form.
-        .fullScreenCover(isPresented: splitScanPresentation) {
+        .fullScreenCover(isPresented: splitScanPresentation, onDismiss: {
+            guard let outcome = splitScanHandoff.takeAfterDismissal(),
+                  appState.currentUser?.has(.billSplits) == true,
+                  appState.activeWorkspace != nil else { return }
+            switch outcome {
+            case .created(let split): createdSplitId = split.id
+            case .queued, .needsAttention: createdSplitId = nil
+            case .rejected: return
+            }
+            showSplitList = true
+        }) {
             SplitScanFlow(workspaceId: appState.activeWorkspace?.id ?? "") { outcome in
-                guard appState.currentUser?.has(.billSplits) == true,
-                      appState.activeWorkspace != nil else { return }
-                // Only a split that reached the server has an id worth opening.
-                // Durable local outcomes land in the pending section instead.
-                switch outcome {
-                case .created(let split): createdSplitId = split.id
-                case .queued, .needsAttention, .rejected: break
-                }
-                showSplitList = true
+                splitScanHandoff.receive(outcome)
             }
         }
         .sheet(isPresented: splitListPresentation) {

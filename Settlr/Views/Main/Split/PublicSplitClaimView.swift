@@ -15,6 +15,11 @@ struct PublicSplitClaimView: View {
     @State private var split: PublicSplit?
     @State private var participantId: String?
     @State private var name = ""
+    @State private var groupSecrets: [String: String] = [:]
+    @State private var companionName = ""
+    @State private var showPaymentReport = false
+    @State private var switchingPerson = false
+    @State private var withdrawingReport = false
     @State private var loadError: String?
     @State private var actionError: String?
     @State private var isJoining = false
@@ -50,7 +55,24 @@ struct PublicSplitClaimView: View {
                 if let split, let me { shareFooter(split: split, me: me) }
             }
         }
-        .task { await load() }
+        .sheet(isPresented: $showPaymentReport) {
+            if let split, let participantId {
+                SplitGroupPaymentSheet(
+                    people: split.participants.filter { !$0.isOrganizer }.map {
+                        SplitGroupPaymentPerson(id: $0.id, name: $0.name, owedCents: $0.owedCents, settled: $0.settled)
+                    }, currency: split.currency, version: nil, guestPayerId: participantId
+                ) { body in
+                    let response: PublicSplitResponse = try await APIClient.shared.fetch(
+                        Endpoints.publicSplitPaymentReport(shareToken), method: "POST", body: body, headers: secretHeader()
+                    )
+                    self.split = response.split
+                }
+            }
+        }
+        .task {
+            groupSecrets = SplitGuestStore.people(for: shareToken)
+            await load()
+        }
     }
 
     // MARK: - Loading
@@ -63,6 +85,10 @@ struct PublicSplitClaimView: View {
             )
             split = resp.split
             participantId = resp.split.viewerParticipantId
+            if let id = participantId, let secret {
+                SplitGuestStore.remember(secret: secret, participantId: id, shareToken: shareToken)
+                groupSecrets = SplitGuestStore.people(for: shareToken)
+            }
             // The organizer can remove someone; drop a stale secret so the screen
             // offers to rejoin instead of failing every tap.
             if resp.split.viewerParticipantId == nil, secret != nil {
@@ -87,8 +113,8 @@ struct PublicSplitClaimView: View {
 
     // MARK: - Actions
 
-    private func join() {
-        let trimmed = name.trimmingCharacters(in: .whitespaces)
+    private func join(companion: Bool = false) {
+        let trimmed = (companion ? companionName : name).trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
         isJoining = true
         actionError = nil
@@ -101,7 +127,10 @@ struct PublicSplitClaimView: View {
                     body: PublicJoinBody(name: trimmed)
                 )
                 SplitGuestStore.save(secret: resp.claimSecret, for: shareToken)
+                SplitGuestStore.remember(secret: resp.claimSecret, participantId: resp.participantId, shareToken: shareToken)
+                groupSecrets = SplitGuestStore.people(for: shareToken)
                 participantId = resp.participantId
+                if companion { companionName = "" }
                 if let joined = resp.split { split = joined }
             } catch {
                 actionError = error.localizedDescription
@@ -131,6 +160,25 @@ struct PublicSplitClaimView: View {
                 // fetch the fresh public DTO that the conflict represents. The
                 // claim secret resolves the same viewer and their quantity.
                 await load()
+            } catch {
+                actionError = error.localizedDescription
+                await load()
+            }
+        }
+    }
+
+    private func withdrawReport(_ report: SplitPaymentReport) {
+        guard !withdrawingReport else { return }
+        withdrawingReport = true
+        actionError = nil
+        Task {
+            defer { withdrawingReport = false }
+            do {
+                let response: PublicSplitResponse = try await APIClient.shared.fetch(
+                    Endpoints.publicSplitPaymentReport(shareToken) + "/" + report.id,
+                    method: "DELETE", headers: secretHeader()
+                )
+                split = response.split
             } catch {
                 actionError = error.localizedDescription
                 await load()
@@ -177,6 +225,21 @@ struct PublicSplitClaimView: View {
                     joinCard(split)
                 }
 
+                if participantId != nil {
+                    groupClaimControls(split)
+                    if split.groupPaymentsAvailable == true, split.payerMode == .organizerPaid, split.status == "locked" {
+                        if let report = split.paymentRequests?.first(where: { $0.paidByParticipantId == participantId }) {
+                            Text("Payment reported: \(formatSplitMoney(report.amountCents, currency: split.currency)). Waiting for the organizer to confirm.")
+                                .font(.footnote).foregroundStyle(Theme.muted)
+                            Button("Withdraw report", role: .destructive) { withdrawReport(report) }
+                                .disabled(withdrawingReport || switchingPerson)
+                        } else {
+                            Button("I paid for myself or a group") { showPaymentReport = true }
+                                .buttonStyle(.borderedProminent)
+                                .disabled(switchingPerson || withdrawingReport)
+                        }
+                    }
+                }
                 itemsSection(split)
 
                 if let actionError {
@@ -266,7 +329,7 @@ struct PublicSplitClaimView: View {
             .formFieldStyle()
             .disabled(!split.isOpen)
 
-            Button(action: join) {
+            Button { join() } label: {
                 HStack {
                     if isJoining { ProgressView().tint(Theme.buttonInk) }
                     Text(split.isOpen ? "Join this split" : "This split is closed")
@@ -292,6 +355,37 @@ struct PublicSplitClaimView: View {
             // Pre-fill with the signed-in name; it's almost always right.
             if name.isEmpty, let accountName = appState.currentUser?.name { name = accountName }
         }
+    }
+
+    private func groupClaimControls(_ split: PublicSplit) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Menu {
+                ForEach(split.participants.filter { groupSecrets[$0.id] != nil }) { person in
+                    Button(person.name) {
+                        guard let credential = groupSecrets[person.id] else { return }
+                        SplitGuestStore.save(secret: credential, for: shareToken)
+                        switchingPerson = true
+                        participantId = person.id
+                        Task {
+                            defer { switchingPerson = false }
+                            await load()
+                        }
+                    }
+                }
+            } label: {
+                Label("Selecting for: \(me?.name ?? "You")", systemImage: "person.2")
+            }
+            if split.isOpen, !split.isEvenSplit {
+                TextField("Add someone in your group", text: $companionName)
+                    .textFieldStyle(.roundedBorder)
+                Button("Add person") { join(companion: true) }
+                    .disabled(companionName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Text("Add each person you’re selecting for, then switch names to claim their items. For a shared bottle or dish, each person selects the same item; its price is divided between them.")
+                    .font(.footnote).foregroundStyle(Theme.muted)
+            }
+        }
+        .disabled(isJoining || switchingPerson || withdrawingReport || !pendingItemIds.isEmpty)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func itemsSection(_ split: PublicSplit) -> some View {
@@ -332,7 +426,7 @@ struct PublicSplitClaimView: View {
             participantQuantity: mineQuantity
         )
         let claimable = !split.isEvenSplit
-        let interactive = participantId != nil && split.isOpen && claimable
+        let interactive = participantId != nil && split.isOpen && claimable && !switchingPerson && !isJoining
         return VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 12) {
                 if control.isShared, claimable {
@@ -360,7 +454,7 @@ struct PublicSplitClaimView: View {
                     } else if claimers.isEmpty {
                         Text("Unclaimed").font(.system(size: 11)).foregroundStyle(Theme.faint)
                     } else if control.isShared {
-                        Text("Sharing: " + claimers.map(\.name).joined(separator: ", "))
+                        Text("Split \(claimers.count) ways · " + claimers.map(\.name).joined(separator: ", "))
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.muted)
                         .lineLimit(1)

@@ -175,3 +175,33 @@ Run `ExpenseAutomationTests` along with the existing Xcode test suite. Then:
 
 The Linux development host cannot build SwiftUI/App Intents or run iOS tests;
 Xcode and device validation are required before release.
+
+### Shared items and group payments
+
+The item editor labels **Units purchased**, **Price per unit**, and **Item total**.
+For one bottle shared by five people, use quantity 1 and allocation **Share among
+people**. Each person claims that item through the shared link; the backend divides
+its full price among its claimants. Price changes remain organizer-only.
+
+In the app's shared-link view, **Add person** creates another guest whose claim
+credential is retained on this device. **Selecting for** switches between those
+people, so one device can claim items for a group without taking over unrelated
+guests. The browser UI is unchanged.
+
+Group payments require the companion backend branch `fix/split-group-payments`
+and migration `0046_bill_split_payment_requests.sql`. Deploy that migration before
+the backend code. The app hides group-payment actions until the API advertises
+`groupPaymentsAvailable`; older servers still decode normally.
+
+After claiming closes, a guest can **Report payment sent** for selected people.
+This does not transfer money or settle debts. In the result screen the organizer
+can review the report and **Confirm payment received**, or **Record a group
+payment** directly. Pending reports can be withdrawn or dismissed. Pull to refresh
+the result screen to retrieve new reports. Backend confirmation is atomic and
+allocates the received total to separate participant income rows, preserving the
+existing per-participant undo/accounting contract.
+
+Device checks: confirm Keep receipt total on the pushed Confirm step; test one
+shared bottle across five guests; add and switch two guests on one device; report
+a group payment, refresh the organizer result, and confirm it. Verify guest reports
+do not mark balances paid, and confirm retry/stale-version errors remain visible.
