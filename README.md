@@ -131,3 +131,47 @@ lets you download an App Store Connect API private key once.
 
 The workflow creates the build number as `YYYYMMDD.GITHUB_RUN_NUMBER`, so each
 upload has a newer build number without changing the Xcode project file.
+
+## Expense Shortcuts (Wallet and Back Tap)
+
+Settings → **Expense Shortcuts** contains setup instructions for both methods.
+The app exposes **Wallet Payment → Settlr** (Amount, Merchant, optional Card or
+Pass and Name) and **Quick Expense** (blank draft) as App Shortcuts, available
+when Settlr is installed. Both setup tabs link to Settlr’s App Shortcuts page;
+the user still assigns Back Tap in iPhone Settings and creates the Wallet
+transaction automation in Shortcuts.
+Connect Wallet transaction variables directly to the Wallet action; no
+Dictionary or separate URL-building action is required. Apple documents the
+[transaction trigger](https://support.apple.com/guide/shortcuts/apd65c67538a/ios).
+
+Both actions open Settlr for review. Requests wait in memory during login and
+workspace selection; multiple requests are queued separately. An existing
+expense or split form is preserved and must be closed before the next draft
+opens. Settings closes automatically for an incoming request. Signing out
+clears queued requests. Force-quitting
+loses unsaved drafts. The review shows the destination workspace and Wallet
+card label, and requires an explicit payment-method choice. Wallet card names
+are not automatically matched to Settlr cards. The existing ledger supports
+cash and credit cards; choose the appropriate method in that ledger. Amounts
+use the existing ledger currency and are not converted. A failed save keeps the
+editable form and displays the server error. Nothing is saved until confirmed.
+
+### Validation on macOS / iPhone
+
+Run `ExpenseAutomationTests` along with the existing Xcode test suite. Then:
+
+1. Find both Settlr actions in Shortcuts after installing the build.
+2. Run Wallet Payment with Amount `12.34`, Merchant `Coffee Shop`, and a card
+   label. Check the draft, category/card selection, and destination workspace.
+3. Test a cold launch, logged-out launch, missing workspace, blank fields,
+   disabled expenses, two queued requests, cancellation, and a failed save.
+4. Confirm a successful save appears on Activity and the Dashboard.
+5. Follow the in-app Wallet guide on an iPhone with a real payment card. Verify
+   transaction variables with an actual tap; the simulator cannot validate the
+   Wallet transaction trigger. Check foregrounding with the phone locked too.
+6. Assign Quick Expense to Back Tap and verify it opens a blank draft.
+7. Run an action while Settings or another form is already presented to verify
+   presentation behavior on the supported iOS versions.
+
+The Linux development host cannot build SwiftUI/App Intents or run iOS tests;
+Xcode and device validation are required before release.

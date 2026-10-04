@@ -4,6 +4,9 @@ struct ExpenseFormSheet: View {
     let workspaceId: String
     let categories: [Category]
     var expense: Expense?
+    var automationDraft: AutomationExpenseDraft?
+    var automationWorkspaceName: String?
+    var saveAction: ((CreateExpenseBody) async throws -> Void)?
     let onSave: (CreateExpenseBody) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -17,6 +20,7 @@ struct ExpenseFormSheet: View {
     @State private var creditCards: [CreditCard] = []
     @State private var selectedCreditCardId: String?
     @State private var errorMessage: String?
+    @State private var isSaving = false
     @FocusState private var amountFocused: Bool
     @FocusState private var descriptionFocused: Bool
 
@@ -31,12 +35,18 @@ struct ExpenseFormSheet: View {
         workspaceId: String,
         categories: [Category],
         expense: Expense? = nil,
+        automationDraft: AutomationExpenseDraft? = nil,
+        automationWorkspaceName: String? = nil,
+        saveAction: ((CreateExpenseBody) async throws -> Void)? = nil,
         onSave: @escaping (CreateExpenseBody) -> Void
     ) {
         self.workspaceId = workspaceId
         self.categories = categories
         self.expense = expense
         self.onSave = onSave
+        self.automationDraft = automationDraft
+        self.automationWorkspaceName = automationWorkspaceName
+        self.saveAction = saveAction
 
         if let expense {
             _description = State(initialValue: expense.description)
@@ -46,11 +56,11 @@ struct ExpenseFormSheet: View {
             _paymentChannel = State(initialValue: expense.paymentChannel)
             _selectedCreditCardId = State(initialValue: expense.creditCardId)
         } else {
-            _description = State(initialValue: "")
-            _amountText = State(initialValue: "")
-            _selectedDate = State(initialValue: Date())
+            _description = State(initialValue: automationDraft?.description ?? "")
+            _amountText = State(initialValue: automationDraft?.amountText ?? "")
+            _selectedDate = State(initialValue: automationDraft?.createdAt ?? Date())
             _selectedCategoryId = State(initialValue: nil)
-            _paymentChannel = State(initialValue: "cash")
+            _paymentChannel = State(initialValue: automationDraft == nil ? "cash" : "")
             _selectedCreditCardId = State(initialValue: nil)
         }
     }
@@ -66,6 +76,19 @@ struct ExpenseFormSheet: View {
 
                 ScrollView {
                     VStack(spacing: 20) {
+                        if let workspaceName = automationWorkspaceName {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Label("Review in \(workspaceName)", systemImage: "tray")
+                                    .font(.headline)
+                                Text("Confirm the amount and payment method before saving.")
+                                    .font(.footnote).foregroundStyle(Theme.muted)
+                                if let card = automationDraft?.card, !card.isEmpty {
+                                    Text("Wallet card: \(card)")
+                                        .font(.footnote).foregroundStyle(Theme.muted)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                         HeroAmountField(
                             amountText: $amountText,
                             tint: Theme.expense,
@@ -91,9 +114,9 @@ struct ExpenseFormSheet: View {
                         paymentSection
                         cardSection
 
-                        Button(isEditing ? "Save Changes" : "Add Expense") { save() }
+                        Button(isSaving ? "Saving…" : (isEditing ? "Save Changes" : "Add Expense")) { save() }
                             .buttonStyle(PrimaryButtonStyle())
-                            .disabled(!isValid)
+                            .disabled(!isValid || isSaving)
                             .padding(.top, 4)
                     }
                     .padding(.horizontal, 20)
@@ -102,6 +125,8 @@ struct ExpenseFormSheet: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
             }
+            .disabled(isSaving)
+            .interactiveDismissDisabled(isSaving)
             .navigationTitle(isEditing ? "Edit Expense" : "Add Expense")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -122,7 +147,7 @@ struct ExpenseFormSheet: View {
         }
         .onAppear {
             normalizeCardPaymentState()
-            if !isEditing { amountFocused = true }
+            if !isEditing && amountText.isEmpty { amountFocused = true }
         }
         .onChange(of: paymentChannel) { _, newValue in
             if newValue == "credit_card" {
@@ -171,7 +196,7 @@ struct ExpenseFormSheet: View {
 
     private var paymentSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionEyebrow("Payment Method")
+            SectionEyebrow(paymentChannel.isEmpty ? "Choose Payment Method" : "Payment Method")
                 .padding(.leading, 4)
             SegmentedToggle(
                 selection: $paymentChannel,
@@ -224,9 +249,10 @@ struct ExpenseFormSheet: View {
     private var isValid: Bool {
         let hasDescription = !description.trimmingCharacters(in: .whitespaces).isEmpty
         let normalized = amountText.replacingOccurrences(of: ",", with: ".")
-        let hasAmount = (Double(normalized) ?? 0) > 0
+        let amount = Double(normalized) ?? 0
+        let hasAmount = amount.isFinite && amount >= 0.005 && amount < Double(Int.max / 100)
         let cardOK = effectivePaymentChannel != "credit_card" || effectiveCreditCardId != nil
-        return hasDescription && hasAmount && cardOK
+        return hasDescription && hasAmount && cardOK && ["cash", "credit_card"].contains(paymentChannel)
     }
 
     private var paymentOptions: [ToggleOption] {
@@ -295,11 +321,19 @@ struct ExpenseFormSheet: View {
             return
         }
         let normalized = amountText.replacingOccurrences(of: ",", with: ".")
-        guard let amount = Double(normalized), amount > 0 else {
+        guard let amount = Double(normalized), amount.isFinite, amount > 0, amount < Double(Int.max / 100) else {
             errorMessage = "Enter a valid amount."
             return
         }
+        guard ["cash", "credit_card"].contains(paymentChannel) else {
+            errorMessage = "Choose a payment method."
+            return
+        }
         let cents = Int((amount * 100).rounded())
+        guard cents > 0 else {
+            errorMessage = "Enter an amount of at least 0.01."
+            return
+        }
         if effectivePaymentChannel == "credit_card" {
             guard effectiveCreditCardId != nil else {
                 errorMessage = creditCards.isEmpty ? "Add a credit card first." : "Select a credit card."
@@ -309,15 +343,32 @@ struct ExpenseFormSheet: View {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
         let dateStr = f.string(from: selectedDate)
-        onSave(CreateExpenseBody(
+        let body = CreateExpenseBody(
             description: description,
             amountCents: cents,
             occurredAt: dateStr,
             categoryId: selectedCategoryId,
             paymentChannel: effectivePaymentChannel,
             creditCardId: effectiveCreditCardId
-        ))
-        dismiss()
+        )
+        if let saveAction {
+            guard !isSaving else { return }
+            isSaving = true
+            errorMessage = nil
+            Task { @MainActor in
+                defer { isSaving = false }
+                do {
+                    try await saveAction(body)
+                    NotificationCenter.default.post(name: .expenseAutomationSaved, object: nil)
+                    dismiss()
+                } catch {
+                    errorMessage = error.localizedDescription
+                }
+            }
+        } else {
+            onSave(body)
+            dismiss()
+        }
     }
 
     private static func formatAmount(_ cents: Int) -> String {

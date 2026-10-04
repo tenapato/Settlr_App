@@ -255,6 +255,9 @@ struct ActivityView: View {
 
     private var activityLifecycle: some View {
         activityFormSheets
+        .onReceive(NotificationCenter.default.publisher(for: .expenseAutomationSaved)) { _ in
+            Task { await reloadActivityIfCurrentWorkspace() }
+        }
         .task(id: workspaceId) {
             showExpenseForm = false
             showIncomeForm = false
