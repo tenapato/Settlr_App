@@ -10,6 +10,7 @@ struct ExpenseFormSheet: View {
     let onSave: (CreateExpenseBody) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppState.self) private var appState
 
     @State private var description: String
     @State private var amountText: String
@@ -20,6 +21,21 @@ struct ExpenseFormSheet: View {
     @State private var selectedCreditCardId: String?
     @State private var errorMessage: String?
     @State private var isSaving = false
+    @State private var cardLoadError: String?
+    @State private var splitChoice = ""
+    @State private var splitVM = BillSplitVM()
+    @State private var selectedSplitId: String?
+    @State private var showNewSplit = false
+    @State private var splitWasSaved = false
+
+    private var isWalletPayment: Bool { automationDraft?.isWalletPayment == true }
+    private var canLinkSplit: Bool {
+        automationDraft != nil && (appState.currentUser?.has(.billSplits) ?? false)
+    }
+    private var selectedSplit: BillSplit? {
+        guard let selectedSplitId, splitVM.detail?.id == selectedSplitId else { return nil }
+        return splitVM.detail
+    }
     @FocusState private var amountFocused: Bool
     @FocusState private var descriptionFocused: Bool
 
@@ -54,7 +70,7 @@ struct ExpenseFormSheet: View {
             _amountText = State(initialValue: automationDraft?.amountText ?? "")
             _selectedDate = State(initialValue: automationDraft?.createdAt ?? Date())
             _selectedCategoryId = State(initialValue: nil)
-            _paymentChannel = State(initialValue: automationDraft == nil ? "cash" : "")
+            _paymentChannel = State(initialValue: automationDraft?.isWalletPayment == true ? "credit_card" : (automationDraft == nil ? "cash" : ""))
             _selectedCreditCardId = State(initialValue: nil)
         }
     }
@@ -97,6 +113,7 @@ struct ExpenseFormSheet: View {
 
                         paymentSection
                         cardSection
+                        if canLinkSplit { splitSection }
 
                         if let error = errorMessage {
                             Text(error)
@@ -105,7 +122,7 @@ struct ExpenseFormSheet: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
-                        Button(isSaving ? "Saving…" : (isEditing ? "Save Changes" : "Add Expense")) { save() }
+                        Button(isSaving ? "Saving…" : saveButtonTitle) { save() }
                             .buttonStyle(PrimaryButtonStyle())
                             .disabled(!isValid || isSaving)
                             .padding(.top, 4)
@@ -134,7 +151,21 @@ struct ExpenseFormSheet: View {
             }
         }
         .preferredColorScheme(.dark)
-        .task { await loadCreditCards() }
+        .task {
+            await loadCreditCards()
+            if canLinkSplit { await splitVM.load(workspaceId: workspaceId) }
+        }
+        .sheet(isPresented: $showNewSplit, onDismiss: {
+            if splitWasSaved { completeAutomationSave() }
+        }) {
+            SplitCreateSheet(
+                workspaceId: workspaceId,
+                vm: splitVM,
+                automationExpense: expenseBody,
+                walletPayment: isWalletPayment,
+                onSaved: { _ in splitWasSaved = true }
+            )
+        }
         .onAppear { if !isEditing && amountText.isEmpty { amountFocused = true } }
         .onChange(of: paymentChannel) { _, newValue in
             if newValue == "credit_card" {
@@ -171,23 +202,85 @@ struct ExpenseFormSheet: View {
         }
     }
 
-    private var paymentSection: some View {
+    private var saveButtonTitle: String {
+        if isEditing { return "Save Changes" }
+        if canLinkSplit && splitChoice == "new" { return "Continue to Bill Split" }
+        if canLinkSplit && splitChoice == "existing" { return "Link Payment to Split" }
+        return "Add Expense"
+    }
+
+    private var splitSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionEyebrow(paymentChannel.isEmpty ? "Choose Payment Method" : "Payment Method")
-                .padding(.leading, 4)
-            SegmentedToggle(
-                selection: $paymentChannel,
-                options: [
-                    ToggleOption(value: "cash", label: "Cash", icon: "banknote.fill"),
-                    ToggleOption(value: "credit_card", label: "Credit Card", icon: "creditcard.fill")
-                ]
-            )
+            SectionEyebrow("Is this a bill split?")
+            SegmentedToggle(selection: $splitChoice, options: [
+                ToggleOption(value: "no", label: "No", icon: "person"),
+                ToggleOption(value: "existing", label: "Existing", icon: "person.2"),
+                ToggleOption(value: "new", label: "New", icon: "plus")
+            ])
+            if splitChoice == "existing" {
+                if splitVM.isLoading {
+                    ProgressView("Loading splits…")
+                } else if let error = splitVM.errorMessage {
+                    Text(error).font(.footnote).foregroundStyle(Theme.expense)
+                    Button("Try Again") { Task { await splitVM.load(workspaceId: workspaceId) } }
+                } else if splitVM.splits.isEmpty {
+                    Text("No bill splits in this workspace. Choose New to create one.")
+                        .font(.footnote).foregroundStyle(Theme.muted)
+                } else {
+                    FormCard {
+                        FormMenuRow(label: "Bill split", value: selectedSplit?.merchant ?? "Choose split", isPlaceholder: selectedSplit == nil) {
+                            ForEach(splitVM.splits) { split in
+                                Button("\(split.merchant) · \(String(split.occurredAt.prefix(10))) · \(formatSplitMoney(split.totalCents, currency: split.currency))") {
+                                    selectedSplitId = split.id
+                                    Task { await splitVM.loadDetail(workspaceId: workspaceId, splitId: split.id) }
+                                }
+                            }
+                        }
+                    }
+                    Text("The selected card will be applied to this split's expense.")
+                        .font(.footnote).foregroundStyle(Theme.muted)
+                    if let selectedSplit, !paymentMatches(selectedSplit) {
+                        Text("The payment must match your expense amount in this split. Check the amount or choose another split.")
+                            .font(.footnote).foregroundStyle(Theme.warning)
+                    }
+                }
+            }
+        }
+    }
+
+    private func paymentMatches(_ split: BillSplit) -> Bool {
+        guard let body = expenseBody else { return false }
+        return AutomationSplitPayment.matches(amountCents: body.amountCents, currency: body.currency, split: split)
+    }
+
+    @ViewBuilder
+    private var paymentSection: some View {
+        if isWalletPayment {
+            Label("Apple Pay · Card", systemImage: "creditcard")
+                .font(.subheadline).foregroundStyle(Theme.muted)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                SectionEyebrow(paymentChannel.isEmpty ? "Choose Payment Method" : "Payment Method")
+                    .padding(.leading, 4)
+                SegmentedToggle(
+                    selection: $paymentChannel,
+                    options: [
+                        ToggleOption(value: "cash", label: "Cash", icon: "banknote.fill"),
+                        ToggleOption(value: "credit_card", label: "Credit Card", icon: "creditcard.fill")
+                    ]
+                )
+            }
         }
     }
 
     @ViewBuilder
     private var cardSection: some View {
         if paymentChannel == "credit_card" {
+            if let cardLoadError {
+                Text(cardLoadError).font(.footnote).foregroundStyle(Theme.warning)
+                Button("Reload Cards") { Task { await loadCreditCards() } }
+            }
             if creditCards.isEmpty {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -218,7 +311,9 @@ struct ExpenseFormSheet: View {
         let amount = Double(normalized) ?? 0
         let hasAmount = amount.isFinite && amount >= 0.005 && amount < Double(Int.max / 100)
         let cardOK = paymentChannel != "credit_card" || selectedCreditCardId != nil
-        return hasDescription && hasAmount && cardOK && ["cash", "credit_card"].contains(paymentChannel)
+        let splitOK = !canLinkSplit || splitChoice == "no" || splitChoice == "new"
+            || (splitChoice == "existing" && selectedSplit.map(paymentMatches) == true && !splitVM.isLoading)
+        return hasDescription && hasAmount && cardOK && splitOK && ["cash", "credit_card"].contains(paymentChannel)
     }
 
     private var categoryValueLabel: String {
@@ -246,20 +341,39 @@ struct ExpenseFormSheet: View {
 
     @MainActor
     private func loadCreditCards() async {
+        cardLoadError = nil
         do {
             let resp: CreditCardsResponse = try await APIClient.shared.fetch(Endpoints.creditCards(workspaceId))
-            creditCards = resp.creditCards
+            creditCards = resp.creditCards.filter { !$0.isArchived || $0.id == expense?.creditCardId }
+            if isWalletPayment && selectedCreditCardId == nil {
+                selectedCreditCardId = WalletCardMatcher.match(automationDraft?.card ?? "", cards: creditCards)
+            }
             ensureDefaultCreditCard()
         } catch {
-            creditCards = []
+            cardLoadError = "Couldn’t load cards. Try again before saving."
         }
     }
 
     private func ensureDefaultCreditCard() {
-        guard paymentChannel == "credit_card", !creditCards.isEmpty else { return }
+        guard paymentChannel == "credit_card", !creditCards.isEmpty, !isWalletPayment else { return }
         if selectedCreditCardId == nil || !creditCards.contains(where: { $0.id == selectedCreditCardId }) {
             selectedCreditCardId = creditCards[0].id
         }
+    }
+
+    private var expenseBody: CreateExpenseBody? {
+        guard let amount = Double(amountText.replacingOccurrences(of: ",", with: ".")),
+              amount.isFinite, amount >= 0.005, amount < Double(Int.max / 100) else { return nil }
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return CreateExpenseBody(description: description, amountCents: Int((amount * 100).rounded()),
+            occurredAt: f.string(from: selectedDate), categoryId: selectedCategoryId,
+            paymentChannel: paymentChannel, creditCardId: paymentChannel == "credit_card" ? selectedCreditCardId : nil)
+    }
+
+    private func completeAutomationSave() {
+        NotificationCenter.default.post(name: .expenseAutomationSaved, object: nil)
+        dismiss()
     }
 
     private func save() {
@@ -298,6 +412,25 @@ struct ExpenseFormSheet: View {
             paymentChannel: paymentChannel,
             creditCardId: paymentChannel == "credit_card" ? selectedCreditCardId : nil
         )
+        if canLinkSplit && splitChoice == "new" {
+            showNewSplit = true
+            return
+        }
+        if canLinkSplit && splitChoice == "existing" {
+            guard let split = selectedSplit, paymentMatches(split), !isSaving else { return }
+            isSaving = true
+            errorMessage = nil
+            Task { @MainActor in
+                defer { isSaving = false }
+                let saved = await splitVM.updatePaymentMethod(workspaceId: workspaceId, splitId: split.id,
+                    body: BillSplitPaymentMethodBody(version: split.version, paymentChannel: body.paymentChannel,
+                        creditCardId: body.creditCardId))
+                if saved { completeAutomationSave() }
+                else { errorMessage = splitVM.errorMessage }
+            }
+            return
+        }
+        guard !canLinkSplit || splitChoice == "no" else { return }
         if let saveAction {
             guard !isSaving else { return }
             isSaving = true

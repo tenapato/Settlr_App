@@ -164,6 +164,19 @@ struct SplitDraft {
         scanWarnings = []
     }
 
+    init(automationExpense: CreateExpenseBody) {
+        self.init()
+        merchant = automationExpense.description
+        occurredAt = Self.day(from: automationExpense.occurredAt) ?? Date()
+        splitMode = "even"
+        selectedTotalCents = automationExpense.amountCents
+        items = [Item(name: automationExpense.description, unitPriceCents: automationExpense.amountCents)]
+        paymentChannel = automationExpense.paymentChannel
+        creditCardId = automationExpense.creditCardId
+        categoryId = automationExpense.categoryId
+        participants.append(.init(id: nil, name: "", isOrganizer: false))
+    }
+
     var filledItems: [Item] { items.filter { !$0.isBlank } }
     var unverifiedItems: [Item] { filledItems.filter { $0.verification == .unverified } }
     var itemSubtotalCents: Int { filledItems.reduce(0) { $0 + $1.lineTotalCents } }
@@ -230,7 +243,8 @@ struct SplitDraft {
                 let name = participant.name.trimmingCharacters(in: .whitespacesAndNewlines)
                 return name.isEmpty ? "Person \(index + 2)" : name
             },
-            mismatchAcknowledged: mismatchAcknowledged ? true : nil
+            mismatchAcknowledged: mismatchAcknowledged ? true : nil,
+            categoryId: categoryId
         )
     }
 

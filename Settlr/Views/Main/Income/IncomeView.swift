@@ -141,12 +141,10 @@ struct IncomeView: View {
     private var incomeFilterChipsRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                FilterChip(label: "Category", value: incomeCategoryValue) {
-                    Button("Any") { vm.filterCategoryId = nil }
-                    ForEach(vm.categories) { cat in
-                        Button(cat.name) { vm.filterCategoryId = cat.id }
-                    }
-                }
+                FilterChip(label: "Category", value: incomeCategoryValue, selectedId: vm.filterCategoryId,
+                    options: [FilterOption(id: nil, title: "Any", icon: "square.grid.2x2")]
+                        + vm.categories.map { FilterOption(id: $0.id, title: $0.name, icon: "tag") }
+                ) { vm.filterCategoryId = $0 }
 
                 if vm.hasActiveFilter {
                     Button {

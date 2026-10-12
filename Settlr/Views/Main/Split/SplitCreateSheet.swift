@@ -14,6 +14,8 @@ struct SplitCreateSheet: View {
     var notice: String?
     /// Non-nil uses this same form as the complete, versioned split editor.
     var editingSplit: BillSplit? = nil
+    var automationExpense: CreateExpenseBody? = nil
+    var walletPayment: Bool = false
     let onSaved: (SplitSaveOutcome) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -344,6 +346,9 @@ struct SplitCreateSheet: View {
             openedEditVersion = editingSplit.version
             totalEdited = true
             hasScanned = true
+        } else if let automationExpense {
+            draft = SplitDraft(automationExpense: automationExpense)
+            totalEdited = true
         } else if let prefill {
             applyScan(prefill)
         } else if draft.participants.count == 1 {
@@ -928,13 +933,18 @@ struct SplitCreateSheet: View {
     private var paymentSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionEyebrow("You paid with")
-            SegmentedToggle(
-                selection: $draft.paymentChannel,
-                options: [
-                    ToggleOption(value: "cash", label: "Cash / debit", icon: "banknote"),
-                    ToggleOption(value: "credit_card", label: "Credit card", icon: "creditcard"),
-                ]
-            )
+            if walletPayment {
+                Label("Apple Pay · Card", systemImage: "creditcard")
+                    .font(.subheadline).foregroundStyle(Theme.muted)
+            } else {
+                SegmentedToggle(
+                    selection: $draft.paymentChannel,
+                    options: [
+                        ToggleOption(value: "cash", label: "Cash / debit", icon: "banknote"),
+                        ToggleOption(value: "credit_card", label: "Credit card", icon: "creditcard"),
+                    ]
+                )
+            }
             if draft.paymentChannel == "credit_card" {
                 FormCard {
                     FormMenuRow(

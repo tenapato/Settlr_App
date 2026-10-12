@@ -2,34 +2,81 @@ import SwiftUI
 
 // MARK: - FilterChip (shared with IncomeView)
 
-struct FilterChip<Content: View>: View {
+struct FilterOption: Identifiable {
+    let id: String?
+    let title: String
+    let icon: String
+}
+
+struct FilterChip: View {
     let label: String
     let value: String
-    @ViewBuilder let content: () -> Content
+    let selectedId: String?
+    let options: [FilterOption]
+    let onSelect: (String?) -> Void
+    @State private var isPresented = false
 
-    var isActive: Bool { value != "Any" }
+    private var isActive: Bool { selectedId != nil }
 
     var body: some View {
-        Menu {
-            content()
-        } label: {
+        Button { isPresented = true } label: {
             HStack(spacing: 4) {
                 Text(isActive ? "\(label): \(value)" : label)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(isActive ? Color(hex: "#0e0f11") : Color(hex: "#8e9197"))
-                    .lineLimit(1)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(isActive ? Color(hex: "#0e0f11").opacity(0.6) : Color(hex: "#5a5d63"))
+                    .font(.system(size: 12, weight: .semibold)).lineLimit(1)
+                Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(isActive ? Color(hex: "#c8ff5a") : Color(hex: "#1c1f23"))
-                    .overlay(Capsule().strokeBorder(isActive ? Color.clear : Color(hex: "#2a2d32"), lineWidth: 1))
-            )
-            .fixedSize(horizontal: true, vertical: false)
+            .foregroundStyle(isActive ? Theme.bg : Theme.muted)
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(isActive ? Theme.accent : Theme.surface2, in: Capsule())
+            .overlay(Capsule().strokeBorder(isActive ? Color.clear : Theme.line, lineWidth: 1))
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $isPresented) {
+            VStack(spacing: 12) {
+                HStack {
+                    Text(label).font(.title3.weight(.semibold))
+                    Spacer()
+                    Button("Done") { isPresented = false }.foregroundStyle(Theme.muted)
+                }
+                .padding(.horizontal, 24).padding(.top, 28)
+                ScrollView {
+                    VStack(spacing: 4) {
+                        ForEach(options) { option in
+                            Button {
+                                onSelect(option.id)
+                                isPresented = false
+                            } label: {
+                                HStack(spacing: 16) {
+                                    Image(systemName: option.icon).font(.system(size: 22))
+                                        .frame(width: 28)
+                                    Text(option.title).font(.body).multilineTextAlignment(.leading)
+                                    Spacer(minLength: 12)
+                                    if option.id == selectedId {
+                                        Image(systemName: "checkmark").font(.body.weight(.semibold))
+                                    }
+                                }
+                                .foregroundStyle(Theme.ink)
+                                .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+                                .padding(.horizontal, 16).padding(.vertical, 4)
+                                .background(option.id == selectedId ? Theme.surface2 : Color.clear,
+                                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityAddTraits(option.id == selectedId ? [.isSelected] : [])
+                        }
+                    }
+                    .padding(.horizontal, 16).padding(.bottom, 24)
+                }
+            }
+            .foregroundStyle(Theme.ink)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(32)
+            .presentationBackground(Color(hex: "#121212"))
+            .preferredColorScheme(.dark)
         }
     }
 }
@@ -150,27 +197,23 @@ struct ExpensesView: View {
     private var filterChipsRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                FilterChip(label: "Channel", value: channelValue) {
-                    Button("Any") { vm.filterChannel = nil }
-                    Button("Cash") { vm.filterChannel = "cash" }
-                    Button("Card") { vm.filterChannel = "credit_card" }
-                }
+                FilterChip(label: "Channel", value: channelValue, selectedId: vm.filterChannel, options: [
+                    FilterOption(id: nil, title: "Any", icon: "line.3.horizontal.decrease"),
+                    FilterOption(id: "cash", title: "Cash", icon: "banknote"),
+                    FilterOption(id: "credit_card", title: "Card", icon: "creditcard")
+                ]) { vm.filterChannel = $0 }
 
                 if !vm.cards.isEmpty {
-                    FilterChip(label: "Card", value: cardValue) {
-                        Button("Any") { vm.filterCardId = nil }
-                        ForEach(vm.cards) { card in
-                            Button(card.label) { vm.filterCardId = card.id }
-                        }
-                    }
+                    FilterChip(label: "Card", value: cardValue, selectedId: vm.filterCardId,
+                        options: [FilterOption(id: nil, title: "Any", icon: "creditcard")]
+                            + vm.cards.map { FilterOption(id: $0.id, title: $0.label, icon: "creditcard") }
+                    ) { vm.filterCardId = $0 }
                 }
 
-                FilterChip(label: "Category", value: categoryValue) {
-                    Button("Any") { vm.filterCategoryId = nil }
-                    ForEach(vm.categories) { cat in
-                        Button(cat.name) { vm.filterCategoryId = cat.id }
-                    }
-                }
+                FilterChip(label: "Category", value: categoryValue, selectedId: vm.filterCategoryId,
+                    options: [FilterOption(id: nil, title: "Any", icon: "square.grid.2x2")]
+                        + vm.categories.map { FilterOption(id: $0.id, title: $0.name, icon: "tag") }
+                ) { vm.filterCategoryId = $0 }
 
                 if vm.hasActiveFilter {
                     Button {

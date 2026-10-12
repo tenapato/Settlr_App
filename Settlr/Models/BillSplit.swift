@@ -659,11 +659,12 @@ struct CreateBillSplitBody: Codable {
     var participantNames: [String]? = nil
     /// Audit-only acknowledgement; never changes the user's selected total.
     var mismatchAcknowledged: Bool? = nil
+    var categoryId: String? = nil
 
     private enum CodingKeys: String, CodingKey {
         case merchant, occurredAt, items, taxCents, tipCents, feeCents, totalCents
         case paymentChannel, creditCardId, idempotencyKey, payer, splitMode
-        case participantCount, participantNames, mismatchAcknowledged
+        case participantCount, participantNames, mismatchAcknowledged, categoryId
     }
 
     init(
@@ -681,7 +682,8 @@ struct CreateBillSplitBody: Codable {
         splitMode: String? = nil,
         participantCount: Int? = nil,
         participantNames: [String]? = nil,
-        mismatchAcknowledged: Bool? = nil
+        mismatchAcknowledged: Bool? = nil,
+        categoryId: String? = nil
     ) {
         self.merchant = merchant
         self.occurredAt = occurredAt
@@ -698,6 +700,7 @@ struct CreateBillSplitBody: Codable {
         self.participantCount = participantCount
         self.participantNames = participantNames
         self.mismatchAcknowledged = mismatchAcknowledged
+        self.categoryId = categoryId
     }
 
     init(from decoder: Decoder) throws {
@@ -717,6 +720,7 @@ struct CreateBillSplitBody: Codable {
         participantCount = try values.decodeIfPresent(Int.self, forKey: .participantCount)
         participantNames = try values.decodeIfPresent([String].self, forKey: .participantNames)
         mismatchAcknowledged = try values.decodeIfPresent(Bool.self, forKey: .mismatchAcknowledged)
+        categoryId = try values.decodeIfPresent(String.self, forKey: .categoryId)
     }
 }
 

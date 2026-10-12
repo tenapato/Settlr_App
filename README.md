@@ -150,9 +150,14 @@ expense or split form is preserved and must be closed before the next draft
 opens. Settings closes automatically for an incoming request. Signing out
 clears queued requests. Force-quitting
 loses unsaved drafts. The review shows the destination workspace and Wallet
-card label, and requires an explicit payment-method choice. Wallet card names
-are not automatically matched to Settlr cards. The existing ledger supports
-cash and credit cards; choose the appropriate method in that ledger. Amounts
+card label. Wallet payments use credit cards and match a unique active card by
+last four digits or card label. Missing or ambiguous matches require choosing a
+card. Quick Expense still offers cash and credit cards. When bill splits are
+enabled, both actions ask whether this is a regular expense, an existing split,
+or a new split. Linking an existing split checks the payment amount and updates
+its versioned payment record without creating another expense. A new split
+starts with the reviewed merchant, amount, date, category and card and uses the
+existing split save queue. Amounts
 use the existing ledger currency and are not converted. A failed save keeps the
 editable form and displays the server error. Nothing is saved until confirmed.
 
