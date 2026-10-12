@@ -8,6 +8,7 @@ struct SavingsRecurringSheet: View {
     @State private var showForm = false
     @State private var editingRule: RecurringSavings?
     @State private var ruleToDelete: RecurringSavings?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         NavigationStack {
@@ -34,9 +35,11 @@ struct SavingsRecurringSheet: View {
                     } label: {
                         Image(systemName: "plus")
                             .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(Theme.accent)
+                            .foregroundStyle(Theme.accentText)
+                            .frame(width: 44, height: 44)
                     }
                     .disabled(vm.accounts.isEmpty)
+                    .accessibilityLabel("Add recurring savings")
                 }
             }
             .sheet(isPresented: $showForm) {
@@ -85,9 +88,8 @@ struct SavingsRecurringSheet: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
                 }
             }
-            .animation(.easeOut(duration: 0.2), value: ruleToDelete != nil)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: ruleToDelete != nil)
         }
-        .preferredColorScheme(.dark)
     }
 
     private var emptyState: some View {
@@ -111,7 +113,7 @@ struct SavingsRecurringSheet: View {
                 } label: {
                     Text("Schedule deposit")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Theme.bg)
+                        .foregroundStyle(Theme.buttonInk)
                         .padding(.horizontal, 24)
                         .padding(.vertical, 12)
                         .background(Theme.accent)
@@ -171,8 +173,9 @@ struct SavingsRecurringSheet: View {
                             }
                         }
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.accentText)
                         .buttonStyle(.plain)
+                        .frame(minWidth: 44, minHeight: 44)
 
                         Button {
                             editingRule = rule
@@ -181,9 +184,10 @@ struct SavingsRecurringSheet: View {
                             Image(systemName: "pencil")
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(Theme.muted)
-                                .frame(width: 32, height: 32)
+                                .frame(width: 44, height: 44)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("Edit recurring savings")
 
                         Button {
                             ruleToDelete = rule
@@ -191,9 +195,10 @@ struct SavingsRecurringSheet: View {
                             Image(systemName: "trash")
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(Theme.expense)
-                                .frame(width: 32, height: 32)
+                                .frame(width: 44, height: 44)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("Delete recurring savings")
                     }
                 }
                 .padding(.vertical, 4)
@@ -267,36 +272,38 @@ struct SavingsRecurringFormSheet: View {
 
                 ScrollView {
                     VStack(spacing: 20) {
-                        HeroAmountField(amountText: $amountText, tint: Theme.income, focus: $amountFocused)
+                        HeroAmountField(
+                            amountText: $amountText,
+                            tint: Theme.income,
+                            focus: $amountFocused,
+                            errorMessage: errorMessage
+                        )
 
-                        FormCard {
-                            FormTextRow(
-                                label: "Description",
-                                placeholder: "CETES, payday save…",
-                                text: $description,
-                                focus: $descriptionFocused
-                            )
-                            FormRowDivider()
+                        VStack(spacing: 0) {
+                            SignalFormRow(label: "Description") {
+                                TextField("CETES, payday save…", text: $description)
+                                    .focused($descriptionFocused)
+                                    .autocorrectionDisabled()
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(Theme.ink)
+                                    .multilineTextAlignment(.trailing)
+                            }
                             accountRow
-                            FormRowDivider()
                             frequencyRow
-                            FormRowDivider()
                             startDateRow
-                            FormRowDivider()
-                            FormTextRow(label: "Notes", placeholder: "Optional", text: $notes)
+                            SignalFormRow(label: "Notes") {
+                                TextField("Optional", text: $notes)
+                                    .autocorrectionDisabled()
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(Theme.ink)
+                                    .multilineTextAlignment(.trailing)
+                            }
                         }
 
                         Text("Deposits are created automatically from the start date onward, including occurrences already due.")
                             .font(.system(size: 12))
                             .foregroundStyle(Theme.faint)
                             .frame(maxWidth: .infinity, alignment: .leading)
-
-                        if let error = errorMessage {
-                            Text(error)
-                                .font(.system(size: 13))
-                                .foregroundStyle(Theme.expense)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
 
                         Button(isEditing ? "Save Changes" : "Schedule Deposits") {
                             save()
@@ -321,50 +328,68 @@ struct SavingsRecurringFormSheet: View {
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button("Done") { amountFocused = false; descriptionFocused = false }
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.accentText)
                         .fontWeight(.semibold)
                 }
             }
         }
-        .preferredColorScheme(.dark)
         .onAppear { if !isEditing { amountFocused = true } }
     }
 
     // MARK: - Sections
 
     private var accountRow: some View {
-        FormMenuRow(
-            label: "Account",
-            value: accounts.first(where: { $0.id == accountId })?.name ?? "Select",
-            isPlaceholder: accountId.isEmpty
-        ) {
-            ForEach(accounts) { account in
-                Button(account.name) { accountId = account.id }
+        SignalNativeFormRow {
+            Menu {
+                ForEach(accounts) { account in
+                    Button(account.name) { accountId = account.id }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Text("Account")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Theme.muted)
+                    Spacer(minLength: 16)
+                    Text(accounts.first(where: { $0.id == accountId })?.name ?? "Select")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(accountId.isEmpty ? Theme.faint : Theme.ink)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.faint)
+                }
             }
         }
     }
 
     private var frequencyRow: some View {
-        FormMenuRow(label: "Repeats", value: frequency.label, isPlaceholder: false) {
-            ForEach(SavingsFrequency.allCases, id: \.self) { option in
-                Button(option.label) { frequency = option }
+        SignalNativeFormRow {
+            Menu {
+                ForEach(SavingsFrequency.allCases, id: \.self) { option in
+                    Button(option.label) { frequency = option }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Text("Repeats")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Theme.muted)
+                    Spacer(minLength: 16)
+                    Text(frequency.label)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Theme.ink)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.faint)
+                }
             }
         }
     }
 
     private var startDateRow: some View {
-        HStack(spacing: 12) {
-            Text("Starts")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Theme.muted)
-            Spacer()
-            DatePicker("", selection: $startDate, displayedComponents: .date)
-                .labelsHidden()
+        SignalNativeFormRow {
+            DatePicker("Starts", selection: $startDate, displayedComponents: .date)
                 .datePickerStyle(.compact)
                 .tint(Theme.accent)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 9)
     }
 
     // MARK: - Derived

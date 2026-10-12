@@ -34,10 +34,51 @@ if /usr/libexec/PlistBuddy -c 'Print :UIDeviceFamily' "$plist" >/dev/null 2>&1; 
   exit 1
 fi
 
-if ! rg -U -q 'final class APIClient \{\n[[:space:]]+@MainActor\n[[:space:]]+static let shared = APIClient\(\)' "$api_client"; then
-  echo "APIClient.shared must be main-actor isolated with its initializer." >&2
+if ! rg -U -q '^@MainActor\nfinal class APIClient \{\n[[:space:]]+static let shared = APIClient\(\)' "$api_client"; then
+  echo "APIClient must be a main-actor type with an unannotated shared initializer." >&2
   exit 1
 fi
+
+consumer_files="
+Settlr/State/AppState.swift:AppState
+Settlr/ViewModels/AuthViewModel.swift:AuthViewModel
+Settlr/ViewModels/WorkspacePickerVM.swift:WorkspacePickerVM
+Settlr/ViewModels/DashboardVM.swift:DashboardVM
+Settlr/ViewModels/ExpensesVM.swift:ExpensesVM
+Settlr/ViewModels/IncomeVM.swift:IncomeVM
+Settlr/ViewModels/BillSplitVM.swift:BillSplitVM
+Settlr/ViewModels/TelegramSettingsVM.swift:TelegramSettingsVM
+Settlr/Views/Main/Savings/SavingsVM.swift:SavingsVM
+Settlr/Views/Main/CardsView.swift:CardsVM
+Settlr/Views/Main/CardPaymentsView.swift:CardPaymentsVM
+Settlr/Views/Main/CategoriesView.swift:CategoriesVM
+"
+while IFS=: read -r consumer_file consumer_type; do
+  [ -n "$consumer_file" ] || continue
+  if ! rg -U -q "^@MainActor\n@Observable\nfinal class ${consumer_type}|^@Observable\n@MainActor\nfinal class ${consumer_type}" "$consumer_file"; then
+    echo "$consumer_type must be class-level @MainActor isolated." >&2
+    exit 1
+  fi
+done <<EOF
+$consumer_files
+EOF
+
+if ! rg -q 'TextField\("", text: \$amountText, prompt:' Settlr/Views/Components/FormControls.swift; then
+  echo "HeroAmountField must use a valid labeled TextField initializer." >&2
+  exit 1
+fi
+
+for load_file in Settlr/Views/Main/Savings/SavingsVM.swift Settlr/ViewModels/ActivityVM.swift; do
+  if [ "$load_file" = Settlr/Views/Main/Savings/SavingsVM.swift ]; then
+    cleanup_pattern='defer \{\n[[:space:]]+if generation == loadGeneration, activeWorkspaceID == workspaceId \{\n[[:space:]]+isLoading = false\n[[:space:]]+\}\n[[:space:]]+\}'
+  else
+    cleanup_pattern='defer \{\n[[:space:]]+if generation == loadGeneration, activeWorkspaceID == workspaceId \{\n[[:space:]]+isLoading = false\n[[:space:]]+hasLoaded = true\n[[:space:]]+\}\n[[:space:]]+\}'
+  fi
+  if ! rg -U -q "$cleanup_pattern" "$load_file"; then
+    echo "$load_file must conditionally clear isLoading without returning from defer." >&2
+    exit 1
+  fi
+done
 
 if ! rg -q 'final class CameraController: NSObject, @unchecked Sendable' "$receipt_capture"; then
   echo "CameraController must document its manually synchronized Sendable boundary." >&2

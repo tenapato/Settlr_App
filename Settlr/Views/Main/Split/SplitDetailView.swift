@@ -56,9 +56,14 @@ struct SplitDetailView: View {
         .sheet(isPresented: $showResult) {
             if let split {
                 NavigationStack {
-                    SplitResultView(split: split, onFinish: { showResult = false })
+                    SplitResultView(
+                        split: split,
+                        workspaceId: workspaceId,
+                        splitId: splitId,
+                        vm: vm,
+                        onFinish: { showResult = false }
+                    )
                 }
-                .preferredColorScheme(.dark)
             }
         }
         .sheet(isPresented: $showEditor) {
@@ -81,10 +86,10 @@ struct SplitDetailView: View {
                 )
             }
         }
-        .alert("Undo settlements before editing", isPresented: $showSettledEditExplanation) {
+        .alert("Undo settlements before reopening", isPresented: $showSettledEditExplanation) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("At least one person is already marked paid. Undo those settlements, then reopen the split to edit its money and items.")
+            Text("At least one person is already marked paid. Undo every settlement before reopening claiming or editing the split.")
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -93,6 +98,7 @@ struct SplitDetailView: View {
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Theme.ink)
                         .rotationEffect(.degrees(refreshSpin))
+                        .frame(width: 44, height: 44)
                 }
                 .disabled(isRefreshing)
                 .accessibilityLabel("Check for new claims")
@@ -100,13 +106,13 @@ struct SplitDetailView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     if let split {
-                        if split.isOpen {
-                            Button { showEditor = true } label: {
-                                Label("Edit split", systemImage: "pencil")
-                            }
-                        } else if split.participants.contains(where: \.isSettled) {
+                        if split.participants.contains(where: \.isSettled) {
                             Button { showSettledEditExplanation = true } label: {
                                 Label("Editing unavailable", systemImage: "lock")
+                            }
+                        } else if split.isOpen {
+                            Button { showEditor = true } label: {
+                                Label("Edit split", systemImage: "pencil")
                             }
                         } else {
                             Button { reopenAndEdit() } label: {
@@ -131,6 +137,7 @@ struct SplitDetailView: View {
                     Image(systemName: "ellipsis.circle")
                         .font(.system(size: 17))
                         .foregroundStyle(Theme.ink)
+                        .frame(width: 44, height: 44)
                 }
             }
         }
@@ -206,17 +213,19 @@ struct SplitDetailView: View {
             VStack(spacing: 18) {
                 header(split)
                 if let error = vm.errorMessage {
-                    Text(error)
+                    Text("\(error) Retry when you're ready.")
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.expense)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 paymentMethodRow(split)
+                if split.accountingPresentation.summaryMode != .reviewRequired {
+                    shareCard(split)
+                }
                 if split.accountingPresentation.summaryMode == .reviewRequired {
                     unavailablePayerCard(split)
                     closedItemsSection(split)
                 } else if split.isOpen {
-                    shareCard(split)
                     itemsSection(split)
                     peopleSection(split)
                 } else if split.isEachOwn {
@@ -324,9 +333,9 @@ struct SplitDetailView: View {
                     ShareLink(item: link.absoluteString) {
                         HStack(spacing: 8) {
                             Image(systemName: "square.and.arrow.up").font(.system(size: 15, weight: .semibold))
-                            Text("Send link").font(.system(size: 15, weight: .semibold))
+                            Text("Share split").font(.system(size: 15, weight: .semibold))
                         }
-                        .foregroundStyle(Theme.bg)
+                        .foregroundStyle(Theme.buttonInk)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                         .background(Theme.accent)
@@ -350,13 +359,11 @@ struct SplitDetailView: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("Copy link")
 
-                    Button {
-                        showQR = true
-                    } label: {
-                        Image(systemName: "qrcode")
-                            .font(.system(size: 15, weight: .semibold))
+                    Button { showQR = true } label: {
+                        Label("Show QR", systemImage: "qrcode")
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Theme.ink)
-                            .frame(width: 46, height: 44)
+                            .frame(minWidth: 112, minHeight: 44)
                             .background(Theme.surface)
                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                             .overlay(
@@ -365,7 +372,7 @@ struct SplitDetailView: View {
                             )
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Show QR code")
+                    .accessibilityLabel("Show QR")
                 }
             }
 
@@ -373,7 +380,7 @@ struct SplitDetailView: View {
             // is the fallback that always works at a table — but only where there
             // is something to tap. An even split is decided by the headcount, so
             // walking the phone around asking "what did you have" changes nothing.
-            if !split.items.isEmpty, !split.isEvenSplit {
+            if split.isOpen, !split.items.isEmpty, !split.isEvenSplit {
                 Button {
                     showPassAround = true
                 } label: {
@@ -395,14 +402,14 @@ struct SplitDetailView: View {
                 .buttonStyle(.plain)
             }
 
-            if split.isEvenSplit {
+            if split.isEvenSplit || !split.isOpen {
                 Button {
                     showResult = true
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "list.number")
                             .font(.system(size: 15, weight: .semibold))
-                        Text("Show who pays what").font(.system(size: 15, weight: .semibold))
+                        Text("Show result").font(.system(size: 15, weight: .semibold))
                     }
                     .foregroundStyle(Theme.ink)
                     .frame(maxWidth: .infinity)
@@ -418,9 +425,11 @@ struct SplitDetailView: View {
             }
 
             Text(
-                split.isEvenSplit
-                    ? "The bill is divided equally — anyone with the link sees their share. No account, no install needed."
-                    : "Anyone with the link picks their own items — no account, no install needed. It opens in the app if they have it."
+                !split.isOpen
+                    ? "This split is closed. The link still shows the final shares."
+                    : (split.isEvenSplit
+                        ? "The bill is divided equally — anyone with the link sees their share. No account, no install needed."
+                        : "Anyone with the link picks their own items — no account, no install needed. It opens in the app if they have it.")
             )
             .font(.system(size: 12))
             .foregroundStyle(Theme.faint)
@@ -458,7 +467,7 @@ struct SplitDetailView: View {
                     if person.isOrganizer {
                         Text("you")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(Theme.bg)
+                            .foregroundStyle(Theme.buttonInk)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(Theme.accent)
@@ -589,7 +598,7 @@ struct SplitDetailView: View {
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(Theme.muted)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 9)
+                        .frame(minHeight: 44)
                         .background(Theme.surface2)
                         .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                 }
@@ -603,7 +612,7 @@ struct SplitDetailView: View {
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(Theme.ink)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 9)
+                                .frame(minHeight: 44)
                                 .background(Theme.surface2)
                                 .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                         }
@@ -613,8 +622,9 @@ struct SplitDetailView: View {
                     } label: {
                         Text("Mark paid")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Theme.bg)
+                            .foregroundStyle(Theme.buttonInk)
                             .frame(maxWidth: .infinity)
+                            .frame(minHeight: 44)
                             .padding(.vertical, 9)
                             .background(Theme.accent)
                             .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
@@ -845,8 +855,9 @@ struct SplitDetailView: View {
                 }
             }
             .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(Theme.bg)
+            .foregroundStyle(Theme.buttonInk)
             .frame(maxWidth: .infinity)
+            .frame(minHeight: 44)
             .padding(.vertical, 11)
             .background(Theme.accent)
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -962,6 +973,7 @@ struct SplitDetailView: View {
                 Image(systemName: person.isSettled ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 20))
                     .foregroundStyle(person.isSettled ? Theme.income : Theme.faint)
+                    .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
             .disabled(vm.isSaving)
@@ -977,19 +989,24 @@ struct SplitDetailView: View {
 
     @ViewBuilder
     private func lockButton(_ split: BillSplit) -> some View {
+        let hasSettlements = split.participants.contains(where: \.isSettled)
         VStack(spacing: 6) {
             Button {
-                Task {
-                    _ = await vm.setStatus(
-                        workspaceId: workspaceId,
-                        splitId: splitId,
-                        status: split.isOpen ? "locked" : "open"
-                    )
+                if !split.isOpen && hasSettlements {
+                    showSettledEditExplanation = true
+                } else {
+                    Task {
+                        _ = await vm.setStatus(
+                            workspaceId: workspaceId,
+                            splitId: splitId,
+                            status: split.isOpen ? "locked" : "open"
+                        )
+                    }
                 }
             } label: {
-                Text(lockButtonTitle(split))
+                Text(!split.isOpen && hasSettlements ? "Undo settlements to reopen" : lockButtonTitle(split))
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(split.isOpen ? Theme.bg : Theme.ink)
+                    .foregroundStyle(split.isOpen ? Theme.buttonInk : Theme.ink)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(split.isOpen ? Theme.accent : Theme.surface2)
@@ -997,7 +1014,11 @@ struct SplitDetailView: View {
             }
             .disabled(vm.isSaving)
 
-            Text(lockButtonCaption(split))
+            Text(
+                !split.isOpen && hasSettlements
+                    ? "Settled shares must be undone before claiming can reopen."
+                    : lockButtonCaption(split)
+            )
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.faint)
                 .multilineTextAlignment(.center)

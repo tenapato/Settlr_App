@@ -239,7 +239,7 @@ enum SpendingInsights {
         return "\(arrow) \(sign)\(formatted)%"
     }
 
-    private static func currencyString(_ cents: Int) -> String {
+    fileprivate static func currencyString(_ cents: Int) -> String {
         let value = Double(cents) / 100.0
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
@@ -249,6 +249,86 @@ enum SpendingInsights {
         formatter.decimalSeparator = "."
         let number = formatter.string(from: NSNumber(value: value)) ?? "\(value)"
         return "MXN $\(number)"
+    }
+}
+
+extension DashboardFallbackSignal {
+    var tickerInsight: SpendingInsight {
+        let money = signedCents.map(SpendingInsights.currencyString)
+
+        switch kind {
+        case .income:
+            return SpendingInsight(
+                id: id,
+                eyebrow: "INCOME",
+                title: "Income received",
+                value: money ?? "",
+                detail: nil,
+                tone: .good,
+                swatch: nil
+            )
+        case .spending:
+            return SpendingInsight(
+                id: id,
+                eyebrow: "SPENDING",
+                title: "Spent this month",
+                value: money ?? "",
+                detail: nil,
+                tone: .bad,
+                swatch: nil
+            )
+        case .available:
+            return SpendingInsight(
+                id: id,
+                eyebrow: "AVAILABLE",
+                title: "Available this month",
+                value: money ?? "",
+                detail: nil,
+                tone: (signedCents ?? 0) < 0 ? .bad : .neutral,
+                swatch: nil
+            )
+        case .savings:
+            let movedBack = (signedCents ?? 0) > 0
+            return SpendingInsight(
+                id: id,
+                eyebrow: "SAVINGS",
+                title: movedBack ? "Moved back from savings" : "Moved to savings",
+                value: money ?? "",
+                detail: nil,
+                tone: movedBack ? .good : .neutral,
+                swatch: nil
+            )
+        case .noSpending:
+            return SpendingInsight(
+                id: id,
+                eyebrow: "SPENDING",
+                title: "No spending yet",
+                value: "This month",
+                detail: nil,
+                tone: .neutral,
+                swatch: nil
+            )
+        case .movementCount:
+            return SpendingInsight(
+                id: id,
+                eyebrow: "ACTIVITY",
+                title: "Movements this month",
+                value: "\(count ?? 0)",
+                detail: nil,
+                tone: .neutral,
+                swatch: nil
+            )
+        case .noMovement:
+            return SpendingInsight(
+                id: id,
+                eyebrow: "ACTIVITY",
+                title: "No movements yet",
+                value: "This month",
+                detail: nil,
+                tone: .neutral,
+                swatch: nil
+            )
+        }
     }
 }
 
@@ -405,11 +485,39 @@ private struct TickerLineView: View {
     }
 }
 
+private struct InsightStaticRow: View {
+    let insights: [SpendingInsight]
+    var onTap: (() -> Void)?
+    let itemSpacing: CGFloat
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: itemSpacing) {
+                ForEach(Array(insights.enumerated()), id: \.element.id) { index, insight in
+                    if let onTap {
+                        Button(action: onTap) {
+                            TickerLineView(insight: insight)
+                                .frame(minHeight: 44)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        TickerLineView(insight: insight)
+                            .frame(minHeight: 44)
+                    }
+                    if index < insights.count - 1 { TickerDot() }
+                }
+            }
+        }
+        .scrollIndicators(.hidden)
+        .frame(minHeight: 44)
+    }
+}
+
 // MARK: - Insight Ticker
 
 struct InsightTicker: View {
     let insights: [SpendingInsight]
-    var onTap: () -> Void = {}
+    var onTap: (() -> Void)?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -472,21 +580,25 @@ struct InsightTicker: View {
     }
 
     private var staticRow: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: itemSpacing) {
-                ForEach(Array(insights.enumerated()), id: \.element.id) { i, insight in
-                    Button(action: onTap) {
-                        TickerLineView(insight: insight)
-                    }
-                    .buttonStyle(.plain)
-                    if i < insights.count - 1 { TickerDot() }
-                }
-            }
-        }
-        .scrollIndicators(.hidden)
+        InsightStaticRow(insights: insights, onTap: onTap, itemSpacing: itemSpacing)
     }
 
+    @ViewBuilder
     private var animatedRow: some View {
+        if let onTap {
+            animatedTicker
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(accessibilitySummary)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction { onTap() }
+        } else {
+            animatedTicker
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(accessibilitySummary)
+        }
+    }
+
+    private var animatedTicker: some View {
         // The outer `GeometryReader` reports the PARENT's proposed width (not the very wide
         // repeated content), which is what lets `repeatCount(for:)` bound the rendered width.
         GeometryReader { outerGeo in
@@ -494,10 +606,10 @@ struct InsightTicker: View {
                 measuringCopy
                 scrollingContent(viewportWidth: outerGeo.size.width)
             }
-            .frame(width: outerGeo.size.width, height: 20, alignment: .leading)
+            .frame(width: outerGeo.size.width, height: 44, alignment: .leading)
             .clipped()
         }
-        .frame(height: 20)
+        .frame(height: 44)
         .contentShape(Rectangle())
         .gesture(dragGesture)
         .onAppear {
@@ -526,10 +638,10 @@ struct InsightTicker: View {
                 scheduleResume()
             }
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(insights.map { "\($0.title) \($0.value)" }.joined(separator: ", "))
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction { onTap() }
+    }
+
+    private var accessibilitySummary: String {
+        insights.map { "\($0.title) \($0.value)" }.joined(separator: ", ")
     }
 
     /// A single, hidden, natural-width copy used purely to measure one cycle.
@@ -603,7 +715,7 @@ struct InsightTicker: View {
                     && abs(value.translation.height) < 5
                     && Date().timeIntervalSince(touchStart ?? Date()) < 0.35
                 touchStart = nil
-                if isTap { onTap() }
+                if isTap { onTap?() }
             }
     }
 
@@ -665,32 +777,112 @@ struct SpendingInsightsTicker: View {
     let months: [MonthDataPoint]
     var onTap: () -> Void = {}
 
-    @State private var appeared = false
-
     private var insights: [SpendingInsight] {
         SpendingInsights.build(current: summary, previous: previous, months: months)
     }
 
+    private var fallback: DashboardFallbackSignalSet {
+        DashboardFallbackSignals.build(summary: summary)
+    }
+
+    private var mode: DashboardSignalSectionMode {
+        DashboardSignalSectionMode.resolve(realInsightCount: insights.count, fallback: fallback)
+    }
+
+    @ViewBuilder
     var body: some View {
-        if summary.expenseCents == 0 || summary.sortedCategories.isEmpty {
-            EmptyView()
-        } else {
-            InsightTicker(insights: insights, onTap: onTap)
-                .padding(.horizontal, 24)
-                .opacity(appeared ? 1 : 0)
-                .offset(y: appeared ? 0 : 12)
-                .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.15), value: appeared)
-                .onAppear { reveal() }
-                .onChange(of: summary.expenseCents) { _, _ in
-                    appeared = false
-                    reveal()
-                }
+        switch mode {
+        case let .spending(primaryIndex, tickerIndices):
+            spendingSection(
+                primary: insights[primaryIndex],
+                tickerInsights: tickerIndices.map { insights[$0] }
+            )
+        case let .fallback(animated):
+            fallbackSection(animated: animated)
         }
     }
 
-    private func reveal() {
-        withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.15)) {
-            appeared = true
+    private func spendingSection(
+        primary: SpendingInsight,
+        tickerInsights: [SpendingInsight]
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            signalHeader(showsSwipeHint: !tickerInsights.isEmpty)
+
+            Button(action: onTap) {
+                HStack(alignment: .bottom, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(primary.title) leads spending")
+                            .font(.title3.weight(.bold))
+                            .foregroundStyle(Theme.ink)
+                            .lineLimit(2)
+                        if let detail = primary.detail {
+                            Text(detail)
+                                .font(.caption)
+                                .foregroundStyle(Theme.muted)
+                        }
+                    }
+                    Spacer(minLength: 8)
+                    Text(primary.value)
+                        .font(.system(size: 34, weight: .bold))
+                        .monospacedDigit()
+                        .foregroundStyle(primary.tone.color)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 20)
+            .padding(.bottom, tickerInsights.isEmpty ? 0 : 14)
+
+            if !tickerInsights.isEmpty {
+                tickerRail {
+                    InsightTicker(insights: tickerInsights, onTap: onTap)
+                }
+            }
         }
+    }
+
+    private func fallbackSection(animated: Bool) -> some View {
+        let fallbackInsights = fallback.signals.map(\.tickerInsight)
+
+        return VStack(alignment: .leading, spacing: 0) {
+            signalHeader(showsSwipeHint: animated)
+
+            tickerRail {
+                if animated {
+                    InsightTicker(insights: fallbackInsights, onTap: nil)
+                } else {
+                    InsightStaticRow(insights: fallbackInsights, onTap: nil, itemSpacing: 16)
+                }
+            }
+        }
+    }
+
+    private func signalHeader(showsSwipeHint: Bool) -> some View {
+        HStack {
+            SectionEyebrow("THIS MONTH'S SIGNAL")
+            Spacer()
+            if showsSwipeHint {
+                Text("Swipe for more")
+                    .font(.caption2)
+                    .foregroundStyle(Theme.faint)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 9)
+    }
+
+    private func tickerRail<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(.horizontal, 20)
+            .overlay(alignment: .top) {
+                Rectangle().fill(Theme.line).frame(height: 1)
+            }
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(Theme.line).frame(height: 1)
+            }
     }
 }

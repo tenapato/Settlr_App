@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Settlr — Product identity moodboards</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root { color-scheme: dark; }
+    body {
+      margin: 0;
+      background: #0b0c0e;
+      color: #f4f4f0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .page { max-width: 1500px; margin: 0 auto; padding: 52px 28px 72px; }
+    .eyebrow { color: #a7aaad; font-size: 11px; font-weight: 750; letter-spacing: .16em; text-transform: uppercase; }
+    h1 { max-width: 760px; margin: 12px 0 10px; font-size: clamp(32px, 5vw, 62px); line-height: .98; letter-spacing: -.045em; }
+    .intro { max-width: 720px; margin: 0 0 36px; color: #a7aaad; font-size: 16px; line-height: 1.55; }
+    .boards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: stretch; }
+    .board {
+      position: relative; min-width: 0; padding: 12px; border: 1px solid #292c30; border-radius: 26px;
+      background: #111316; cursor: pointer; transition: transform .16s ease, border-color .16s ease;
+    }
+    .board:hover { transform: translateY(-3px); border-color: #555b62; }
+    .board.selected { border-color: #f4f4f0; outline: 2px solid rgba(244,244,240,.18); }
+    .board.selected::after {
+      content: "SELECTED"; position: absolute; top: 24px; right: 24px; z-index: 5;
+      padding: 6px 9px; border-radius: 999px; background: #f4f4f0; color: #0b0c0e;
+      font-size: 9px; font-weight: 850; letter-spacing: .12em;
+    }
+    .phone {
+      min-height: 610px; overflow: hidden; border-radius: 18px; padding: 22px 18px 18px;
+      display: flex; flex-direction: column;
+    }
+    .phone-top { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 720; }
+    .mark { display: flex; align-items: center; gap: 9px; }
+    .mark-glyph { display: grid; gap: 3px; width: 24px; }
+    .mark-glyph i { display: block; height: 3px; border-radius: 2px; }
+    .mark-glyph i:nth-child(2) { margin-left: 6px; }
+    .section-label { margin-top: 32px; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+    .balance { margin-top: 8px; font-size: clamp(35px, 3.4vw, 52px); line-height: 1; font-weight: 780; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
+    .delta { margin-top: 10px; font-size: 12px; font-weight: 700; }
+    .actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 24px; }
+    .action { padding: 13px 6px 11px; border-radius: 12px; text-align: center; font-size: 10px; font-weight: 740; }
+    .action b { display: block; margin-bottom: 7px; font-size: 17px; line-height: 1; }
+    .activity-head { display: flex; justify-content: space-between; align-items: baseline; margin: 28px 0 9px; }
+    .activity-head strong { font-size: 15px; }
+    .activity-head span { font-size: 10px; font-weight: 750; }
+    .row { display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: center; padding: 11px 0; border-bottom: 1px solid; }
+    .row-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; font-size: 10px; font-weight: 850; }
+    .row-copy strong, .row-copy span { display: block; }
+    .row-copy strong { font-size: 12px; }
+    .row-copy span { margin-top: 3px; font-size: 9px; opacity: .55; }
+    .amount { font-size: 12px; font-weight: 760; font-variant-numeric: tabular-nums; }
+    .nav { margin-top: auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; padding: 8px; border-radius: 16px; }
+    .nav span { padding: 8px 2px; text-align: center; font-size: 9px; font-weight: 700; }
+    .board-meta { padding: 20px 10px 12px; }
+    .board-id { display: flex; align-items: center; gap: 9px; }
+    .letter { width: 25px; height: 25px; display: grid; place-items: center; border: 1px solid #474b50; border-radius: 50%; color: #c5c7c9; font-size: 11px; font-weight: 800; }
+    h2 { margin: 0; font-size: 21px; letter-spacing: -.025em; }
+    .tagline { min-height: 42px; margin: 10px 0 16px; color: #9ea2a6; font-size: 13px; line-height: 1.5; }
+    .swatches { display: flex; gap: 7px; margin-bottom: 17px; }
+    .swatch { width: 30px; height: 30px; border: 1px solid rgba(255,255,255,.14); border-radius: 50%; }
+    .principles { display: flex; flex-wrap: wrap; gap: 7px; }
+    .principles span { padding: 7px 9px; border: 1px solid #2d3034; border-radius: 999px; color: #b6b9bc; font-size: 10px; }
+    .recommend { margin-top: 18px; padding: 18px 20px; border: 1px solid #2b2e32; border-radius: 18px; display: flex; gap: 14px; align-items: flex-start; }
+    .recommend strong { color: #caff3a; white-space: nowrap; font-size: 11px; letter-spacing: .1em; }
+    .recommend p { margin: 0; color: #a8abad; font-size: 13px; line-height: 1.5; }
+
+    /* A — Signal Black */
+    .signal { background: #090a0b; color: #f5f6f0; }
+    .signal .mark-glyph i, .signal .row-icon, .signal .action.primary { background: #caff3a; color: #090a0b; }
+    .signal .section-label, .signal .delta, .signal .activity-head span { color: #caff3a; }
+    .signal .action { background: #181b1e; border: 1px solid #292d31; }
+    .signal .row { border-color: #222529; }
+    .signal .nav { background: #181b1e; border: 1px solid #292d31; }
+    .signal .nav .active { color: #caff3a; }
+
+    /* B — Electric Ledger */
+    .ledger { background: #f0efe8; color: #0c1115; }
+    .ledger .mark-glyph i, .ledger .action.primary { background: #005cff; color: white; }
+    .ledger .section-label, .ledger .delta, .ledger .activity-head span { color: #005cff; }
+    .ledger .action { background: #deded6; border: 1px solid #c8c8c0; }
+    .ledger .row { border-color: #d2d1ca; }
+    .ledger .row-icon { background: #d9e4ff; color: #005cff; border-radius: 4px; }
+    .ledger .nav { background: #0c1115; color: #868b8e; }
+    .ledger .nav .active { color: white; }
+
+    /* C — Phantom Pulse */
+    .pulse { background: #121019; color: #f4f1ff; }
+    .pulse .mark-glyph i, .pulse .action.primary { background: #ab8cff; color: #121019; }
+    .pulse .section-label, .pulse .delta, .pulse .activity-head span { color: #ab8cff; }
+    .pulse .action { background: #1f1c2a; border: 1px solid #332e42; border-radius: 18px; }
+    .pulse .row { border-color: #292536; }
+    .pulse .row-icon { background: #262136; color: #c3adff; border-radius: 50%; }
+    .pulse .nav { background: #1f1c2a; }
+    .pulse .nav .active { color: #ab8cff; }
+
+    @media (max-width: 1040px) { .boards { grid-template-columns: 1fr; } .phone { min-height: 560px; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="eyebrow">Settlr identity study · direction 01</div>
+    <h1>Which Settlr should users recognize in one second?</h1>
+    <p class="intro">Three deliberately different expressions of the same product. Compare the overall attitude—not individual screen details. Each direction supports both light and dark mode in the final system.</p>
+
+    <section class="boards">
+      <article class="board" data-choice="signal-black" onclick="toggleSelect(this)">
+        <div class="phone signal">
+          <div class="phone-top"><div class="mark"><div class="mark-glyph"><i></i><i></i><i></i></div><b>SETTLR</b></div><span>•••</span></div>
+          <div class="section-label">Available this month</div>
+          <div class="balance">$18,420</div>
+          <div class="delta">↑ 12.4% ahead of July</div>
+          <div class="actions"><div class="action primary"><b>＋</b>Add</div><div class="action"><b>↗</b>Split</div><div class="action"><b>⌁</b>Scan</div></div>
+          <div class="activity-head"><strong>Latest activity</strong><span>VIEW ALL</span></div>
+          <div class="row"><div class="row-icon">FD</div><div class="row-copy"><strong>Food & drink</strong><span>Today · BBVA</span></div><div class="amount">−$428</div></div>
+          <div class="row"><div class="row-icon">SV</div><div class="row-copy"><strong>Savings</strong><span>Yesterday · Goal</span></div><div class="amount">+$1,200</div></div>
+          <div class="row"><div class="row-icon">TX</div><div class="row-copy"><strong>Card payment</strong><span>Aug 24 · Nu</span></div><div class="amount">−$2,840</div></div>
+          <div class="nav"><span class="active">Overview</span><span>Activity</span><span>Money</span><span>Profile</span></div>
+        </div>
+        <div class="board-meta"><div class="board-id"><span class="letter">A</span><h2>Signal Black</h2></div><p class="tagline">A financial instrument: precise, fast, unmistakably Settlr. The existing lime becomes a disciplined signal rather than decoration.</p><div class="swatches"><i class="swatch" style="background:#090a0b"></i><i class="swatch" style="background:#181b1e"></i><i class="swatch" style="background:#f5f6f0"></i><i class="swatch" style="background:#caff3a"></i></div><div class="principles"><span>High contrast</span><span>Dense clarity</span><span>Compact motion</span><span>Recommended</span></div></div>
+      </article>
+
+      <article class="board" data-choice="electric-ledger" onclick="toggleSelect(this)">
+        <div class="phone ledger">
+          <div class="phone-top"><div class="mark"><div class="mark-glyph"><i></i><i></i><i></i></div><b>Settlr</b></div><span>•••</span></div>
+          <div class="section-label">August position</div>
+          <div class="balance">$18,420</div>
+          <div class="delta">12.4% ahead of July</div>
+          <div class="actions"><div class="action primary"><b>＋</b>Add</div><div class="action"><b>↗</b>Split</div><div class="action"><b>⌁</b>Scan</div></div>
+          <div class="activity-head"><strong>Latest activity</strong><span>SEE LEDGER</span></div>
+          <div class="row"><div class="row-icon">01</div><div class="row-copy"><strong>Food & drink</strong><span>Today · BBVA</span></div><div class="amount">−$428</div></div>
+          <div class="row"><div class="row-icon">02</div><div class="row-copy"><strong>Savings</strong><span>Yesterday · Goal</span></div><div class="amount">+$1,200</div></div>
+          <div class="row"><div class="row-icon">03</div><div class="row-copy"><strong>Card payment</strong><span>Aug 24 · Nu</span></div><div class="amount">−$2,840</div></div>
+          <div class="nav"><span class="active">Overview</span><span>Activity</span><span>Money</span><span>Profile</span></div>
+        </div>
+        <div class="board-meta"><div class="board-id"><span class="letter">B</span><h2>Electric Ledger</h2></div><p class="tagline">Editorial and highly legible. A light-first system makes the product feel more established, analytical, and differentiated from crypto wallets.</p><div class="swatches"><i class="swatch" style="background:#f0efe8"></i><i class="swatch" style="background:#deded6"></i><i class="swatch" style="background:#0c1115"></i><i class="swatch" style="background:#005cff"></i></div><div class="principles"><span>Editorial</span><span>Light-first</span><span>Rigid grid</span><span>Data-forward</span></div></div>
+      </article>
+
+      <article class="board" data-choice="phantom-pulse" onclick="toggleSelect(this)">
+        <div class="phone pulse">
+          <div class="phone-top"><div class="mark"><div class="mark-glyph"><i></i><i></i><i></i></div><b>settlr</b></div><span>•••</span></div>
+          <div class="section-label">Your month</div>
+          <div class="balance">$18,420</div>
+          <div class="delta">↑ 12.4% ahead of July</div>
+          <div class="actions"><div class="action primary"><b>＋</b>Add</div><div class="action"><b>↗</b>Split</div><div class="action"><b>⌁</b>Scan</div></div>
+          <div class="activity-head"><strong>Latest activity</strong><span>VIEW ALL</span></div>
+          <div class="row"><div class="row-icon">FD</div><div class="row-copy"><strong>Food & drink</strong><span>Today · BBVA</span></div><div class="amount">−$428</div></div>
+          <div class="row"><div class="row-icon">SV</div><div class="row-copy"><strong>Savings</strong><span>Yesterday · Goal</span></div><div class="amount">+$1,200</div></div>
+          <div class="row"><div class="row-icon">TX</div><div class="row-copy"><strong>Card payment</strong><span>Aug 24 · Nu</span></div><div class="amount">−$2,840</div></div>
+          <div class="nav"><span class="active">Home</span><span>Activity</span><span>Cards</span><span>Profile</span></div>
+        </div>
+        <div class="board-meta"><div class="board-id"><span class="letter">C</span><h2>Phantom Pulse</h2></div><p class="tagline">The most expressive option: softer shapes, dark violet depth, and wallet-like action controls. Energetic, but closer to the crypto category.</p><div class="swatches"><i class="swatch" style="background:#121019"></i><i class="swatch" style="background:#1f1c2a"></i><i class="swatch" style="background:#f4f1ff"></i><i class="swatch" style="background:#ab8cff"></i></div><div class="principles"><span>Expressive</span><span>Wallet-native</span><span>Softer geometry</span><span>Social energy</span></div></div>
+      </article>
+    </section>
+
+    <div class="recommend"><strong>MY READ</strong><p><b>Signal Black</b> is the strongest foundation. It keeps Settlr’s recognizable lime, sharpens the geometry, and borrows Phantom’s confidence without making a personal-finance app look like a crypto wallet. Click any board to select it, then tell me what you would mix or change.</p></div>
+  </main>
+</body>
+</html>

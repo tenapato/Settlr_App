@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Settlr — Floating create control</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root { color-scheme: dark; }
+    body { margin: 0; background: #0a0b0c; color: #f4f5ef; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; -webkit-font-smoothing: antialiased; }
+    main { max-width: 1260px; margin: 0 auto; padding: 54px 28px 72px; }
+    .eyebrow { color: #caff3a; font-size: 10px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+    h1 { max-width: 760px; margin: 10px 0 12px; font-size: clamp(32px, 5vw, 56px); line-height: 1; letter-spacing: -.045em; }
+    .intro { max-width: 720px; margin: 0 0 34px; color: #9b9fa3; font-size: 15px; line-height: 1.55; }
+    .options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .option { position: relative; padding: 12px; border: 1px solid #292c30; border-radius: 25px; background: #111316; cursor: pointer; transition: .16s ease; }
+    .option:hover { transform: translateY(-3px); border-color: #555b61; }
+    .option.selected { border-color: #f3f4ee; outline: 2px solid rgba(243,244,238,.16); }
+    .option.selected::after { content: "SELECTED"; position: absolute; right: 24px; top: 24px; z-index: 5; padding: 6px 9px; border-radius: 999px; color: #090a0b; background: #f3f4ee; font-size: 9px; font-weight: 850; letter-spacing: .12em; }
+    .stage { position: relative; height: 570px; overflow: hidden; border-radius: 18px; background: #090a0b; border: 1px solid #202327; }
+    .screen { position: absolute; inset: 0; padding: 28px 18px 105px; }
+    .brand { display: flex; gap: 8px; align-items: center; font-size: 12px; font-weight: 820; letter-spacing: .06em; }
+    .logo { display: grid; gap: 3px; width: 21px; }
+    .logo i { display: block; height: 3px; border-radius: 2px; background: #caff3a; }
+    .logo i:nth-child(2) { margin-left: 5px; }
+    .ghost-label { margin-top: 34px; color: #caff3a; font-size: 9px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+    .ghost-value { margin-top: 7px; font-size: 39px; font-weight: 780; letter-spacing: -.05em; }
+    .ghost-line { height: 1px; margin-top: 28px; background: #202327; }
+    .ghost-row { display: grid; grid-template-columns: 34px 1fr 60px; gap: 10px; align-items: center; padding: 15px 0; border-bottom: 1px solid #202327; }
+    .ghost-icon { width: 34px; height: 34px; border-radius: 10px; background: #191c1f; }
+    .ghost-copy i, .ghost-copy b, .ghost-amount { display: block; height: 7px; border-radius: 5px; background: #25282c; }
+    .ghost-copy i { width: 70%; margin-top: 7px; background: #191c1f; }
+    .ghost-amount { width: 52px; justify-self: end; }
+    .dim { position: absolute; inset: 0; background: rgba(0,0,0,.58); }
+    .bottom { position: absolute; left: 16px; right: 16px; bottom: 16px; display: flex; gap: 11px; align-items: center; }
+    .tabs { height: 58px; flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); align-items: center; padding: 6px; border: 1px solid #2a2e32; border-radius: 999px; background: #171a1d; }
+    .tabs span { text-align: center; color: #73777c; font-size: 9px; font-weight: 720; }
+    .tabs .active { color: #caff3a; }
+    .fab { flex: 0 0 auto; display: grid; place-items: center; border: 0; font-weight: 520; }
+    .fab.circle { width: 58px; height: 58px; border-radius: 50%; background: #caff3a; color: #090a0b; font-size: 30px; }
+    .fab.ring { width: 58px; height: 58px; border-radius: 50%; background: #171a1d; color: #caff3a; border: 2px solid #caff3a; font-size: 28px; }
+    .fab.extended { height: 58px; min-width: 92px; gap: 7px; grid-auto-flow: column; padding: 0 18px; border-radius: 999px; background: #caff3a; color: #090a0b; font-size: 13px; font-weight: 780; }
+    .fab.extended b { font-size: 23px; font-weight: 520; }
+    .menu { position: absolute; right: 16px; bottom: 88px; width: 224px; overflow: hidden; border: 1px solid #303439; border-radius: 18px; background: #15181b; }
+    .menu-row { display: grid; grid-template-columns: 34px 1fr; gap: 11px; align-items: center; min-height: 54px; padding: 8px 13px; border-bottom: 1px solid #282c30; }
+    .menu-row:last-child { border-bottom: 0; }
+    .menu-icon { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 9px; background: #22262a; color: #caff3a; font-size: 14px; font-weight: 750; }
+    .menu-row strong { display: block; font-size: 12px; }
+    .menu-row small { display: block; margin-top: 2px; color: #777c81; font-size: 9px; }
+    .speed-menu { right: 17px; width: auto; background: transparent; border: 0; overflow: visible; display: grid; gap: 9px; }
+    .speed-item { display: flex; align-items: center; justify-content: flex-end; gap: 9px; }
+    .speed-item span { padding: 7px 10px; border: 1px solid #303439; border-radius: 8px; background: #15181b; font-size: 10px; font-weight: 730; }
+    .speed-item i { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%; background: #f3f4ee; color: #090a0b; font-size: 13px; font-style: normal; font-weight: 800; }
+    .meta { padding: 18px 9px 10px; }
+    .meta-top { display: flex; align-items: center; gap: 9px; }
+    .letter { width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid #484c51; border-radius: 50%; color: #c5c7c9; font-size: 10px; font-weight: 800; }
+    h2 { margin: 0; font-size: 20px; letter-spacing: -.025em; }
+    .meta p { min-height: 60px; margin: 10px 0 15px; color: #9ca0a4; font-size: 12px; line-height: 1.5; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chips span { padding: 6px 8px; border: 1px solid #2e3236; border-radius: 999px; color: #b3b6b9; font-size: 9px; }
+    .note { margin-top: 18px; padding: 17px 19px; border: 1px solid #2c3034; border-radius: 17px; color: #a6aaad; font-size: 12px; line-height: 1.55; }
+    .note b { color: #caff3a; }
+    @media (max-width: 950px) { .options { grid-template-columns: 1fr; } .stage { height: 540px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">Signal Black · Create interaction</div>
+    <h1>Keep the floating button. Make its behavior feel inevitable.</h1>
+    <p class="intro">All three stay at the bottom right and open above the thumb. The difference is how much presence the control has and how the expanded actions are organized.</p>
+
+    <section class="options">
+      <article class="option" data-choice="satellite-menu" onclick="toggleSelect(this)">
+        <div class="stage">
+          <div class="screen"><div class="brand"><span class="logo"><i></i><i></i><i></i></span>SETTLR</div><div class="ghost-label">Available this month</div><div class="ghost-value">$18,420</div><div class="ghost-line"></div><div class="ghost-row"><div class="ghost-icon"></div><div class="ghost-copy"><b></b><i></i></div><div class="ghost-amount"></div></div><div class="ghost-row"><div class="ghost-icon"></div><div class="ghost-copy"><b></b><i></i></div><div class="ghost-amount"></div></div></div>
+          <div class="dim"></div>
+          <div class="menu"><div class="menu-row"><div class="menu-icon">⌁</div><div><strong>Scan and split</strong><small>Start with the receipt</small></div></div><div class="menu-row"><div class="menu-icon">−</div><div><strong>Add expense</strong><small>Record money out</small></div></div><div class="menu-row"><div class="menu-icon">＋</div><div><strong>Add income</strong><small>Record money in</small></div></div><div class="menu-row"><div class="menu-icon">S</div><div><strong>Add savings</strong><small>Move toward a goal</small></div></div></div>
+          <div class="bottom"><div class="tabs"><span class="active">Overview</span><span>Activity</span><span>Money</span></div><button class="fab circle">×</button></div>
+        </div>
+        <div class="meta"><div class="meta-top"><span class="letter">A</span><h2>Satellite menu</h2></div><p>A detached lime button opens one compact action card. Clear labels, calm hierarchy, and a single thumb-sized target.</p><div class="chips"><span>Best clarity</span><span>Scales to 4–5 actions</span><span>Recommended</span></div></div>
+      </article>
+
+      <article class="option" data-choice="speed-dial" onclick="toggleSelect(this)">
+        <div class="stage">
+          <div class="screen"><div class="brand"><span class="logo"><i></i><i></i><i></i></span>SETTLR</div><div class="ghost-label">Available this month</div><div class="ghost-value">$18,420</div><div class="ghost-line"></div><div class="ghost-row"><div class="ghost-icon"></div><div class="ghost-copy"><b></b><i></i></div><div class="ghost-amount"></div></div><div class="ghost-row"><div class="ghost-icon"></div><div class="ghost-copy"><b></b><i></i></div><div class="ghost-amount"></div></div></div>
+          <div class="dim"></div>
+          <div class="menu speed-menu"><div class="speed-item"><span>Scan and split</span><i>⌁</i></div><div class="speed-item"><span>Add expense</span><i>−</i></div><div class="speed-item"><span>Add income</span><i>＋</i></div><div class="speed-item"><span>Add savings</span><i>S</i></div></div>
+          <div class="bottom"><div class="tabs"><span class="active">Overview</span><span>Activity</span><span>Money</span></div><button class="fab ring">×</button></div>
+        </div>
+        <div class="meta"><div class="meta-top"><span class="letter">B</span><h2>Vertical speed dial</h2></div><p>Individual actions rise from a ringed button. More kinetic and expressive, but the labels float separately and the interaction carries more visual noise.</p><div class="chips"><span>Most energetic</span><span>Fast repeat use</span><span>More motion</span></div></div>
+      </article>
+
+      <article class="option" data-choice="extended-add" onclick="toggleSelect(this)">
+        <div class="stage">
+          <div class="screen"><div class="brand"><span class="logo"><i></i><i></i><i></i></span>SETTLR</div><div class="ghost-label">Available this month</div><div class="ghost-value">$18,420</div><div class="ghost-line"></div><div class="ghost-row"><div class="ghost-icon"></div><div class="ghost-copy"><b></b><i></i></div><div class="ghost-amount"></div></div><div class="ghost-row"><div class="ghost-icon"></div><div class="ghost-copy"><b></b><i></i></div><div class="ghost-amount"></div></div></div>
+          <div class="dim"></div>
+          <div class="menu"><div class="menu-row"><div class="menu-icon">⌁</div><div><strong>Scan and split</strong><small>Start with the receipt</small></div></div><div class="menu-row"><div class="menu-icon">−</div><div><strong>Add expense</strong><small>Record money out</small></div></div><div class="menu-row"><div class="menu-icon">＋</div><div><strong>Add income</strong><small>Record money in</small></div></div><div class="menu-row"><div class="menu-icon">S</div><div><strong>Add savings</strong><small>Move toward a goal</small></div></div></div>
+          <div class="bottom"><div class="tabs"><span class="active">Overview</span><span>Activity</span><span>Money</span></div><button class="fab extended"><b>×</b>Add</button></div>
+        </div>
+        <div class="meta"><div class="meta-top"><span class="letter">C</span><h2>Extended Add</h2></div><p>The button names itself, increasing discoverability. It is harder to miss but competes with the tab bar and takes more horizontal space.</p><div class="chips"><span>Most discoverable</span><span>Strong CTA</span><span>Largest footprint</span></div></div>
+      </article>
+    </section>
+
+    <div class="note"><b>Recommendation:</b> Satellite menu. Keep the closed 58pt lime circle, rotate the plus into a close state, dim the underlying screen, and open a single continuous card aligned above it. Use restrained spring motion and one light haptic; Reduce Motion gets a fade.</div>
+  </main>
+</body>
+</html>

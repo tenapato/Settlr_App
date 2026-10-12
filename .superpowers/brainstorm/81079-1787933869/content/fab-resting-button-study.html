@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Settlr — Create button study</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root { color-scheme: dark; }
+    body { margin: 0; background: #090a0b; color: #f4f5ef; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; -webkit-font-smoothing: antialiased; }
+    main { max-width: 1280px; margin: 0 auto; padding: 52px 28px 72px; }
+    .eyebrow { color: #caff3a; font-size: 10px; font-weight: 820; letter-spacing: .16em; text-transform: uppercase; }
+    h1 { max-width: 820px; margin: 10px 0 12px; font-size: clamp(32px, 5vw, 56px); line-height: 1; letter-spacing: -.045em; }
+    .intro { max-width: 760px; margin: 0 0 34px; color: #999da1; font-size: 15px; line-height: 1.55; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 18px; }
+    .choice { position: relative; min-width: 0; padding: 12px; border: 1px solid #292d31; border-radius: 25px; background: #111316; cursor: pointer; transition: .16s ease; }
+    .choice:hover { transform: translateY(-3px); border-color: #5b6065; }
+    .choice.selected { border-color: #f4f5ef; outline: 2px solid rgba(244,245,239,.16); }
+    .choice.selected::after { content: "SELECTED"; position: absolute; z-index: 8; top: 23px; right: 23px; padding: 6px 9px; border-radius: 999px; background: #f4f5ef; color: #090a0b; font-size: 9px; font-weight: 850; letter-spacing: .12em; }
+    .stage { min-height: 262px; display: grid; align-content: center; gap: 27px; overflow: hidden; padding: 28px 22px; border: 1px solid #202327; border-radius: 18px; background: #090a0b; }
+    .state-labels { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; color: #6e7377; font-size: 8px; font-weight: 820; letter-spacing: .14em; text-transform: uppercase; text-align: center; }
+    .pairs { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .state { min-width: 0; }
+    .bar { display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .tabs { width: min(270px, calc(100% - 68px)); height: 58px; display: grid; grid-template-columns: repeat(4,1fr); align-items: center; padding: 6px; border: 1px solid #2b2f33; border-radius: 999px; background: #171a1d; }
+    .tab { display: grid; gap: 4px; place-items: center; color: #72777b; font-size: 7px; font-weight: 720; }
+    .tab b { font-size: 9px; }
+    .tab.active { color: #caff3a; }
+    .fab { position: relative; width: 58px; height: 58px; display: grid; place-items: center; flex: 0 0 auto; color: #090a0b; }
+    .plus { position: relative; width: 24px; height: 24px; }
+    .plus::before, .plus::after { content: ""; position: absolute; left: 50%; top: 50%; border-radius: 2px; background: currentColor; transform: translate(-50%,-50%); }
+    .plus::before { width: 24px; height: 3px; }
+    .plus::after { width: 3px; height: 24px; }
+    .open .plus { transform: rotate(45deg); }
+    .disc { border-radius: 50%; background: #caff3a; }
+    .disc.open { background: #2a2e32; color: #f4f5ef; }
+    .signal { border-radius: 17px; background: #caff3a; }
+    .signal .plus::before { width: 25px; height: 4px; box-shadow: 0 -8px 0 -1px currentColor, 0 8px 0 -1px currentColor; }
+    .signal .plus::after { width: 4px; height: 25px; }
+    .signal.open { background: #23272b; color: #caff3a; }
+    .lens { border: 1px solid #4a5055; border-radius: 50%; background: #202428; color: #caff3a; }
+    .lens::after { content: ""; position: absolute; inset: 7px; border: 1px solid #34393e; border-radius: 50%; }
+    .lens.open { border-color: #caff3a; }
+    .lens.open::after { border-color: rgba(202,255,58,.28); }
+    .extended { width: 91px; border-radius: 999px; background: #caff3a; display: flex; align-items: center; justify-content: center; gap: 9px; padding: 0 16px; font-size: 11px; font-weight: 820; }
+    .extended .plus { width: 18px; height: 18px; }
+    .extended .plus::before { width: 18px; }
+    .extended .plus::after { height: 18px; }
+    .extended.open { width: 58px; padding: 0; border-radius: 50%; background: #2a2e32; color: #f4f5ef; }
+    .extended.open span:last-child { display: none; }
+    .meta { padding: 18px 9px 9px; }
+    .meta-head { display: flex; align-items: center; gap: 9px; }
+    .letter { width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid #494d52; border-radius: 50%; color: #c5c8ca; font-size: 10px; font-weight: 820; }
+    h2 { margin: 0; font-size: 20px; letter-spacing: -.025em; }
+    .meta p { min-height: 38px; margin: 10px 0 14px; color: #9da1a5; font-size: 12px; line-height: 1.5; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chips span { padding: 6px 8px; border: 1px solid #2e3236; border-radius: 999px; color: #b2b5b8; font-size: 9px; }
+    .foot { margin-top: 18px; padding: 17px 19px; border: 1px solid #2d3135; border-radius: 17px; color: #a4a8ab; font-size: 12px; line-height: 1.55; }
+    .foot b { color: #caff3a; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    @media (max-width: 570px) { .stage { padding: 25px 10px; } .tabs { width: calc(100% - 62px); } .tab { font-size: 6px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">Signal Black · Resting launcher</div>
+    <h1>The button should say “create” and still look uniquely Settlr.</h1>
+    <p class="intro">Each option shows the closed state beside its transformation while the Signature Scanner is open. The navigation and 58pt minimum target stay fixed.</p>
+    <section class="grid">
+      <article class="choice" data-choice="pure-signal-disc" onclick="toggleSelect(this)">
+        <div class="stage"><div class="state-labels"><span>Closed</span><span>Menu open</span></div><div class="pairs"><div class="state"><div class="bar"><div class="tabs"><div class="tab active"><b>⌂</b>Home</div><div class="tab"><b>≡</b>Activity</div><div class="tab"><b>S</b>Savings</div><div class="tab"><b>▭</b>Cards</div></div><div class="fab disc"><i class="plus"></i></div></div></div><div class="state"><div class="bar"><div class="tabs"><div class="tab active"><b>⌂</b>Home</div><div class="tab"><b>≡</b>Activity</div><div class="tab"><b>S</b>Savings</div><div class="tab"><b>▭</b>Cards</div></div><div class="fab disc open"><i class="plus"></i></div></div></div></div></div>
+        <div class="meta"><div class="meta-head"><span class="letter">A</span><h2>Pure signal disc</h2></div><p>A refined version of the current control: optically balanced plus, quieter close state, and no decorative effects.</p><div class="chips"><span>Most familiar</span><span>Lowest risk</span><span>Still generic</span></div></div>
+      </article>
+      <article class="choice" data-choice="settlr-signal" onclick="toggleSelect(this)">
+        <div class="stage"><div class="state-labels"><span>Closed</span><span>Menu open</span></div><div class="pairs"><div class="state"><div class="bar"><div class="tabs"><div class="tab active"><b>⌂</b>Home</div><div class="tab"><b>≡</b>Activity</div><div class="tab"><b>S</b>Savings</div><div class="tab"><b>▭</b>Cards</div></div><div class="fab signal"><i class="plus"></i></div></div></div><div class="state"><div class="bar"><div class="tabs"><div class="tab active"><b>⌂</b>Home</div><div class="tab"><b>≡</b>Activity</div><div class="tab"><b>S</b>Savings</div><div class="tab"><b>▭</b>Cards</div></div><div class="fab signal open"><i class="plus"></i></div></div></div></div></div>
+        <div class="meta"><div class="meta-head"><span class="letter">B</span><h2>Settlr signal</h2></div><p>A continuous squircle and stepped cross echo the three-line Settlr mark while remaining legible as a create control.</p><div class="chips"><span>Most ownable</span><span>Sharp geometry</span><span>Recommended</span></div></div>
+      </article>
+      <article class="choice" data-choice="dark-lens" onclick="toggleSelect(this)">
+        <div class="stage"><div class="state-labels"><span>Closed</span><span>Menu open</span></div><div class="pairs"><div class="state"><div class="bar"><div class="tabs"><div class="tab active"><b>⌂</b>Home</div><div class="tab"><b>≡</b>Activity</div><div class="tab"><b>S</b>Savings</div><div class="tab"><b>▭</b>Cards</div></div><div class="fab lens"><i class="plus"></i></div></div></div><div class="state"><div class="bar"><div class="tabs"><div class="tab active"><b>⌂</b>Home</div><div class="tab"><b>≡</b>Activity</div><div class="tab"><b>S</b>Savings</div><div class="tab"><b>▭</b>Cards</div></div><div class="fab lens open"><i class="plus"></i></div></div></div></div></div>
+        <div class="meta"><div class="meta-head"><span class="letter">C</span><h2>Dark lens</h2></div><p>Reverses the contrast: dark material with a lime glyph. It integrates better with iOS chrome but weakens the signature action.</p><div class="chips"><span>Understated</span><span>Native material</span><span>Lower emphasis</span></div></div>
+      </article>
+      <article class="choice" data-choice="create-capsule" onclick="toggleSelect(this)">
+        <div class="stage"><div class="state-labels"><span>Closed</span><span>Menu open</span></div><div class="pairs"><div class="state"><div class="bar"><div class="tabs"><div class="tab active"><b>⌂</b>Home</div><div class="tab"><b>≡</b>Activity</div><div class="tab"><b>S</b>Savings</div><div class="tab"><b>▭</b>Cards</div></div><div class="fab extended"><i class="plus"></i><span>Create</span></div></div></div><div class="state"><div class="bar"><div class="tabs"><div class="tab active"><b>⌂</b>Home</div><div class="tab"><b>≡</b>Activity</div><div class="tab"><b>S</b>Savings</div><div class="tab"><b>▭</b>Cards</div></div><div class="fab extended open"><i class="plus"></i><span>Create</span></div></div></div></div></div>
+        <div class="meta"><div class="meta-head"><span class="letter">D</span><h2>Create capsule</h2></div><p>A labelled resting control is easiest to discover, then collapses to a close disc when open. It gives the tab bar less breathing room.</p><div class="chips"><span>Most discoverable</span><span>Explicit</span><span>Largest footprint</span></div></div>
+      </article>
+    </section>
+    <div class="foot"><b>Recommendation: B, Settlr signal.</b> It turns the launcher into a recognizable brand asset without hiding its purpose. The final glyph should use SF Symbol optical proportions as its baseline, then be custom-drawn to echo the logo.</div>
+  </main>
+</body>
+</html>

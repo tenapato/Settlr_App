@@ -3,6 +3,7 @@ import Observation
 
 // MARK: - ViewModel
 
+@MainActor
 @Observable
 final class CardsVM {
     var cards: [CreditCard] = []
@@ -32,9 +33,10 @@ final class CardsVM {
     }
 
     @MainActor
-    func createCard(workspaceId: String) async {
+    @discardableResult
+    func createCard(workspaceId: String) async -> Bool {
         let label = newLabel.trimmingCharacters(in: .whitespaces)
-        guard !label.isEmpty else { return }
+        guard !label.isEmpty else { return false }
         isCreating = true
         errorMessage = nil
         defer { isCreating = false }
@@ -50,8 +52,10 @@ final class CardsVM {
             cards.append(resp.creditCard)
             resetForm()
             showCreateSheet = false
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
@@ -69,12 +73,15 @@ final class CardsVM {
     }
 
     @MainActor
-    func deleteCard(workspaceId: String, cardId: String) async {
+    @discardableResult
+    func deleteCard(workspaceId: String, cardId: String) async -> Bool {
         do {
             try await api.send(Endpoints.creditCard(workspaceId, cardId), method: "DELETE")
             cards.removeAll { $0.id == cardId }
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
@@ -88,9 +95,24 @@ final class CardsVM {
 struct CardsView: View {
     let workspaceId: String
     var embedded: Bool = false
+    var onCardMutated: (() async -> Void)? = nil
+    private let ownsViewModel: Bool
     @State private var vm = CardsVM()
     @State private var searchText = ""
     @State private var selectedCard: CreditCard?
+
+    init(
+        workspaceId: String,
+        embedded: Bool = false,
+        vm: CardsVM? = nil,
+        onCardMutated: (() async -> Void)? = nil
+    ) {
+        self.workspaceId = workspaceId
+        self.embedded = embedded
+        self.onCardMutated = onCardMutated
+        self.ownsViewModel = vm == nil
+        _vm = State(initialValue: vm ?? CardsVM())
+    }
 
     private var filteredCards: [CreditCard] {
         guard !searchText.isEmpty else { return vm.cards }
@@ -113,21 +135,22 @@ struct CardsView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
-        .task { await vm.load(workspaceId: workspaceId) }
+        .task {
+            guard ownsViewModel else { return }
+            await vm.load(workspaceId: workspaceId)
+        }
     }
 
     private var cardsBody: some View {
         ZStack {
-            Color(hex: "#0e0f11").ignoresSafeArea()
+            Theme.bg.ignoresSafeArea()
 
             ZStack {
-                if vm.isLoading {
-                    ProgressView()
-                        .tint(Color(hex: "#c8ff5a"))
+                if vm.isLoading && vm.cards.isEmpty {
+                    SettlrPulseLoadingView(message: "Loading cards")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .transition(.opacity)
-                } else if let err = vm.errorMessage {
+                } else if let err = vm.errorMessage, vm.cards.isEmpty {
                     CardsErrorView(message: err) {
                         Task { await vm.load(workspaceId: workspaceId) }
                     }
@@ -146,16 +169,22 @@ struct CardsView: View {
                 Button { vm.showCreateSheet = true } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color(hex: "#c8ff5a"))
+                        .foregroundStyle(Theme.accentText)
+                        .frame(width: 44, height: 44)
                 }
+                .accessibilityLabel("Add credit card")
             }
         }
         .sheet(isPresented: $vm.showCreateSheet) {
-            CreateCardSheet(vm: vm, workspaceId: workspaceId)
+            CreateCardSheet(vm: vm, workspaceId: workspaceId) {
+                await onCardMutated?()
+            }
         }
         .sheet(item: $selectedCard) { card in
             CardDetailSheet(workspaceId: workspaceId, card: card) { body in
-                try await vm.updateCard(workspaceId: workspaceId, cardId: card.id, body: body)
+                let updated = try await vm.updateCard(workspaceId: workspaceId, cardId: card.id, body: body)
+                await onCardMutated?()
+                return updated
             }
         }
     }
@@ -163,30 +192,39 @@ struct CardsView: View {
     private var cardList: some View {
         ScrollView {
             LazyVStack(spacing: 14) {
+                if vm.errorMessage != nil, !vm.cards.isEmpty {
+                    SignalRefreshWarning(message: "Showing saved card data. Refresh failed.") {
+                        Task { await vm.load(workspaceId: workspaceId) }
+                    }
+                    .padding(.horizontal, 20)
+                }
+
                 // Search bar pinned at top
                 HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(Color(hex: "#5a5d63"))
+                        .foregroundStyle(Theme.faint)
                     TextField("Search by name, network, or last 4", text: $searchText)
                         .font(.system(size: 15))
-                        .foregroundStyle(Color(hex: "#ecedee"))
+                        .foregroundStyle(Theme.ink)
                         .autocorrectionDisabled()
                         .autocapitalization(.none)
                     if !searchText.isEmpty {
                         Button { searchText = "" } label: {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.system(size: 14))
-                                .foregroundStyle(Color(hex: "#5a5d63"))
+                                .foregroundStyle(Theme.faint)
+                                .frame(width: 44, height: 44)
                         }
+                        .accessibilityLabel("Clear card search")
                     }
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
                 .background(
                     RoundedRectangle(cornerRadius: 14)
-                        .fill(Color(hex: "#15171a"))
-                        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1))
+                        .fill(Theme.surface)
+                        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Theme.line, lineWidth: 1))
                 )
                 .padding(.horizontal, 20)
                 .padding(.top, 4)
@@ -195,10 +233,10 @@ struct CardsView: View {
                     VStack(spacing: 10) {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 32))
-                            .foregroundStyle(Color(hex: "#5a5d63"))
+                            .foregroundStyle(Theme.faint)
                         Text("No results for \"\(searchText)\"")
                             .font(.system(size: 15))
-                            .foregroundStyle(Color(hex: "#8e9197"))
+                            .foregroundStyle(Theme.muted)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.top, 60)
@@ -213,7 +251,11 @@ struct CardsView: View {
                         .padding(.horizontal, 20)
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
-                                Task { await vm.deleteCard(workspaceId: workspaceId, cardId: card.id) }
+                                Task {
+                                    if await vm.deleteCard(workspaceId: workspaceId, cardId: card.id) {
+                                        await onCardMutated?()
+                                    }
+                                }
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
@@ -235,12 +277,17 @@ private struct CardTile: View {
     let card: CreditCard
     let rank: Int
     @State private var appeared = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VirtualCardFace(card: card, style: .compact)
             .opacity(appeared ? 1 : 0)
             .offset(y: appeared ? 0 : 14)
             .onAppear {
+                guard !reduceMotion else {
+                    appeared = true
+                    return
+                }
                 let delay = Double(rank) * 0.06
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.8).delay(delay)) {
                     appeared = true
@@ -254,6 +301,7 @@ private struct CardTile: View {
 private struct CreateCardSheet: View {
     let vm: CardsVM
     let workspaceId: String
+    let onCreated: () async -> Void
     @FocusState private var focusedField: Field?
 
     private enum Field: Hashable {
@@ -265,26 +313,26 @@ private struct CreateCardSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(hex: "#0e0f11").ignoresSafeArea()
+                Theme.bg.ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 18) {
                         CardFormField(label: "Card Name *") {
                             TextField("e.g. Chase Sapphire", text: Binding(get: { vm.newLabel }, set: { vm.newLabel = $0 }))
                                 .focused($focusedField, equals: .name)
-                                .foregroundStyle(Color(hex: "#ecedee"))
+                                .foregroundStyle(Theme.ink)
                         }
 
                         CardFormField(label: "Last 4 Digits") {
                             TextField("1234", text: Binding(get: { vm.newLastFour }, set: { vm.newLastFour = String($0.prefix(4)) }))
                                 .keyboardType(.numberPad)
                                 .focused($focusedField, equals: .lastFour)
-                                .foregroundStyle(Color(hex: "#ecedee"))
+                                .foregroundStyle(Theme.ink)
                         }
 
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Network")
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(Color(hex: "#8e9197"))
+                                .foregroundStyle(Theme.muted)
                                 .tracking(1).textCase(.uppercase)
 
                             HStack(spacing: 8) {
@@ -294,13 +342,15 @@ private struct CreateCardSheet: View {
                                     } label: {
                                         Text(label)
                                             .font(.system(size: 13, weight: .semibold))
-                                            .foregroundStyle(vm.newNetwork == val ? Color(hex: "#0e0f11") : Color(hex: "#8e9197"))
+                                            .foregroundStyle(vm.newNetwork == val ? Theme.buttonInk : Theme.muted)
                                             .frame(maxWidth: .infinity)
-                                            .padding(.vertical, 10)
+                                            .frame(minHeight: 44)
                                             .background(RoundedRectangle(cornerRadius: 9)
-                                                .fill(vm.newNetwork == val ? Color(hex: "#c8ff5a") : Color(hex: "#15171a")))
+                                                .fill(vm.newNetwork == val ? Theme.accent : Theme.surface))
                                     }
                                     .buttonStyle(.plain)
+                                    .accessibilityValue(vm.newNetwork == val ? "Selected" : "Not selected")
+                                    .accessibilityAddTraits(vm.newNetwork == val ? .isSelected : [])
                                 }
                             }
                         }
@@ -309,31 +359,35 @@ private struct CreateCardSheet: View {
                             TextField("e.g. 50000", text: Binding(get: { vm.newLimitStr }, set: { vm.newLimitStr = $0 }))
                                 .keyboardType(.numberPad)
                                 .focused($focusedField, equals: .limit)
-                                .foregroundStyle(Color(hex: "#ecedee"))
+                                .foregroundStyle(Theme.ink)
                         }
 
                         if let err = vm.errorMessage {
                             Text(err)
                                 .font(.system(size: 13))
-                                .foregroundStyle(Color(hex: "#ff6b6b"))
+                                .foregroundStyle(Theme.expense)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
                         Button {
-                            Task { await vm.createCard(workspaceId: workspaceId) }
+                            Task {
+                                if await vm.createCard(workspaceId: workspaceId) {
+                                    await onCreated()
+                                }
+                            }
                         } label: {
                             Group {
                                 if vm.isCreating {
-                                    ProgressView().tint(Color(hex: "#0e0f11"))
+                                    ProgressView().tint(Theme.buttonInk)
                                 } else {
                                     Text("Add Card")
                                         .font(.system(size: 16, weight: .semibold))
-                                        .foregroundStyle(Color(hex: "#0e0f11"))
+                                        .foregroundStyle(Theme.buttonInk)
                                 }
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
-                            .background(RoundedRectangle(cornerRadius: 14).fill(Color(hex: "#c8ff5a")))
+                            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.accent))
                         }
                         .disabled(vm.newLabel.trimmingCharacters(in: .whitespaces).isEmpty || vm.isCreating)
                         .opacity(vm.newLabel.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1)
@@ -347,18 +401,18 @@ private struct CreateCardSheet: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { vm.showCreateSheet = false; vm.resetForm(); vm.errorMessage = nil }
-                        .foregroundStyle(Color(hex: "#8e9197"))
+                        .foregroundStyle(Theme.muted)
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button("Done") { focusedField = nil }
-                        .foregroundStyle(Color(hex: "#c8ff5a"))
+                        .foregroundStyle(Theme.accentText)
                         .fontWeight(.semibold)
                 }
             }
         }
         .presentationDetents([.large])
-        .presentationBackground(Color(hex: "#0e0f11"))
+        .presentationBackground(Theme.bg)
         .presentationCornerRadius(24)
         .onAppear { focusedField = .name; vm.errorMessage = nil }
     }
@@ -372,63 +426,65 @@ private struct CardFormField<Content: View>: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(label)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color(hex: "#8e9197"))
+                .foregroundStyle(Theme.muted)
                 .tracking(1).textCase(.uppercase)
             content()
                 .font(.system(size: 16))
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(hex: "#15171a"))
-                    .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1)))
+                    .fill(Theme.surface)
+                    .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.line, lineWidth: 1)))
         }
     }
 }
 
 // MARK: - Empty / Error
 
-private struct CardsEmptyView: View {
+struct CardsEmptyView: View {
     let onAdd: () -> Void
     var body: some View {
         VStack(spacing: 20) {
             Image(systemName: "creditcard")
                 .font(.system(size: 48))
-                .foregroundStyle(Color(hex: "#5a5d63"))
+                .foregroundStyle(Theme.faint)
             VStack(spacing: 8) {
                 Text("No cards yet")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#ecedee"))
+                    .foregroundStyle(Theme.ink)
                 Text("Add a credit card to track spending")
                     .font(.system(size: 14))
-                    .foregroundStyle(Color(hex: "#8e9197"))
+                    .foregroundStyle(Theme.muted)
             }
             Button(action: onAdd) {
                 Text("Add Card")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#0e0f11"))
+                    .foregroundStyle(Theme.buttonInk)
                     .padding(.horizontal, 28).padding(.vertical, 12)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: "#c8ff5a")))
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Theme.accent))
+                    .frame(minHeight: 44)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
-private struct CardsErrorView: View {
+struct CardsErrorView: View {
     let message: String
     let onRetry: () -> Void
     var body: some View {
         VStack(spacing: 14) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 32))
-                .foregroundStyle(Color(hex: "#ffb547"))
+                .foregroundStyle(Theme.warning)
             Text(message)
                 .font(.system(size: 14))
-                .foregroundStyle(Color(hex: "#8e9197"))
+                .foregroundStyle(Theme.muted)
                 .multilineTextAlignment(.center)
             Button("Retry", action: onRetry)
-                .foregroundStyle(Color(hex: "#c8ff5a"))
+                .foregroundStyle(Theme.accentText)
                 .font(.system(size: 15, weight: .semibold))
+                .frame(minWidth: 44, minHeight: 44)
         }
         .padding(.horizontal, 32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

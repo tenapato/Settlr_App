@@ -27,4 +27,15 @@ final class TipPresetTests: XCTestCase {
             11_206
         )
     }
+
+    func testRetotalKeepsTheSelectedTotalNonnegative() {
+        XCTAssertEqual(
+            TipPreset.retotal(
+                selectedTotal: 100,
+                replacing: 200,
+                with: 0
+            ),
+            0
+        )
+    }
 }

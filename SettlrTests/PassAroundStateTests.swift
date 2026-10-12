@@ -2,6 +2,16 @@ import XCTest
 @testable import Settlr
 
 final class PassAroundStateTests: XCTestCase {
+    func testPassAroundResultDoesNotOfferSettlementForEachOwn() {
+        let presentation = SplitResultPresentation(payerMode: .eachOwn)
+
+        XCTAssertNil(presentation.amountToCollectLabel)
+        XCTAssertEqual(
+            presentation.participantStatus(isOrganizer: false, isSettled: false),
+            "Paid their own"
+        )
+    }
+
     func testOnePersonRequiresExplicitSoloChoiceBeforeStarting() {
         // This catches pass-around silently opening as "1 of 1" without the
         // organizer deliberately choosing a one-person flow.

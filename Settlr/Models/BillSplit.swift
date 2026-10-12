@@ -1,5 +1,46 @@
 import Foundation
 
+/// Orders detail reads against writes without coupling the rule to networking.
+/// A mutation invalidates reads that began before it, while a successful
+/// mutation also invalidates reads that overlapped the write and may have
+/// observed the server just before it committed.
+struct BillSplitDetailResponseGate {
+    struct LoadToken: Equatable {
+        fileprivate let revision: Int
+        fileprivate let generation: Int
+    }
+
+    private var revision = 0
+    private var loadGeneration = 0
+
+    mutating func beginLoad() -> LoadToken {
+        loadGeneration += 1
+        return LoadToken(revision: revision, generation: loadGeneration)
+    }
+
+    mutating func beginMutation() -> Int {
+        revision += 1
+        loadGeneration += 1
+        return revision
+    }
+
+    func shouldAdopt(load token: LoadToken) -> Bool {
+        token.revision == revision && token.generation == loadGeneration
+    }
+
+    func shouldAdopt(mutation token: Int) -> Bool {
+        token == revision
+    }
+
+    @discardableResult
+    mutating func commitMutation(_ token: Int) -> Bool {
+        guard shouldAdopt(mutation: token) else { return false }
+        revision += 1
+        loadGeneration += 1
+        return true
+    }
+}
+
 // MARK: - Organizer-facing models (workspace-scoped API)
 
 struct BillSplitSummary: Codable, Identifiable {
@@ -490,16 +531,22 @@ struct BillSplit: Codable, Identifiable {
     let unallocatedExtrasCents: Int
     let outstandingCents: Int
 
+    let groupPaymentsAvailable: Bool
+    let paymentRequests: [SplitPaymentReport]
+
     private enum CodingKeys: String, CodingKey {
         case id, shareToken, shareUrl, merchant, currency, occurredAt, subtotalCents
         case taxCents, tipCents, feeCents, totalCents, status, version
         case mismatchAcknowledged, payer, splitMode, paymentChannel, creditCardId
         case categoryId, expenseId, createdAt, items, participants, unclaimedItemsCents
+        case groupPaymentsAvailable, paymentRequests
         case unallocatedExtrasCents, outstandingCents
     }
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
+        groupPaymentsAvailable = try values.decodeIfPresent(Bool.self, forKey: .groupPaymentsAvailable) ?? false
+        paymentRequests = try values.decodeIfPresent([SplitPaymentReport].self, forKey: .paymentRequests) ?? []
         id = try values.decode(String.self, forKey: .id)
         shareToken = try values.decode(String.self, forKey: .shareToken)
         shareUrl = try values.decodeIfPresent(String.self, forKey: .shareUrl)
@@ -958,6 +1005,29 @@ struct ScannedReceipt: Decodable {
     }
 }
 
+/// The scan-derived facts shown at the Review checkpoint. Setup-only fields
+/// such as date, category, and payment method intentionally do not belong here.
+struct ReceiptReviewPresentation {
+    let merchantName: String
+    let totalCents: Int
+    let statusText: String
+    let needsAttention: Bool
+    let merchantNeedsAttention: Bool
+
+    init(receipt: ScannedReceipt) {
+        let trimmedMerchant = receipt.merchant?.trimmingCharacters(in: .whitespacesAndNewlines)
+        merchantName = trimmedMerchant.flatMap { $0.isEmpty ? nil : $0 } ?? "Merchant not found"
+        totalCents = receipt.totalCents
+        merchantNeedsAttention = trimmedMerchant?.isEmpty != false
+        needsAttention = merchantNeedsAttention
+            || receipt.totalCents <= 0
+            || receipt.items.isEmpty
+            || receipt.items.contains { $0.verification == .unverified }
+            || !receipt.warnings.isEmpty
+        statusText = needsAttention ? "Review highlighted details" : "Scan looks ready"
+    }
+}
+
 // MARK: - Public share-link models (used by the deep-link claim screen)
 
 struct PublicSplitParticipant: Codable, Identifiable {
@@ -1005,6 +1075,9 @@ struct PublicSplit: Codable {
     let unclaimedItemsCents: Int
     let viewerParticipantId: String?
 
+    let groupPaymentsAvailable: Bool?
+    let paymentRequests: [SplitPaymentReport]?
+
     var isOpen: Bool { status == "open" }
     var payerMode: BillSplitPayerMode { BillSplitPayerMode(persistedValue: payer) }
     var isEachOwn: Bool { payerMode == .eachOwn }
@@ -1038,5 +1111,31 @@ enum SplitGuestStore {
 
     static func clear(for shareToken: String) {
         UserDefaults.standard.removeObject(forKey: key(shareToken))
+    }
+}
+
+struct SplitPaymentReport: Codable, Identifiable {
+    let id: String
+    let paidByParticipantId: String
+    let participantIds: [String]
+    let amountCents: Int
+}
+
+struct SplitGroupPaymentBody: Encodable {
+    let participantIds: [String]
+    let paidByParticipantId: String
+    let version: Int?
+    let requestId: String?
+}
+
+extension SplitGuestStore {
+    static func people(for shareToken: String) -> [String: String] {
+        (UserDefaults.standard.dictionary(forKey: "settlr.split.people.\(shareToken)") as? [String: String]) ?? [:]
+    }
+
+    static func remember(secret: String, participantId: String, shareToken: String) {
+        var group = people(for: shareToken)
+        group[participantId] = secret
+        UserDefaults.standard.set(group, forKey: "settlr.split.people.\(shareToken)")
     }
 }

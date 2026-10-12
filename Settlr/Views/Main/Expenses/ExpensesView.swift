@@ -75,8 +75,7 @@ struct FilterChip: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(32)
-            .presentationBackground(Color(hex: "#121212"))
-            .preferredColorScheme(.dark)
+            .presentationBackground(Theme.surface)
         }
     }
 }
@@ -106,7 +105,6 @@ struct ExpensesView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
         .task { await vm.load(workspaceId: workspaceId) }
         .onChange(of: vm.selectedMonth) { _, _ in
             Task { await vm.load(workspaceId: workspaceId) }

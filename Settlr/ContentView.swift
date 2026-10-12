@@ -28,7 +28,7 @@ struct ContentView: View {
         @Bindable var appState = appState
         return Group {
             if appState.isLoading {
-                SplashView()
+                SplashView(message: "Opening Settlr")
             } else if let notice = appState.deactivation {
                 // Ahead of the auth check: a deactivated account may or may not
                 // still have a decoded user, and either way the login screen is
@@ -40,7 +40,12 @@ struct ContentView: View {
                 LoginView()
             } else if appState.activeWorkspace == nil {
                 if appState.isRestoringWorkspace {
-                    SplashView()
+                    SettlrPulseLoadingView(
+                        message: "Getting your workspace",
+                        detail: "Loading balances and account access."
+                    )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Theme.bg.ignoresSafeArea())
                 } else {
                     WorkspacePickerView()
                 }
@@ -48,6 +53,7 @@ struct ContentView: View {
                 MainTabView()
             }
         }
+        .background(Theme.bg.ignoresSafeArea())
         .fullScreenCover(item: $automationPresentation, onDismiss: {
             if let id = presentedAutomationID { automationInbox.remove(id: id) }
             presentedAutomationID = nil
@@ -134,18 +140,15 @@ struct ContentView: View {
 }
 
 private struct SplashView: View {
+    let message: String
+
     var body: some View {
         ZStack {
-            Color(hex: "#0e0f11").ignoresSafeArea()
-            VStack(spacing: 12) {
-                Image("SettlrLogo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 80, height: 80)
-                Text("Settlr")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundStyle(Color(hex: "#ecedee"))
-            }
+            Theme.bg.ignoresSafeArea()
+            SettlrPulseLoadingView(
+                message: message,
+                detail: "Checking your session and account access."
+            )
         }
     }
 }

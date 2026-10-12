@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 
+@MainActor
 @Observable
 final class SavingsVM {
     var accounts: [SavingsAccount] = []
@@ -10,13 +11,24 @@ final class SavingsVM {
     var selectedAccountId: String? = nil // nil = All
     var isLoading = false
     var errorMessage: String?
+    var accountsErrorMessage: String?
+    var entriesErrorMessage: String?
+    var recurringErrorMessage: String?
     /// True once an accounts fetch has succeeded. An empty `accounts` only means
     /// "this workspace has none" when this is true — otherwise the load failed or
     /// hasn't finished, and callers must not treat it as a confirmed empty state.
     var hasLoadedAccounts = false
 
+    /// Account responses are allowed to refresh independently from entries.
+    /// Presenters use this marker to distinguish retained accounts from the
+    /// current request's settled result (including a settled failure).
+    private(set) var accountsRequestGeneration: Int = 0
+    private(set) var settledAccountsRequestGeneration: Int?
+
     private let api = APIClient.shared
     private var inFlightLoad: Task<Void, Never>?
+    private var loadGeneration = 0
+    private var activeWorkspaceID: String?
 
     var displayBalanceCents: Int {
         if let id = selectedAccountId,
@@ -35,15 +47,75 @@ final class SavingsVM {
         accounts.first { $0.id == id }
     }
 
+    /// True only when the accounts response belongs to the requested workspace.
+    /// This keeps global quick actions from presenting a form with stale data.
+    var loadedWorkspaceID: String? { activeWorkspaceID }
+
+    var hasSettledCurrentAccountsRequest: Bool {
+        guard activeWorkspaceID != nil else { return false }
+        return settledAccountsRequestGeneration == loadGeneration
+            && accountsRequestGeneration == loadGeneration
+    }
+
+    @MainActor
+    func accountsRequestIsSettled(for workspaceId: String) -> Bool {
+        activeWorkspaceID == workspaceId && hasSettledCurrentAccountsRequest
+    }
+
+    @MainActor
+    func workspaceMutationGeneration(for workspaceId: String) -> Int {
+        guard activeWorkspaceID == workspaceId else { return -1 }
+        return loadGeneration
+    }
+
+    private func acceptsMutation(workspaceId: String, expectedGeneration: Int?) -> Bool {
+        guard let expectedGeneration else { return true }
+        return activeWorkspaceID == workspaceId && loadGeneration == expectedGeneration
+    }
+
     var activeRecurringCount: Int {
         recurring.filter(\.active).count
     }
 
     @MainActor
     func load(workspaceId: String) async {
-        let task = Task { @MainActor in await self.performLoad(workspaceId: workspaceId) }
+        if activeWorkspaceID != workspaceId {
+            resetForWorkspace()
+            activeWorkspaceID = workspaceId
+        }
+        loadGeneration += 1
+        let generation = loadGeneration
+        accountsRequestGeneration = generation
+        settledAccountsRequestGeneration = nil
+        isLoading = true
+        errorMessage = nil
+        accountsErrorMessage = nil
+        entriesErrorMessage = nil
+        recurringErrorMessage = nil
+        let task = Task { @MainActor in await self.performLoad(workspaceId: workspaceId, generation: generation) }
         inFlightLoad = task
         await task.value
+    }
+
+    @MainActor
+    func resetForWorkspace() {
+        loadGeneration += 1
+        activeWorkspaceID = nil
+        inFlightLoad?.cancel()
+        inFlightLoad = nil
+        isLoading = false
+        accounts = []
+        entries = []
+        recurring = []
+        totalBalanceCents = 0
+        selectedAccountId = nil
+        hasLoadedAccounts = false
+        accountsRequestGeneration = 0
+        settledAccountsRequestGeneration = nil
+        errorMessage = nil
+        accountsErrorMessage = nil
+        entriesErrorMessage = nil
+        recurringErrorMessage = nil
     }
 
     /// Awaits the in-flight load, if any, so callers can act on settled state instead of
@@ -54,95 +126,169 @@ final class SavingsVM {
     }
 
     @MainActor
-    private func performLoad(workspaceId: String) async {
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
+    private func performLoad(workspaceId: String, generation: Int) async {
+        guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }
+        defer {
+            if generation == loadGeneration, activeWorkspaceID == workspaceId {
+                isLoading = false
+            }
+        }
 
         // Recurring rules are supplementary: the endpoint may be absent on a given
         // deployment, and losing them must not blank out accounts and entries.
-        async let recurringTask: RecurringSavingsListResponse? = try? await api.fetch(
-            Endpoints.recurringSavings(workspaceId)
+        async let accountsTask: SavingsAccountsResponse = api.fetch(Endpoints.savingsAccounts(workspaceId))
+        async let entriesTask: SavingsEntriesResponse = api.fetch(
+            Endpoints.savingsEntries(workspaceId, accountId: selectedAccountId)
         )
 
         do {
-            async let accountsTask: SavingsAccountsResponse = api.fetch(Endpoints.savingsAccounts(workspaceId))
-            async let entriesTask: SavingsEntriesResponse = api.fetch(
-                Endpoints.savingsEntries(workspaceId, accountId: selectedAccountId)
-            )
-            let (accountsResp, entriesResp) = try await (accountsTask, entriesTask)
+            let accountsResp = try await accountsTask
+            guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }
             accounts = accountsResp.accounts.sorted { $0.sortOrder < $1.sortOrder }
             totalBalanceCents = accountsResp.totalBalanceCents
-            entries = entriesResp.entries
             hasLoadedAccounts = true
+            settledAccountsRequestGeneration = generation
             if let id = selectedAccountId, !accounts.contains(where: { $0.id == id }) {
                 selectedAccountId = nil
             }
         } catch {
+            guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }
+            settledAccountsRequestGeneration = generation
+            accountsErrorMessage = error.localizedDescription
             errorMessage = error.localizedDescription
         }
 
-        recurring = await recurringTask?.recurringSavings ?? []
+        do {
+            let entriesResp = try await entriesTask
+            guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }
+            entries = entriesResp.entries
+        } catch {
+            guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }
+            entriesErrorMessage = error.localizedDescription
+            errorMessage = error.localizedDescription
+        }
+
+        guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }
+        do {
+            let response: RecurringSavingsListResponse = try await api.fetch(Endpoints.recurringSavings(workspaceId))
+            guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }
+            recurringErrorMessage = nil
+            recurring = response.recurringSavings
+        } catch {
+            guard generation == loadGeneration, activeWorkspaceID == workspaceId else { return }
+            // Recurring rules are supplementary. Keep prior rules when this
+            // optional endpoint is unavailable, but expose its error separately.
+            recurringErrorMessage = error.localizedDescription
+        }
     }
 
     @MainActor
-    func createAccount(workspaceId: String, name: String, color: String) async -> Bool {
+    func createAccount(
+        workspaceId: String,
+        name: String,
+        color: String,
+        targetAmountCents: Int? = nil,
+        targetDate: String? = nil,
+        expectedGeneration: Int? = nil
+    ) async -> Bool {
         do {
             let resp: SavingsAccountResponse = try await api.fetch(
                 Endpoints.savingsAccounts(workspaceId),
                 method: "POST",
-                body: CreateSavingsAccountBody(name: name, color: color, currency: "MXN")
+                body: CreateSavingsAccountBody(
+                    name: name,
+                    color: color,
+                    currency: "MXN",
+                    targetAmountCents: targetAmountCents,
+                    targetDate: targetDate
+                )
             )
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return false }
             accounts.append(resp.account)
             accounts.sort { $0.sortOrder < $1.sortOrder }
+            hasLoadedAccounts = true
+            accountsErrorMessage = nil
             return true
         } catch {
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return false }
             errorMessage = error.localizedDescription
             return false
         }
     }
 
     @MainActor
-    func updateAccount(workspaceId: String, accountId: String, name: String, color: String) async -> Bool {
+    func updateAccount(
+        workspaceId: String,
+        accountId: String,
+        name: String,
+        color: String,
+        targetAmountCents: Int? = nil,
+        targetDate: String? = nil,
+        expectedGeneration: Int? = nil
+    ) async -> Bool {
         do {
             let resp: SavingsAccountResponse = try await api.fetch(
                 Endpoints.savingsAccount(workspaceId, accountId),
                 method: "PATCH",
-                body: UpdateSavingsAccountBody(name: name, color: color)
+                body: UpdateSavingsAccountBody(
+                    name: name,
+                    color: color,
+                    targetAmountCents: targetAmountCents,
+                    targetDate: targetDate
+                )
             )
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return false }
             if let idx = accounts.firstIndex(where: { $0.id == accountId }) {
                 accounts[idx] = resp.account
             }
+            hasLoadedAccounts = true
+            accountsErrorMessage = nil
             return true
         } catch {
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return false }
             errorMessage = error.localizedDescription
             return false
         }
     }
 
     @MainActor
-    func deleteAccount(workspaceId: String, accountId: String) async {
+    func deleteAccount(
+        workspaceId: String,
+        accountId: String,
+        expectedGeneration: Int? = nil
+    ) async {
         do {
             try await api.send(Endpoints.savingsAccount(workspaceId, accountId), method: "DELETE")
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return }
             accounts.removeAll { $0.id == accountId }
             entries.removeAll { $0.accountId == accountId }
             if selectedAccountId == accountId { selectedAccountId = nil }
             totalBalanceCents = accounts.reduce(0) { $0 + $1.balanceCents }
+            hasLoadedAccounts = true
+            accountsErrorMessage = nil
         } catch {
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return }
             errorMessage = error.localizedDescription
         }
     }
 
     @MainActor
-    func createEntry(workspaceId: String, body: CreateSavingsEntryBody) async {
+    func createEntry(
+        workspaceId: String,
+        body: CreateSavingsEntryBody,
+        reload: Bool = true,
+        expectedGeneration: Int? = nil
+    ) async {
         do {
             let _: SavingsEntryResponse = try await api.fetch(
                 Endpoints.savingsEntries(workspaceId),
                 method: "POST",
                 body: body
             )
-            await load(workspaceId: workspaceId)
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return }
+            if reload { await load(workspaceId: workspaceId) }
         } catch {
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return }
             errorMessage = error.localizedDescription
         }
     }

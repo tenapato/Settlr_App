@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 
+@MainActor
 @Observable
 final class IncomeVM {
     var incomes: [Income] = []
@@ -19,6 +20,8 @@ final class IncomeVM {
     }()
 
     private let api = APIClient.shared
+    private var categoryLoadGeneration = 0
+    private var categoryWorkspaceID: String?
 
     var hasActiveFilter: Bool {
         !searchText.isEmpty || filterCategoryId != nil
@@ -50,6 +53,51 @@ final class IncomeVM {
     }
 
     @MainActor
+    func resetCategoriesForWorkspace(_ workspaceId: String) {
+        categoryLoadGeneration += 1
+        categoryWorkspaceID = workspaceId
+        categories = []
+    }
+
+    /// Returns a token Activity can use to reject a save response that crosses
+    /// a workspace switch. Existing callers do not need to participate.
+    @MainActor
+    func workspaceMutationGeneration(for workspaceId: String) -> Int {
+        guard categoryWorkspaceID == workspaceId else { return -1 }
+        return categoryLoadGeneration
+    }
+
+    private func acceptsMutation(
+        workspaceId: String,
+        expectedGeneration: Int?
+    ) -> Bool {
+        guard let expectedGeneration else { return true }
+        return categoryWorkspaceID == workspaceId && categoryLoadGeneration == expectedGeneration
+    }
+
+    @MainActor
+    func loadCategories(workspaceId: String, categoriesEnabled: Bool) async {
+        if categoryWorkspaceID != workspaceId {
+            resetCategoriesForWorkspace(workspaceId)
+        }
+        guard categoriesEnabled else {
+            categories = []
+            return
+        }
+        let generation = categoryLoadGeneration
+        do {
+            let response: CategoriesResponse = try await api.fetch(
+                Endpoints.categories(workspaceId) + "?scope=income"
+            )
+            guard generation == categoryLoadGeneration, categoryWorkspaceID == workspaceId else { return }
+            categories = response.categories
+        } catch {
+            guard generation == categoryLoadGeneration, categoryWorkspaceID == workspaceId else { return }
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
     func load(workspaceId: String) async {
         isLoading = true
         defer { isLoading = false }
@@ -75,44 +123,63 @@ final class IncomeVM {
     }
 
     @MainActor
-    func create(workspaceId: String, body: CreateIncomeBody) async {
+    func create(
+        workspaceId: String,
+        body: CreateIncomeBody,
+        expectedGeneration: Int? = nil
+    ) async {
         do {
             let response: CreateIncomeResponse = try await api.fetch(
                 Endpoints.income(workspaceId),
                 method: "POST",
                 body: body
             )
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return }
             incomes.insert(response.income, at: 0)
         } catch {
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return }
             errorMessage = error.localizedDescription
         }
     }
 
     @MainActor
     @discardableResult
-    func update(workspaceId: String, incomeId: String, body: CreateIncomeBody) async -> Income? {
+    func update(
+        workspaceId: String,
+        incomeId: String,
+        body: CreateIncomeBody,
+        expectedGeneration: Int? = nil
+    ) async -> Income? {
         do {
             let response: CreateIncomeResponse = try await api.fetch(
                 Endpoints.incomeItem(workspaceId, incomeId),
                 method: "PATCH",
                 body: body
             )
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return nil }
             if let idx = incomes.firstIndex(where: { $0.id == incomeId }) {
                 incomes[idx] = response.income
             }
             return response.income
         } catch {
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return nil }
             errorMessage = error.localizedDescription
             return nil
         }
     }
 
     @MainActor
-    func delete(workspaceId: String, incomeId: String) async {
+    func delete(
+        workspaceId: String,
+        incomeId: String,
+        expectedGeneration: Int? = nil
+    ) async {
         do {
             try await api.send(Endpoints.incomeItem(workspaceId, incomeId), method: "DELETE")
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return }
             incomes.removeAll { $0.id == incomeId }
         } catch {
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -120,16 +187,23 @@ final class IncomeVM {
     // MARK: - Recurring income rules
 
     @MainActor
-    func createRecurring(workspaceId: String, body: CreateRecurringIncomeBody) async -> Bool {
+    func createRecurring(
+        workspaceId: String,
+        body: CreateRecurringIncomeBody,
+        reload: Bool = true,
+        expectedGeneration: Int? = nil
+    ) async -> Bool {
         do {
             let _: RecurringIncomeResponse = try await api.fetch(
                 Endpoints.recurringIncome(workspaceId),
                 method: "POST",
                 body: body
             )
-            await load(workspaceId: workspaceId)
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return false }
+            if reload { await load(workspaceId: workspaceId) }
             return true
         } catch {
+            guard acceptsMutation(workspaceId: workspaceId, expectedGeneration: expectedGeneration) else { return false }
             errorMessage = error.localizedDescription
             return false
         }

@@ -52,7 +52,6 @@ struct CardsAndCategoriesView: View {
             .navigationTitle(selectedSegment.title)
             .navigationBarTitleDisplayMode(.large)
         }
-        .preferredColorScheme(.dark)
         .onAppear(perform: reconcileSegment)
         .onChange(of: segments) { _, _ in reconcileSegment() }
     }

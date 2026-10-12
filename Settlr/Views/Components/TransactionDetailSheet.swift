@@ -5,13 +5,13 @@ import SwiftUI
 private struct TransactionDetailRow: View {
     let label: String
     let value: String
-    var valueColor: Color = Color(hex: "#ecedee")
+    var valueColor: Color = Theme.ink
 
     var body: some View {
         HStack(alignment: .top) {
             Text(label)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color(hex: "#8e9197"))
+                .foregroundStyle(Theme.muted)
             Spacer(minLength: 16)
             Text(value)
                 .font(.system(size: 15, weight: .medium))
@@ -33,10 +33,10 @@ private struct TransactionDetailCard<Content: View>: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(Color(hex: "#15171a"))
+                .fill(Theme.surface)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
-                        .strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1)
+                        .strokeBorder(Theme.line, lineWidth: 1)
                 )
         )
     }
@@ -45,9 +45,38 @@ private struct TransactionDetailCard<Content: View>: View {
 private struct TransactionDetailDivider: View {
     var body: some View {
         Divider()
-            .overlay(Color(hex: "#2a2d32"))
+            .overlay(Theme.line)
             .padding(.leading, 16)
     }
+}
+
+private struct TransactionRecoveryBanner: View {
+    let message: String
+    let onRetry: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle")
+                .foregroundStyle(Theme.warning)
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(Theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button("Retry", action: onRetry)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Theme.accentText)
+                .frame(minWidth: 44, minHeight: 44)
+        }
+        .padding(.horizontal, 12)
+        .background(Theme.surface2, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .accessibilityElement(children: .contain)
+    }
+}
+
+private enum TransactionRetryAction {
+    case edit
+    case delete
 }
 
 private extension View {
@@ -55,9 +84,8 @@ private extension View {
         self
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
-            .presentationBackground(Color(hex: "#0e0f11"))
+            .presentationBackground(Theme.bg)
             .presentationCornerRadius(24)
-            .preferredColorScheme(.dark)
     }
 }
 
@@ -68,22 +96,32 @@ struct ExpenseDetailSheet: View {
     let categories: [Category]
     let cards: [CreditCard]
     let onUpdated: (Expense) -> Void
+    let onDeleted: (() -> Void)?
+    let isWorkspaceCurrent: () -> Bool
 
     @State private var expense: Expense
     @Environment(\.dismiss) private var dismiss
     @State private var showEditForm = false
+    @State private var showDeleteConfirmation = false
+    @State private var isDeleting = false
+    @State private var operationErrorMessage: String?
+    @State private var retryAction: TransactionRetryAction?
 
     init(
         workspaceId: String,
         expense: Expense,
         categories: [Category],
         cards: [CreditCard],
-        onUpdated: @escaping (Expense) -> Void
+        onUpdated: @escaping (Expense) -> Void,
+        onDeleted: (() -> Void)? = nil,
+        isWorkspaceCurrent: @escaping () -> Bool = { true }
     ) {
         self.workspaceId = workspaceId
         self.categories = categories
         self.cards = cards
         self.onUpdated = onUpdated
+        self.onDeleted = onDeleted
+        self.isWorkspaceCurrent = isWorkspaceCurrent
         _expense = State(initialValue: expense)
     }
 
@@ -114,16 +152,26 @@ struct ExpenseDetailSheet: View {
                 VStack(spacing: 20) {
                     header(
                         icon: expense.paymentChannel == "credit_card" ? "creditcard.fill" : "banknote.fill",
-                        tint: Color(hex: "#ff6b6b"),
+                        tint: Theme.expense,
                         amountCents: expense.amountCents,
-                        amountColor: Color(hex: "#ecedee")
+                        amountColor: Theme.ink
                     )
+
+                    if let operationErrorMessage {
+                        TransactionRecoveryBanner(message: operationErrorMessage) {
+                            switch retryAction {
+                            case .edit: showEditForm = true
+                            case .delete: showDeleteConfirmation = true
+                            case nil: break
+                            }
+                        }
+                    }
 
                     TransactionDetailCard {
                         HStack(alignment: .top, spacing: 8) {
                             Text(expense.description)
                                 .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(Color(hex: "#ecedee"))
+                                .foregroundStyle(Theme.ink)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             ExpenseMarkerTags(expense: expense)
                         }
@@ -164,24 +212,40 @@ struct ExpenseDetailSheet: View {
                 .padding(.bottom, 14)
             }
             .contentMargins(.bottom, 24, for: .scrollContent)
-            .background(Color(hex: "#0e0f11"))
+            .background(Theme.bg)
             .navigationTitle("Expense")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { showEditForm = true } label: {
-                        Image(systemName: "pencil")
-                            .foregroundStyle(Color(hex: "#c8ff5a"))
+                    HStack(spacing: 18) {
+                        Button { showEditForm = true } label: {
+                            Image(systemName: "pencil")
+                                .foregroundStyle(Theme.accentText)
+                                .frame(width: 44, height: 44)
+                        }
+                        if onDeleted != nil {
+                            Button(role: .destructive) { showDeleteConfirmation = true } label: {
+                                Image(systemName: "trash")
+                                    .frame(width: 44, height: 44)
+                            }
+                            .disabled(isDeleting)
+                        }
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
-                        .foregroundStyle(Color(hex: "#c8ff5a"))
+                        .foregroundStyle(Theme.accentText)
                         .fontWeight(.semibold)
                 }
             }
         }
         .transactionDetailSheetStyle()
+        .alert("Delete Expense?", isPresented: $showDeleteConfirmation) {
+            Button("Delete", role: .destructive) { Task { await deleteExpense() } }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This expense will be removed from the workspace.")
+        }
         .sheet(isPresented: $showEditForm) {
             ExpenseFormSheet(
                 workspaceId: workspaceId,
@@ -190,6 +254,8 @@ struct ExpenseDetailSheet: View {
             ) { body in
                 Task {
                     if let updated = await updateExpense(body) {
+                        operationErrorMessage = nil
+                        retryAction = nil
                         expense = updated
                         onUpdated(updated)
                     }
@@ -206,9 +272,31 @@ struct ExpenseDetailSheet: View {
                 method: "PATCH",
                 body: body
             )
+            guard isWorkspaceCurrent() else { return nil }
             return response.expense
         } catch {
+            operationErrorMessage = "Couldn’t update this expense. Saved data is unchanged. \(error.localizedDescription)"
+            retryAction = .edit
             return nil
+        }
+    }
+
+    @MainActor
+    private func deleteExpense() async {
+        guard !isDeleting, let onDeleted else { return }
+        isDeleting = true
+        defer { isDeleting = false }
+        do {
+            try await APIClient.shared.send(
+                Endpoints.expense(workspaceId, expense.id),
+                method: "DELETE"
+            )
+            guard isWorkspaceCurrent() else { return }
+            onDeleted()
+            dismiss()
+        } catch {
+            operationErrorMessage = "Couldn’t delete this expense. It is still saved. \(error.localizedDescription)"
+            retryAction = .delete
         }
     }
 }
@@ -219,20 +307,30 @@ struct IncomeDetailSheet: View {
     let workspaceId: String
     let categories: [Category]
     let onUpdated: (Income) -> Void
+    let onDeleted: (() -> Void)?
+    let isWorkspaceCurrent: () -> Bool
 
     @State private var income: Income
     @Environment(\.dismiss) private var dismiss
     @State private var showEditForm = false
+    @State private var showDeleteConfirmation = false
+    @State private var isDeleting = false
+    @State private var operationErrorMessage: String?
+    @State private var retryAction: TransactionRetryAction?
 
     init(
         workspaceId: String,
         income: Income,
         categories: [Category],
-        onUpdated: @escaping (Income) -> Void
+        onUpdated: @escaping (Income) -> Void,
+        onDeleted: (() -> Void)? = nil,
+        isWorkspaceCurrent: @escaping () -> Bool = { true }
     ) {
         self.workspaceId = workspaceId
         self.categories = categories
         self.onUpdated = onUpdated
+        self.onDeleted = onDeleted
+        self.isWorkspaceCurrent = isWorkspaceCurrent
         _income = State(initialValue: income)
     }
 
@@ -246,16 +344,26 @@ struct IncomeDetailSheet: View {
                 VStack(spacing: 20) {
                     header(
                         icon: "arrow.down.circle.fill",
-                        tint: Color(hex: "#5ddf8a"),
+                        tint: Theme.income,
                         amountCents: income.amountCents,
-                        amountColor: Color(hex: "#5ddf8a")
+                        amountColor: Theme.income
                     )
+
+                    if let operationErrorMessage {
+                        TransactionRecoveryBanner(message: operationErrorMessage) {
+                            switch retryAction {
+                            case .edit: showEditForm = true
+                            case .delete: showDeleteConfirmation = true
+                            case nil: break
+                            }
+                        }
+                    }
 
                     TransactionDetailCard {
                         HStack(alignment: .top, spacing: 8) {
                             Text(income.description)
                                 .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(Color(hex: "#ecedee"))
+                                .foregroundStyle(Theme.ink)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             IncomeMarkerTags(income: income)
                         }
@@ -284,24 +392,40 @@ struct IncomeDetailSheet: View {
                 .padding(.bottom, 14)
             }
             .contentMargins(.bottom, 24, for: .scrollContent)
-            .background(Color(hex: "#0e0f11"))
+            .background(Theme.bg)
             .navigationTitle("Income")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { showEditForm = true } label: {
-                        Image(systemName: "pencil")
-                            .foregroundStyle(Color(hex: "#c8ff5a"))
+                    HStack(spacing: 18) {
+                        Button { showEditForm = true } label: {
+                            Image(systemName: "pencil")
+                                .foregroundStyle(Theme.accentText)
+                                .frame(width: 44, height: 44)
+                        }
+                        if onDeleted != nil {
+                            Button(role: .destructive) { showDeleteConfirmation = true } label: {
+                                Image(systemName: "trash")
+                                    .frame(width: 44, height: 44)
+                            }
+                            .disabled(isDeleting)
+                        }
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
-                        .foregroundStyle(Color(hex: "#c8ff5a"))
+                        .foregroundStyle(Theme.accentText)
                         .fontWeight(.semibold)
                 }
             }
         }
         .transactionDetailSheetStyle()
+        .alert("Delete Income?", isPresented: $showDeleteConfirmation) {
+            Button("Delete", role: .destructive) { Task { await deleteIncome() } }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This income will be removed from the workspace.")
+        }
         .sheet(isPresented: $showEditForm) {
             IncomeFormSheet(
                 workspaceId: workspaceId,
@@ -310,6 +434,8 @@ struct IncomeDetailSheet: View {
             ) { body, _ in
                 Task {
                     if let updated = await updateIncome(body) {
+                        operationErrorMessage = nil
+                        retryAction = nil
                         income = updated
                         onUpdated(updated)
                     }
@@ -326,9 +452,31 @@ struct IncomeDetailSheet: View {
                 method: "PATCH",
                 body: body
             )
+            guard isWorkspaceCurrent() else { return nil }
             return response.income
         } catch {
+            operationErrorMessage = "Couldn’t update this income. Saved data is unchanged. \(error.localizedDescription)"
+            retryAction = .edit
             return nil
+        }
+    }
+
+    @MainActor
+    private func deleteIncome() async {
+        guard !isDeleting, let onDeleted else { return }
+        isDeleting = true
+        defer { isDeleting = false }
+        do {
+            try await APIClient.shared.send(
+                Endpoints.incomeItem(workspaceId, income.id),
+                method: "DELETE"
+            )
+            guard isWorkspaceCurrent() else { return }
+            onDeleted()
+            dismiss()
+        } catch {
+            operationErrorMessage = "Couldn’t delete this income. It is still saved. \(error.localizedDescription)"
+            retryAction = .delete
         }
     }
 }
@@ -357,6 +505,6 @@ private func header(icon: String, tint: Color, amountCents: Int, amountColor: Co
 }
 
 private func categoryColor(_ hex: String?) -> Color {
-    guard let hex, !hex.isEmpty else { return Color(hex: "#8e9197") }
+    guard let hex, !hex.isEmpty else { return Theme.muted }
     return Color(hex: hex)
 }

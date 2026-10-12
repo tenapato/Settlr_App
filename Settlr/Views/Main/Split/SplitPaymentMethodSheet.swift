@@ -153,8 +153,9 @@ struct SplitPaymentMethodSheet: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
         .presentationDetents([.medium])
+        .presentationBackground(Theme.bg)
+        .interactiveDismissDisabled(vm.isSaving)
         .task { await loadCards() }
         .onChange(of: vm.detail?.version) { _, refreshedVersion in
             if let refreshedVersion { state.adoptRefreshedVersion(refreshedVersion) }

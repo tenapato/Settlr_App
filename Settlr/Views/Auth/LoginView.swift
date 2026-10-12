@@ -3,134 +3,116 @@ import SwiftUI
 
 struct LoginView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.colorScheme) private var colorScheme
     @State private var vm = AuthViewModel()
     @State private var showSignup = false
 
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(hex: "#0e0f11").ignoresSafeArea()
+                Theme.bg.ignoresSafeArea()
 
-                VStack(spacing: 0) {
-                    Spacer()
-
-                    // Logo / wordmark
-                    VStack(spacing: 8) {
-                        Image("SettlrLogo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 72, height: 72)
-                        Text("Settlr")
-                            .font(.system(size: 34, weight: .bold))
-                            .foregroundStyle(Color(hex: "#ecedee"))
-                        Text("Track every peso.")
-                            .font(.system(size: 15, weight: .regular))
-                            .foregroundStyle(Color(hex: "#8e9197"))
-                    }
-                    .padding(.bottom, 48)
-
-                    // Form
-                    VStack(spacing: 14) {
-                        StyledTextField(placeholder: "Email", text: $vm.email, keyboardType: .emailAddress)
-                        StyledTextField(placeholder: "Password", text: $vm.password, isSecure: true)
-
-                        if let error = vm.errorMessage {
-                            Text(error)
-                                .font(.system(size: 13))
-                                .foregroundStyle(Color(hex: "#ff6b6b"))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 4)
+                ScrollView {
+                    VStack(spacing: 32) {
+                        VStack(spacing: 8) {
+                            Image("SettlrLogo")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 72, height: 72)
+                                .accessibilityHidden(true)
+                            Text("Settlr")
+                                .font(.largeTitle.bold())
+                                .foregroundStyle(Theme.ink)
+                            Text("Track every peso.")
+                                .font(.body)
+                                .foregroundStyle(Theme.muted)
                         }
 
-                        Button {
-                            Task { await vm.signIn(appState: appState) }
-                        } label: {
-                            Group {
+                        VStack(spacing: 14) {
+                            StyledTextField(placeholder: "Email", text: $vm.email, keyboardType: .emailAddress)
+                            StyledTextField(placeholder: "Password", text: $vm.password, isSecure: true)
+
+                            if let error = vm.errorMessage {
+                                Text(error)
+                                    .font(.footnote)
+                                    .foregroundStyle(Theme.expense)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 4)
+                                    .accessibilityLabel("Sign in failed. \(error)")
+                            }
+
+                            Button {
+                                Task { await vm.signIn(appState: appState) }
+                            } label: {
                                 if vm.isLoading {
-                                    ProgressView().tint(Color(hex: "#0e0f11"))
+                                    ProgressView().tint(Theme.buttonInk)
                                 } else {
-                                    Text("Sign In")
-                                        .font(.system(size: 16, weight: .semibold))
-                                        .foregroundStyle(Color(hex: "#0e0f11"))
+                                    Text("Sign in")
                                 }
                             }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(Color(hex: "#c8ff5a"))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                        }
-                        .disabled(vm.isLoading)
+                            .buttonStyle(PrimaryButtonStyle())
+                            .disabled(vm.isLoading)
 
-                        HStack(spacing: 12) {
-                            Rectangle()
-                                .fill(Color(hex: "#2a2d32"))
-                                .frame(height: 1)
-                            Text("or")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(Color(hex: "#5a5d63"))
-                            Rectangle()
-                                .fill(Color(hex: "#2a2d32"))
-                                .frame(height: 1)
-                        }
-
-                        SignInWithAppleButton(.signIn) { request in
-                            request.requestedScopes = [.fullName, .email]
-                        } onCompletion: { result in
-                            Task { await vm.signInWithApple(result: result, appState: appState) }
-                        }
-                        .signInWithAppleButtonStyle(.black)
-                        .frame(height: 50)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1)
-                        )
-                        .disabled(vm.isLoading)
-
-                        Button {
-                            Task { await vm.signInWithGoogle(appState: appState) }
-                        } label: {
-                            HStack(spacing: 10) {
-                                Text("G")
-                                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                                    .foregroundStyle(Color(hex: "#c8ff5a"))
-                                Text("Continue with Google")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(Color(hex: "#ecedee"))
+                            HStack(spacing: 12) {
+                                Rectangle().fill(Theme.line).frame(height: 1)
+                                Text("or").font(.footnote.weight(.medium)).foregroundStyle(Theme.faint)
+                                Rectangle().fill(Theme.line).frame(height: 1)
                             }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .fill(Color(hex: "#15171a"))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 14)
-                                            .strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1)
-                                    )
-                            )
+
+                            SignInWithAppleButton(.signIn) { request in
+                                request.requestedScopes = [.fullName, .email]
+                            } onCompletion: { result in
+                                Task { await vm.signInWithApple(result: result, appState: appState) }
+                            }
+                            .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                            .frame(height: 52)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .disabled(vm.isLoading)
+
+                            Button {
+                                Task { await vm.signInWithGoogle(appState: appState) }
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Text("G")
+                                        .font(.title3.bold())
+                                        .foregroundStyle(Theme.accentText)
+                                    Text("Continue with Google")
+                                        .font(.body.weight(.semibold))
+                                        .foregroundStyle(Theme.ink)
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 50)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .fill(Theme.surface)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                                .strokeBorder(Theme.line, lineWidth: 1)
+                                        )
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(vm.isLoading)
                         }
-                        .disabled(vm.isLoading)
+
+                        HStack(spacing: 4) {
+                            Text("Don't have an account?").foregroundStyle(Theme.muted)
+                            Button("Sign up") { showSignup = true }
+                                .foregroundStyle(Theme.accentText)
+                                .frame(minHeight: 44)
+                        }
+                        .font(.subheadline)
                     }
+                    .frame(maxWidth: 480)
                     .padding(.horizontal, 24)
-
-                    Spacer()
-
-                    // Sign up link
-                    HStack(spacing: 4) {
-                        Text("Don't have an account?")
-                            .foregroundStyle(Color(hex: "#8e9197"))
-                        Button("Sign Up") { showSignup = true }
-                            .foregroundStyle(Color(hex: "#c8ff5a"))
-                    }
-                    .font(.system(size: 14))
-                    .padding(.bottom, 32)
+                    .padding(.vertical, 48)
+                    .frame(maxWidth: .infinity)
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
             .navigationDestination(isPresented: $showSignup) {
                 SignupView()
             }
         }
-        .preferredColorScheme(.dark)
     }
 }
 
@@ -151,16 +133,17 @@ struct StyledTextField: View {
                     .autocorrectionDisabled()
             }
         }
-        .font(.system(size: 16))
-        .foregroundStyle(Color(hex: "#ecedee"))
+        .font(.body)
+        .foregroundStyle(Theme.ink)
+        .tint(Theme.accent)
         .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .frame(minHeight: 52)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(hex: "#15171a"))
+                .fill(Theme.surface)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1)
+                        .strokeBorder(Theme.line, lineWidth: 1)
                 )
         )
     }

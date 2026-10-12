@@ -10,6 +10,7 @@ struct SplitListView: View {
     @Environment(AppState.self) private var appState
     @State private var vm = BillSplitVM()
     @State private var showCreate = false
+    @State private var splitScanHandoff = SplitScanHandoff()
     @State private var openSplitId: String?
     @State private var discarding: PendingSplit?
     private let queue = PendingSplitQueue.shared
@@ -18,6 +19,10 @@ struct SplitListView: View {
     private var pending: [PendingSplit] {
         guard let userId = appState.currentUser?.id else { return [] }
         return queue.entries(userId: userId, workspaceId: workspaceId)
+    }
+
+    private var hasWaitingPending: Bool {
+        pending.contains { $0.isWaiting }
     }
 
     var body: some View {
@@ -53,12 +58,19 @@ struct SplitListView: View {
             .navigationDestination(item: $openSplitId) { id in
                 SplitDetailView(workspaceId: workspaceId, splitId: id, vm: vm)
             }
-            .fullScreenCover(isPresented: $showCreate) {
+            .fullScreenCover(isPresented: $showCreate, onDismiss: {
+                guard let outcome = splitScanHandoff.takeAfterDismissal(),
+                      appState.currentUser?.has(.billSplits) == true,
+                      appState.activeWorkspace?.id == workspaceId else { return }
+                switch outcome {
+                case .created(let split): openSplitId = split.id
+                case .queued, .needsAttention: break
+                case .rejected: return
+                }
+                Task { await vm.load(workspaceId: workspaceId) }
+            }) {
                 SplitScanFlow(workspaceId: workspaceId) { outcome in
-                    // A queued split has no server id, so there is nothing to
-                    // open — it appears in the pending section instead.
-                    if case .created(let split) = outcome { openSplitId = split.id }
-                    Task { await vm.load(workspaceId: workspaceId) }
+                    splitScanHandoff.receive(outcome)
                 }
             }
             .confirmationDialog(
@@ -75,7 +87,6 @@ struct SplitListView: View {
                 Text("It hasn't uploaded yet, so it will be gone for good.")
             }
         }
-        .preferredColorScheme(.dark)
         .task {
             if openSplitId == nil { openSplitId = initialSplitId }
             await vm.load(workspaceId: workspaceId)
@@ -124,14 +135,14 @@ struct SplitListView: View {
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
-    // MARK: - Waiting to upload
+    // MARK: - Pending splits
 
     private var pendingSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                SectionEyebrow("Waiting to upload")
+                SectionEyebrow("Pending splits")
                 Spacer()
-                if network.isOnline {
+                if network.isOnline && hasWaitingPending {
                     Button("Sync now") { Task { await syncPending() } }
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Theme.accent)
@@ -277,7 +288,7 @@ struct SplitListView: View {
             Button { showCreate = true } label: {
                 Text("Split a bill")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.bg)
+                    .foregroundStyle(Theme.buttonInk)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
                     .background(Theme.accent)

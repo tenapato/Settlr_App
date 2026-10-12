@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Settlr — Satellite menu variants</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root { color-scheme: dark; }
+    body { margin: 0; background: #090a0b; color: #f4f5ef; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; -webkit-font-smoothing: antialiased; }
+    main { max-width: 1360px; margin: 0 auto; padding: 52px 28px 70px; }
+    .eyebrow { color: #caff3a; font-size: 10px; font-weight: 820; letter-spacing: .16em; text-transform: uppercase; }
+    h1 { max-width: 850px; margin: 10px 0 12px; font-size: clamp(32px, 5vw, 56px); line-height: 1; letter-spacing: -.045em; }
+    .intro { max-width: 760px; margin: 0 0 34px; color: #989ca0; font-size: 15px; line-height: 1.55; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .choice { position: relative; min-width: 0; padding: 12px; border: 1px solid #292d31; border-radius: 25px; background: #111316; cursor: pointer; transition: transform .16s ease, border-color .16s ease; }
+    .choice:hover { transform: translateY(-3px); border-color: #5a5f65; }
+    .choice.selected { border-color: #f4f5ef; outline: 2px solid rgba(244,245,239,.16); }
+    .choice.selected::after { content: "SELECTED"; position: absolute; z-index: 8; top: 23px; right: 23px; padding: 6px 9px; border-radius: 999px; background: #f4f5ef; color: #090a0b; font-size: 9px; font-weight: 850; letter-spacing: .12em; }
+    .phone { position: relative; height: 590px; overflow: hidden; border: 1px solid #202327; border-radius: 18px; background: #090a0b; }
+    .content { position: absolute; inset: 0; padding: 25px 18px 110px; }
+    .brand { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 820; letter-spacing: .06em; }
+    .logo { display: grid; gap: 3px; width: 21px; }
+    .logo i { display: block; height: 3px; border-radius: 2px; background: #caff3a; }
+    .logo i:nth-child(2) { margin-left: 5px; }
+    .label { margin-top: 34px; color: #caff3a; font-size: 9px; font-weight: 820; letter-spacing: .14em; text-transform: uppercase; }
+    .value { margin-top: 7px; font-size: 39px; font-weight: 780; letter-spacing: -.05em; }
+    .ghost-title { width: 105px; height: 8px; margin-top: 34px; border-radius: 8px; background: #2b2e32; }
+    .ghost { display: grid; grid-template-columns: 35px 1fr 58px; gap: 10px; align-items: center; padding: 15px 0; border-bottom: 1px solid #202327; }
+    .ghost-icon { width: 35px; height: 35px; border-radius: 10px; background: #191c1f; }
+    .ghost-copy b, .ghost-copy i, .ghost-amount { display: block; height: 7px; border-radius: 5px; background: #282b2f; }
+    .ghost-copy i { width: 65%; margin-top: 7px; background: #191c1f; }
+    .ghost-amount { width: 50px; justify-self: end; }
+    .veil { position: absolute; inset: 0; background: rgba(0,0,0,.62); }
+    .bar { position: absolute; left: 16px; right: 16px; bottom: 16px; display: flex; align-items: center; gap: 11px; }
+    .tabs { height: 58px; flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); align-items: center; padding: 6px; border: 1px solid #2b2f33; border-radius: 999px; background: #171a1d; }
+    .tabs span { color: #777b80; text-align: center; font-size: 9px; font-weight: 720; }
+    .tabs .active { color: #caff3a; }
+    .fab { width: 58px; height: 58px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 50%; background: #caff3a; color: #090a0b; font-size: 30px; font-weight: 500; }
+    .menu { position: absolute; right: 16px; bottom: 87px; overflow: hidden; border: 1px solid #303438; border-radius: 18px; background: #15181b; }
+    .menu.slim { width: 226px; }
+    .row { display: grid; grid-template-columns: 34px 1fr; gap: 11px; align-items: center; min-height: 55px; padding: 8px 13px; border-bottom: 1px solid #282c30; }
+    .row:last-child { border-bottom: 0; }
+    .icon { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 9px; background: #22262a; color: #caff3a; font-size: 14px; font-weight: 800; }
+    .row strong { display: block; font-size: 12px; }
+    .row small { display: block; margin-top: 3px; color: #777c81; font-size: 9px; }
+
+    .menu.signature { width: 242px; padding: 8px; }
+    .signature .hero { padding: 14px; border-radius: 12px; background: #caff3a; color: #090a0b; }
+    .hero-top { display: flex; align-items: center; gap: 10px; }
+    .hero-icon { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid rgba(9,10,11,.28); border-radius: 10px; font-size: 15px; font-weight: 800; }
+    .hero strong { font-size: 13px; }
+    .hero p { margin: 8px 0 0; font-size: 10px; line-height: 1.35; opacity: .72; }
+    .signature .micro-label { padding: 15px 8px 7px; color: #71767b; font-size: 8px; font-weight: 820; letter-spacing: .14em; text-transform: uppercase; }
+    .signature .row { min-height: 49px; padding: 6px 7px; }
+    .signature .row:last-child { border-bottom: 0; }
+    .signature .icon { background: #212529; }
+
+    .menu.command { width: 264px; padding: 15px; }
+    .command h3 { margin: 0; font-size: 18px; letter-spacing: -.025em; }
+    .command > p { margin: 5px 0 14px; color: #7f8489; font-size: 10px; }
+    .command .row { min-height: 54px; padding: 7px 0; }
+    .command .scan-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding: 12px 13px; border-radius: 11px; background: #22262a; }
+    .scan-footer strong { font-size: 11px; }
+    .scan-footer span { color: #caff3a; font-size: 18px; }
+
+    .meta { padding: 18px 9px 10px; }
+    .meta-head { display: flex; align-items: center; gap: 9px; }
+    .letter { width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid #494d52; border-radius: 50%; color: #c5c8ca; font-size: 10px; font-weight: 820; }
+    h2 { margin: 0; font-size: 20px; letter-spacing: -.025em; }
+    .meta p { min-height: 58px; margin: 10px 0 15px; color: #9da1a5; font-size: 12px; line-height: 1.5; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chips span { padding: 6px 8px; border: 1px solid #2e3236; border-radius: 999px; color: #b2b5b8; font-size: 9px; }
+    .foot { margin-top: 18px; padding: 17px 19px; border: 1px solid #2d3135; border-radius: 17px; color: #a4a8ab; font-size: 12px; line-height: 1.55; }
+    .foot b { color: #caff3a; }
+    @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } .phone { height: 550px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">Signal Black · Satellite menu study</div>
+    <h1>Same floating button. Three levels of hierarchy.</h1>
+    <p class="intro">The closed state and anchor stay identical. Choose how the open menu should communicate Settlr’s priorities.</p>
+
+    <section class="grid">
+      <article class="choice" data-choice="balanced-list" onclick="toggleSelect(this)">
+        <div class="phone">
+          <div class="content"><div class="brand"><span class="logo"><i></i><i></i><i></i></span>SETTLR</div><div class="label">Available this month</div><div class="value">$18,420</div><div class="ghost-title"></div><div class="ghost"><i class="ghost-icon"></i><div class="ghost-copy"><b></b><i></i></div><i class="ghost-amount"></i></div><div class="ghost"><i class="ghost-icon"></i><div class="ghost-copy"><b></b><i></i></div><i class="ghost-amount"></i></div></div>
+          <div class="veil"></div>
+          <div class="menu slim"><div class="row"><div class="icon">⌁</div><div><strong>Scan and split</strong><small>Start with a receipt</small></div></div><div class="row"><div class="icon">−</div><div><strong>Add expense</strong><small>Record money out</small></div></div><div class="row"><div class="icon">＋</div><div><strong>Add income</strong><small>Record money in</small></div></div><div class="row"><div class="icon">S</div><div><strong>Add savings</strong><small>Move toward a goal</small></div></div></div>
+          <div class="bar"><div class="tabs"><span class="active">Overview</span><span>Activity</span><span>Money</span></div><div class="fab">×</div></div>
+        </div>
+        <div class="meta"><div class="meta-head"><span class="letter">A</span><h2>Balanced list</h2></div><p>Every creation path has equal weight. The fastest to learn and the most stable when feature availability changes.</p><div class="chips"><span>Predictable</span><span>Compact</span><span>Feature-safe</span></div></div>
+      </article>
+
+      <article class="choice" data-choice="signature-scanner" onclick="toggleSelect(this)">
+        <div class="phone">
+          <div class="content"><div class="brand"><span class="logo"><i></i><i></i><i></i></span>SETTLR</div><div class="label">Available this month</div><div class="value">$18,420</div><div class="ghost-title"></div><div class="ghost"><i class="ghost-icon"></i><div class="ghost-copy"><b></b><i></i></div><i class="ghost-amount"></i></div><div class="ghost"><i class="ghost-icon"></i><div class="ghost-copy"><b></b><i></i></div><i class="ghost-amount"></i></div></div>
+          <div class="veil"></div>
+          <div class="menu signature"><div class="hero"><div class="hero-top"><div class="hero-icon">⌁</div><strong>Scan and split</strong></div><p>Capture a receipt and divide it in seconds.</p></div><div class="micro-label">Add manually</div><div class="row"><div class="icon">−</div><div><strong>Expense</strong><small>Money out</small></div></div><div class="row"><div class="icon">＋</div><div><strong>Income</strong><small>Money in</small></div></div><div class="row"><div class="icon">S</div><div><strong>Savings</strong><small>Move toward a goal</small></div></div></div>
+          <div class="bar"><div class="tabs"><span class="active">Overview</span><span>Activity</span><span>Money</span></div><div class="fab">×</div></div>
+        </div>
+        <div class="meta"><div class="meta-head"><span class="letter">B</span><h2>Signature scanner</h2></div><p>Turns receipt scanning and bill splitting into Settlr’s signature action while keeping manual entry immediately available.</p><div class="chips"><span>Strongest identity</span><span>Clear priority</span><span>Recommended</span></div></div>
+      </article>
+
+      <article class="choice" data-choice="command-card" onclick="toggleSelect(this)">
+        <div class="phone">
+          <div class="content"><div class="brand"><span class="logo"><i></i><i></i><i></i></span>SETTLR</div><div class="label">Available this month</div><div class="value">$18,420</div><div class="ghost-title"></div><div class="ghost"><i class="ghost-icon"></i><div class="ghost-copy"><b></b><i></i></div><i class="ghost-amount"></i></div><div class="ghost"><i class="ghost-icon"></i><div class="ghost-copy"><b></b><i></i></div><i class="ghost-amount"></i></div></div>
+          <div class="veil"></div>
+          <div class="menu command"><h3>Add a record</h3><p>Choose the movement you want to capture.</p><div class="row"><div class="icon">−</div><div><strong>Expense</strong><small>Purchase or outgoing payment</small></div></div><div class="row"><div class="icon">＋</div><div><strong>Income</strong><small>Deposit or incoming payment</small></div></div><div class="row"><div class="icon">S</div><div><strong>Savings</strong><small>Contribution to an account</small></div></div><div class="scan-footer"><strong>Scan and split a receipt</strong><span>⌁</span></div></div>
+          <div class="bar"><div class="tabs"><span class="active">Overview</span><span>Activity</span><span>Money</span></div><div class="fab">×</div></div>
+        </div>
+        <div class="meta"><div class="meta-head"><span class="letter">C</span><h2>Command card</h2></div><p>A larger, more explicit composition. Best for first-time comprehension, but visually heavier and slower for experienced users.</p><div class="chips"><span>Self-explanatory</span><span>Spacious</span><span>Heavier</span></div></div>
+      </article>
+    </section>
+
+    <div class="foot"><b>My recommendation changed to B:</b> the stronger scan treatment gives Settlr a memorable product behavior—not just a color palette. If bill splitting is not the app’s strategic differentiator, A is the safer choice.</div>
+  </main>
+</body>
+</html>

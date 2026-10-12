@@ -40,6 +40,11 @@ struct ExpenseFormSheet: View {
     @FocusState private var descriptionFocused: Bool
 
     private var isEditing: Bool { expense != nil }
+    private var canUseCreditCards: Bool { appState.currentUser?.has(.creditCards) == true }
+    private var effectivePaymentChannel: String { canUseCreditCards ? paymentChannel : "cash" }
+    private var effectiveCreditCardId: String? {
+        effectivePaymentChannel == "credit_card" ? selectedCreditCardId : nil
+    }
 
     init(
         workspaceId: String,
@@ -99,14 +104,24 @@ struct ExpenseFormSheet: View {
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        HeroAmountField(amountText: $amountText, tint: Theme.expense, focus: $amountFocused)
+                        HeroAmountField(
+                            amountText: $amountText,
+                            tint: Theme.expense,
+                            focus: $amountFocused,
+                            errorMessage: errorMessage
+                        )
 
-                        FormCard {
-                            FormTextRow(label: "Description", placeholder: "What was it for?", text: $description, focus: $descriptionFocused)
-                            FormRowDivider()
+                        VStack(spacing: 0) {
+                            SignalFormRow(label: "Description") {
+                                TextField("What was it for?", text: $description)
+                                    .focused($descriptionFocused)
+                                    .autocorrectionDisabled()
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(Theme.ink)
+                                    .multilineTextAlignment(.trailing)
+                            }
                             dateRow
                             if !expenseCategories.isEmpty {
-                                FormRowDivider()
                                 categoryRow
                             }
                         }
@@ -145,12 +160,11 @@ struct ExpenseFormSheet: View {
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button("Done") { amountFocused = false; descriptionFocused = false }
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.accentText)
                         .fontWeight(.semibold)
                 }
             }
         }
-        .preferredColorScheme(.dark)
         .task {
             await loadCreditCards()
             if canLinkSplit { await splitVM.load(workspaceId: workspaceId) }
@@ -166,7 +180,10 @@ struct ExpenseFormSheet: View {
                 onSaved: { _ in splitWasSaved = true }
             )
         }
-        .onAppear { if !isEditing && amountText.isEmpty { amountFocused = true } }
+        .onAppear {
+            normalizeCardPaymentState()
+            if !isEditing && amountText.isEmpty { amountFocused = true }
+        }
         .onChange(of: paymentChannel) { _, newValue in
             if newValue == "credit_card" {
                 ensureDefaultCreditCard()
@@ -174,30 +191,40 @@ struct ExpenseFormSheet: View {
                 selectedCreditCardId = nil
             }
         }
+        .onChange(of: canUseCreditCards) { _, _ in normalizeCardPaymentState() }
     }
 
     // MARK: - Rows
 
     private var dateRow: some View {
-        HStack(spacing: 12) {
-            Text("Date")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Theme.muted)
-            Spacer()
-            DatePicker("", selection: $selectedDate, displayedComponents: .date)
-                .labelsHidden()
+        SignalNativeFormRow {
+            DatePicker("Date", selection: $selectedDate, displayedComponents: .date)
                 .datePickerStyle(.compact)
                 .tint(Theme.accent)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 9)
     }
 
     private var categoryRow: some View {
-        FormMenuRow(label: "Category", value: categoryValueLabel, isPlaceholder: selectedCategoryId == nil) {
-            Button("No category") { selectedCategoryId = nil }
-            ForEach(expenseCategories) { cat in
-                Button(cat.name) { selectedCategoryId = cat.id }
+        SignalNativeFormRow {
+            Menu {
+                Button("No category") { selectedCategoryId = nil }
+                ForEach(expenseCategories) { cat in
+                    Button(cat.name) { selectedCategoryId = cat.id }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Text("Category")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Theme.muted)
+                    Spacer(minLength: 16)
+                    Text(categoryValueLabel)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(selectedCategoryId == nil ? Theme.faint : Theme.ink)
+                        .lineLimit(1)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.faint)
+                }
             }
         }
     }
@@ -265,10 +292,7 @@ struct ExpenseFormSheet: View {
                     .padding(.leading, 4)
                 SegmentedToggle(
                     selection: $paymentChannel,
-                    options: [
-                        ToggleOption(value: "cash", label: "Cash", icon: "banknote.fill"),
-                        ToggleOption(value: "credit_card", label: "Credit Card", icon: "creditcard.fill")
-                    ]
+                    options: paymentOptions
                 )
             }
         }
@@ -276,7 +300,7 @@ struct ExpenseFormSheet: View {
 
     @ViewBuilder
     private var cardSection: some View {
-        if paymentChannel == "credit_card" {
+        if paymentChannel == "credit_card", canUseCreditCards {
             if let cardLoadError {
                 Text(cardLoadError).font(.footnote).foregroundStyle(Theme.warning)
                 Button("Reload Cards") { Task { await loadCreditCards() } }
@@ -292,10 +316,24 @@ struct ExpenseFormSheet: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 4)
             } else {
-                FormCard {
-                    FormMenuRow(label: "Card", value: cardValueLabel, isPlaceholder: selectedCreditCardId == nil) {
+        SignalNativeFormRow {
+            Menu {
                         ForEach(creditCards) { card in
                             Button(cardOptionLabel(card)) { selectedCreditCardId = card.id }
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text("Card")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(Theme.muted)
+                            Spacer(minLength: 16)
+                            Text(cardValueLabel)
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(selectedCreditCardId == nil ? Theme.faint : Theme.ink)
+                                .lineLimit(1)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(Theme.faint)
                         }
                     }
                 }
@@ -310,10 +348,18 @@ struct ExpenseFormSheet: View {
         let normalized = amountText.replacingOccurrences(of: ",", with: ".")
         let amount = Double(normalized) ?? 0
         let hasAmount = amount.isFinite && amount >= 0.005 && amount < Double(Int.max / 100)
-        let cardOK = paymentChannel != "credit_card" || selectedCreditCardId != nil
+        let cardOK = (!isWalletPayment || canUseCreditCards) && (effectivePaymentChannel != "credit_card" || effectiveCreditCardId != nil)
         let splitOK = !canLinkSplit || splitChoice == "no" || splitChoice == "new"
             || (splitChoice == "existing" && selectedSplit.map(paymentMatches) == true && !splitVM.isLoading)
         return hasDescription && hasAmount && cardOK && splitOK && ["cash", "credit_card"].contains(paymentChannel)
+    }
+
+    private var paymentOptions: [ToggleOption] {
+        var options = [ToggleOption(value: "cash", label: "Cash", icon: "banknote.fill")]
+        if canUseCreditCards {
+            options.append(ToggleOption(value: "credit_card", label: "Credit Card", icon: "creditcard.fill"))
+        }
+        return options
     }
 
     private var categoryValueLabel: String {
@@ -337,11 +383,21 @@ struct ExpenseFormSheet: View {
         return card.label
     }
 
+    /// A stale session can revoke card access while an edit sheet is open. Do
+    /// not let that old UI state leak a gated payment channel into a request.
+    private func normalizeCardPaymentState() {
+        guard !canUseCreditCards else { return }
+        paymentChannel = "cash"
+        selectedCreditCardId = nil
+        creditCards = []
+    }
+
     // MARK: - Data + save
 
     @MainActor
     private func loadCreditCards() async {
         cardLoadError = nil
+        guard canUseCreditCards else { return }
         do {
             let resp: CreditCardsResponse = try await APIClient.shared.fetch(Endpoints.creditCards(workspaceId))
             creditCards = resp.creditCards.filter { !$0.isArchived || $0.id == expense?.creditCardId }
@@ -368,7 +424,7 @@ struct ExpenseFormSheet: View {
         f.dateFormat = "yyyy-MM-dd"
         return CreateExpenseBody(description: description, amountCents: Int((amount * 100).rounded()),
             occurredAt: f.string(from: selectedDate), categoryId: selectedCategoryId,
-            paymentChannel: paymentChannel, creditCardId: paymentChannel == "credit_card" ? selectedCreditCardId : nil)
+            paymentChannel: effectivePaymentChannel, creditCardId: effectiveCreditCardId)
     }
 
     private func completeAutomationSave() {
@@ -377,6 +433,11 @@ struct ExpenseFormSheet: View {
     }
 
     private func save() {
+        guard !isWalletPayment || canUseCreditCards else {
+            errorMessage = "Credit cards are disabled for this account."
+            return
+        }
+        normalizeCardPaymentState()
         guard !description.trimmingCharacters(in: .whitespaces).isEmpty else {
             errorMessage = "Description is required."
             return
@@ -395,8 +456,8 @@ struct ExpenseFormSheet: View {
             errorMessage = "Enter an amount of at least 0.01."
             return
         }
-        if paymentChannel == "credit_card" {
-            guard selectedCreditCardId != nil else {
+        if effectivePaymentChannel == "credit_card" {
+            guard effectiveCreditCardId != nil else {
                 errorMessage = creditCards.isEmpty ? "Add a credit card first." : "Select a credit card."
                 return
             }
@@ -409,8 +470,8 @@ struct ExpenseFormSheet: View {
             amountCents: cents,
             occurredAt: dateStr,
             categoryId: selectedCategoryId,
-            paymentChannel: paymentChannel,
-            creditCardId: paymentChannel == "credit_card" ? selectedCreditCardId : nil
+            paymentChannel: effectivePaymentChannel,
+            creditCardId: effectiveCreditCardId
         )
         if canLinkSplit && splitChoice == "new" {
             showNewSplit = true

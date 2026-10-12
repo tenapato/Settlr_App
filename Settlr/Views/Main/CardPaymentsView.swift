@@ -3,6 +3,7 @@ import Observation
 
 // MARK: - ViewModel
 
+@MainActor
 @Observable
 final class CardPaymentsVM {
     var month: String = {
@@ -17,6 +18,8 @@ final class CardPaymentsVM {
     var busyCardId: String?
 
     private let api = APIClient.shared
+    private var loadGeneration: UInt64 = 0
+    private var recordPresentation = CardPaymentSaveLifecycle()
 
     var activeWindow: FortnightWindow? {
         guard fortnight != .all else { return nil }
@@ -58,10 +61,47 @@ final class CardPaymentsVM {
 
     @MainActor
     func load(workspaceId: String) async {
-        isLoading = visibleCards.isEmpty
+        _ = await refreshSummary(workspaceId: workspaceId, presentationToken: nil)
+    }
+
+    func beginRecordPresentation() -> UInt64 {
+        recordPresentation.beginPresentation()
+    }
+
+    func invalidateRecordPresentation() {
+        recordPresentation.invalidate()
+        loadGeneration &+= 1
+        busyCardId = nil
+        isLoading = false
+    }
+
+    func ownsRecordPresentation(_ token: UInt64) -> Bool {
+        recordPresentation.owns(token)
+    }
+
+    private func refreshSummary(
+        workspaceId: String,
+        presentationToken: UInt64?
+    ) async -> CardPaymentRecordResult {
+        guard presentationToken.map({ recordPresentation.owns($0) }) ?? true else { return .stale }
+        loadGeneration &+= 1
+        let generation = loadGeneration
+        let requestedSelection = CardPaymentLoadSnapshot(
+            month: month,
+            fortnight: fortnight.rawValue
+        )
+        // Keep the existing rows visible while a refresh is in flight; roots
+        // render the inline Signal trace alongside that retained content.
+        isLoading = true
         errorMessage = nil
-        defer { isLoading = false }
+        defer {
+            if generation == loadGeneration {
+                isLoading = false
+            }
+        }
         do {
+            let nextSummary: CardPaymentsSummaryResponse?
+            let nextFortnightCards: [FortnightCard]?
             if let window = activeWindow {
                 let prevMonth = CardPaymentFortnight.shiftMonth(window.monthKey, by: -1)
                 async let currentResp: CardPaymentsSummaryResponse = api.fetch(
@@ -71,19 +111,40 @@ final class CardPaymentsVM {
                     Endpoints.cardPaymentsSummary(workspaceId) + MonthRangeQuery.summaryQuery(month: prevMonth)
                 )
                 let (current, previous) = try await (currentResp, previousResp)
-                fortnightCards = CardPaymentFortnight.mergeCards(
+                nextFortnightCards = CardPaymentFortnight.mergeCards(
                     window: window,
                     currentMonthCards: current.creditCards,
                     previousMonthCards: previous.creditCards
                 )
+                nextSummary = nil
             } else {
-                fortnightCards = nil
-                summary = try await api.fetch(
+                nextFortnightCards = nil
+                nextSummary = try await api.fetch(
                     Endpoints.cardPaymentsSummary(workspaceId) + MonthRangeQuery.summaryQuery(month: month)
                 )
             }
+            guard presentationToken.map({ recordPresentation.owns($0) }) ?? true else { return .stale }
+            guard requestedSelection.matches(month: month, fortnight: fortnight.rawValue) else { return .stale }
+            guard generation == loadGeneration else {
+                return presentationToken == nil
+                    ? .stale
+                    : .recordPaymentRefreshFailed("Payment status is still refreshing. Try again in a moment.")
+            }
+            fortnightCards = nextFortnightCards
+            if let nextSummary {
+                summary = nextSummary
+            }
+            return .refreshed
         } catch {
+            guard presentationToken.map({ recordPresentation.owns($0) }) ?? true else { return .stale }
+            guard requestedSelection.matches(month: month, fortnight: fortnight.rawValue) else { return .stale }
+            guard generation == loadGeneration else {
+                return presentationToken == nil
+                    ? .stale
+                    : .recordPaymentRefreshFailed("Payment status is still refreshing. Try again in a moment.")
+            }
             errorMessage = error.localizedDescription
+            return .recordPaymentRefreshFailed(error.localizedDescription)
         }
     }
 
@@ -105,6 +166,39 @@ final class CardPaymentsVM {
             errorMessage = error.localizedDescription
         }
     }
+
+    @MainActor
+    func recordPayment(
+        _ body: MonthlyCardPaymentBody,
+        workspaceId: String,
+        presentationToken: UInt64
+    ) async throws -> CardPaymentRecordResult {
+        guard ownsRecordPresentation(presentationToken) else { return .stale }
+        busyCardId = body.creditCardId
+        defer {
+            if ownsRecordPresentation(presentationToken) {
+                busyCardId = nil
+            }
+        }
+        do {
+            try await api.send(
+                Endpoints.monthlyCardPayments(workspaceId),
+                method: "POST",
+                body: body
+            )
+        } catch {
+            guard ownsRecordPresentation(presentationToken) else { return .stale }
+            throw error
+        }
+        return await refreshSummary(workspaceId: workspaceId, presentationToken: presentationToken)
+    }
+
+    func refreshRecordedPayment(
+        workspaceId: String,
+        presentationToken: UInt64
+    ) async -> CardPaymentRecordResult {
+        await refreshSummary(workspaceId: workspaceId, presentationToken: presentationToken)
+    }
 }
 
 // MARK: - View
@@ -116,7 +210,7 @@ struct CardPaymentsView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(hex: "#0e0f11").ignoresSafeArea()
+                Theme.bg.ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     MonthSelectorBar(selectedMonth: $vm.month) {
@@ -140,7 +234,6 @@ struct CardPaymentsView: View {
             .navigationTitle("Payments")
             .navigationBarTitleDisplayMode(.large)
         }
-        .preferredColorScheme(.dark)
         .task { await vm.load(workspaceId: workspaceId) }
     }
 
@@ -154,9 +247,8 @@ struct CardPaymentsView: View {
 
     @ViewBuilder
     private var content: some View {
-        if vm.isLoading {
-            ProgressView()
-                .tint(Color(hex: "#c8ff5a"))
+        if vm.isLoading && vm.visibleCards.isEmpty {
+            SettlrPulseLoadingView(message: "Loading payment status")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let err = vm.errorMessage, vm.visibleCards.isEmpty {
             PaymentsErrorView(message: err) {
@@ -179,11 +271,15 @@ struct CardPaymentsView: View {
     private var loadedList: some View {
         ScrollView {
             LazyVStack(spacing: 14) {
-                if let err = vm.errorMessage {
-                    Text(err)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color(hex: "#ff6b6b"))
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                if vm.errorMessage != nil {
+                    SignalRefreshWarning(message: "Showing saved payment status. Refresh failed.") {
+                        Task { await vm.load(workspaceId: workspaceId) }
+                    }
+                    .padding(.horizontal, 20)
+                }
+
+                if vm.isLoading {
+                    SignalTraceLoadingView(lastUpdated: nil)
                         .padding(.horizontal, 20)
                 }
 
@@ -195,7 +291,7 @@ struct CardPaymentsView: View {
                 if let window = vm.activeWindow {
                     Text("Payment dates \(window.startDay)–\(window.endDay) · \(monthLabel(window.monthKey)). Cards without a cutoff or payment day are hidden.")
                         .font(.system(size: 11))
-                        .foregroundStyle(Color(hex: "#5a5d63"))
+                        .foregroundStyle(Theme.faint)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 20)
                 }
@@ -260,15 +356,15 @@ private struct FortnightFilterBar: View {
                     Image(systemName: "chevron.down")
                         .font(.system(size: 9, weight: .bold))
                 }
-                .foregroundStyle(selected == .all ? Color(hex: "#8e9197") : Color(hex: "#c8ff5a"))
+                .foregroundStyle(selected == .all ? Theme.muted : Theme.accentText)
                 .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .frame(minHeight: 44)
                 .background(
                     Capsule()
-                        .fill(Color(hex: "#15171a"))
+                        .fill(Theme.surface)
                         .overlay(
                             Capsule().strokeBorder(
-                                selected == .all ? Color(hex: "#2a2d32") : Color(hex: "#c8ff5a").opacity(0.4),
+                                selected == .all ? Theme.line : Theme.accent.opacity(0.4),
                                 lineWidth: 1
                             )
                         )
@@ -288,12 +384,14 @@ private struct FortnightFilterBar: View {
 private struct MonthSelectorBar: View {
     @Binding var selectedMonth: String
     let onChanged: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack {
             Button { change(by: -1) } label: {
                 Image(systemName: "chevron.left")
-                    .foregroundStyle(Color(hex: "#8e9197"))
+                    .foregroundStyle(Theme.muted)
+                    .frame(width: 44, height: 44)
             }
             Spacer()
             Button {
@@ -302,16 +400,18 @@ private struct MonthSelectorBar: View {
                 onChanged()
             } label: {
                 Text(displayLabel)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#ecedee"))
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Theme.ink)
+                    .frame(minHeight: 44)
                     .contentTransition(.numericText())
-                    .animation(.snappy(duration: 0.2), value: selectedMonth)
+                    .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: selectedMonth)
             }
             .buttonStyle(.plain)
             Spacer()
             Button { change(by: 1) } label: {
                 Image(systemName: "chevron.right")
-                    .foregroundStyle(Color(hex: "#8e9197"))
+                    .foregroundStyle(Theme.muted)
+                    .frame(width: 44, height: 44)
             }
         }
         .padding(.vertical, 12)
@@ -344,23 +444,23 @@ private struct TotalsStrip: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            totalCell(label: "To pay", cents: totals.totalPaymentDueCents, color: Color(hex: "#ff6b6b"))
+            totalCell(label: "To pay", cents: totals.totalPaymentDueCents, color: Theme.expense)
             divider
-            totalCell(label: "Recorded", cents: totals.totalPaymentsRecordedCents, color: Color(hex: "#ecedee"))
+            totalCell(label: "Recorded", cents: totals.totalPaymentsRecordedCents, color: Theme.ink)
             divider
-            totalCell(label: "Still owed", cents: totals.remainingDueCents, color: Color(hex: "#ffb547"))
+            totalCell(label: "Still owed", cents: totals.remainingDueCents, color: Theme.warning)
         }
         .padding(.vertical, 14)
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(Color(hex: "#15171a"))
-                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color(hex: "#2a2d32"), lineWidth: 1))
+                .fill(Theme.surface)
+                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Theme.line, lineWidth: 1))
         )
     }
 
     private var divider: some View {
         Rectangle()
-            .fill(Color(hex: "#2a2d32"))
+            .fill(Theme.line)
             .frame(width: 1, height: 32)
     }
 
@@ -368,7 +468,7 @@ private struct TotalsStrip: View {
         VStack(spacing: 4) {
             Text(label)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Color(hex: "#8e9197"))
+                .foregroundStyle(Theme.muted)
                 .tracking(0.5).textCase(.uppercase)
             AmountLabel(cents: cents, font: .system(size: 14, weight: .semibold))
                 .foregroundStyle(color)
@@ -379,23 +479,24 @@ private struct TotalsStrip: View {
 
 // MARK: - Card tile
 
-private struct CardPaymentTile: View {
+struct CardPaymentTile: View {
     let row: CardPaymentRow
     let month: String
     let busy: Bool
     let anyBusy: Bool
     let onSetPaid: (Bool) -> Void
+    var onRecordPayment: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(row.label)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Color(hex: "#ecedee"))
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Theme.ink)
                     Text(maskedNumber)
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundStyle(Color(hex: "#5a5d63"))
+                        .font(.caption.monospaced())
+                        .foregroundStyle(Theme.faint)
                 }
                 Spacer()
                 statusTag
@@ -404,27 +505,27 @@ private struct CardPaymentTile: View {
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("To pay")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color(hex: "#8e9197"))
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Theme.muted)
                         .tracking(0.5).textCase(.uppercase)
-                    AmountLabel(cents: row.paymentDueCents, font: .system(size: 22, weight: .bold))
-                        .foregroundStyle(Color(hex: "#ecedee"))
+                    AmountLabel(cents: row.paymentDueCents, font: .title2.bold())
+                        .foregroundStyle(Theme.ink)
                     if row.dueSource == "override" {
                         Text("Statement override · spend \(moneyString(row.spentCents))")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Color(hex: "#5a5d63"))
+                            .font(.caption2)
+                            .foregroundStyle(Theme.faint)
                     }
                 }
                 Spacer()
                 if let due = paymentDueDateLabel {
                     VStack(alignment: .trailing, spacing: 3) {
                         Text("Due")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#8e9197"))
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(Theme.muted)
                             .tracking(0.5).textCase(.uppercase)
                         Text(due)
-                            .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(Color(hex: "#c8ff5a"))
+                            .font(.subheadline.weight(.semibold).monospaced())
+                            .foregroundStyle(Theme.accentText)
                     }
                 }
             }
@@ -435,49 +536,27 @@ private struct CardPaymentTile: View {
                 if let pct = row.utilizationPct {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Usage")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#8e9197"))
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(Theme.muted)
                             .tracking(0.5).textCase(.uppercase)
                         Text(String(format: pct.truncatingRemainder(dividingBy: 1) == 0 ? "%.0f%%" : "%.1f%%", pct))
-                            .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                            .font(.caption.weight(.semibold).monospaced())
                             .foregroundStyle(utilizationColor)
                     }
                 }
                 Spacer()
             }
 
-            Button {
-                onSetPaid(!row.paidInFull)
-            } label: {
-                Group {
-                    if busy {
-                        ProgressView()
-                            .tint(row.paidInFull ? Color(hex: "#ecedee") : Color(hex: "#0e0f11"))
-                    } else {
-                        Text(row.paidInFull ? "Undo — mark open" : "Mark as paid")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(row.paidInFull ? Color(hex: "#8e9197") : Color(hex: "#0e0f11"))
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 11)
-                        .fill(row.paidInFull ? Color(hex: "#1c1f23") : Color(hex: "#c8ff5a"))
-                )
-            }
-            .buttonStyle(.plain)
-            .disabled(anyBusy)
-            .opacity(anyBusy && !busy ? 0.5 : 1)
+            paymentActions
         }
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color(hex: "#15171a"))
+                .fill(Theme.surface)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
                         .strokeBorder(
-                            row.paidInFull ? Color(hex: "#5ddf8a").opacity(0.35) : Color(hex: "#2a2d32"),
+                            row.paidInFull ? Theme.income.opacity(0.35) : Theme.line,
                             lineWidth: 1
                         )
                 )
@@ -489,26 +568,76 @@ private struct CardPaymentTile: View {
         return "•••• \(four)"
     }
 
+    @ViewBuilder
+    private var paymentActions: some View {
+        if let onRecordPayment, !row.paidInFull {
+            Button(action: onRecordPayment) {
+                Text("Record payment")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.buttonInk)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .background(RoundedRectangle(cornerRadius: 11).fill(Theme.accent))
+            }
+            .buttonStyle(.plain)
+            .disabled(anyBusy)
+
+            Button { onSetPaid(true) } label: {
+                statusActionLabel("Mark as paid", busy: busy, ink: Theme.muted)
+                    .background(RoundedRectangle(cornerRadius: 11).fill(Theme.surface2))
+            }
+            .buttonStyle(.plain)
+            .disabled(anyBusy)
+        } else {
+            Button { onSetPaid(!row.paidInFull) } label: {
+                statusActionLabel(
+                    row.paidInFull ? "Undo paid status" : "Mark as paid",
+                    busy: busy,
+                    ink: row.paidInFull ? Theme.muted : Theme.buttonInk
+                )
+                .background(
+                    RoundedRectangle(cornerRadius: 11)
+                        .fill(row.paidInFull ? Theme.surface2 : Theme.accent)
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(anyBusy)
+        }
+    }
+
+    @ViewBuilder
+    private func statusActionLabel(_ title: String, busy: Bool, ink: Color) -> some View {
+        Group {
+            if busy {
+                ProgressView().tint(ink)
+            } else {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ink)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 44)
+    }
+
     private var statusTag: some View {
         Text(row.paidInFull ? "PAID" : "OPEN")
-            .font(.system(size: 10, weight: .bold))
+            .font(.caption2.bold())
             .tracking(1)
-            .foregroundStyle(row.paidInFull ? Color(hex: "#5ddf8a") : Color(hex: "#ffb547"))
+            .foregroundStyle(row.paidInFull ? Theme.income : Theme.warning)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .background(
                 Capsule().fill(
-                    (row.paidInFull ? Color(hex: "#5ddf8a") : Color(hex: "#ffb547")).opacity(0.14)
+                    (row.paidInFull ? Theme.income : Theme.warning).opacity(0.14)
                 )
             )
     }
 
     private var utilizationColor: Color {
         switch row.utilizationStatus {
-        case "over_limit": return Color(hex: "#ff6b6b")
-        case "warning": return Color(hex: "#ffb547")
-        case "ok": return Color(hex: "#5ddf8a")
-        default: return Color(hex: "#8e9197")
+        case "over_limit": return Theme.expense
+        case "warning": return Theme.warning
+        case "ok": return Theme.income
+        default: return Theme.muted
         }
     }
 
@@ -536,16 +665,16 @@ private struct CardPaymentTile: View {
     private func miniStat(label: String, cents: Int?) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(Color(hex: "#8e9197"))
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Theme.muted)
                 .tracking(0.5).textCase(.uppercase)
             if let cents {
-                AmountLabel(cents: cents, font: .system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#ecedee"))
+                AmountLabel(cents: cents, font: .caption.weight(.semibold))
+                    .foregroundStyle(Theme.ink)
             } else {
                 Text("—")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#5a5d63"))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.faint)
             }
         }
     }
@@ -560,6 +689,219 @@ private struct CardPaymentTile: View {
     }
 }
 
+// MARK: - Record payment sheet
+
+struct CardPaymentRecordSheet: View {
+    let card: FortnightCard
+    let onRecord: (MonthlyCardPaymentBody) async throws -> CardPaymentRecordResult
+    let onRefresh: () async -> CardPaymentRecordResult
+    let isPresentationCurrent: () -> Bool
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var amountText: String
+    @State private var paidAt = Date()
+    @State private var note = ""
+    @State private var errorMessage: String?
+    @State private var isSaving = false
+    @State private var recovery = CardPaymentRecordRecovery()
+    @FocusState private var amountFocused: Bool
+    @FocusState private var noteFocused: Bool
+
+    init(
+        card: FortnightCard,
+        onRecord: @escaping (MonthlyCardPaymentBody) async throws -> CardPaymentRecordResult,
+        onRefresh: @escaping () async -> CardPaymentRecordResult,
+        isPresentationCurrent: @escaping () -> Bool
+    ) {
+        self.card = card
+        self.onRecord = onRecord
+        self.onRefresh = onRefresh
+        self.isPresentationCurrent = isPresentationCurrent
+        _amountText = State(initialValue: CardPaymentDraft.formattedAmount(cents: card.row.outstandingCents))
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Theme.bg.ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: 20) {
+                        cardContext
+
+                        HeroAmountField(
+                            amountText: $amountText,
+                            tint: Theme.accentText,
+                            focus: $amountFocused,
+                            errorMessage: errorMessage
+                        )
+
+                        VStack(spacing: 0) {
+                            SignalNativeFormRow {
+                                DatePicker("Payment date", selection: $paidAt, displayedComponents: .date)
+                                    .datePickerStyle(.compact)
+                                    .tint(Theme.accent)
+                                    .padding(.horizontal, 16)
+                            }
+                            SignalFormRow(label: "Note") {
+                                TextField("Optional", text: $note)
+                                    .focused($noteFocused)
+                                    .autocorrectionDisabled()
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(Theme.ink)
+                                    .multilineTextAlignment(.trailing)
+                            }
+                        }
+
+                        Button(action: saveOrRefresh) {
+                            Group {
+                                if isSaving {
+                                    ProgressView().tint(Theme.buttonInk)
+                                } else {
+                                    Text(recovery.nextAction == .refresh ? "Retry refresh" : "Record payment")
+                                }
+                            }
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+                        .disabled(isSaving)
+                        .accessibilityHint("Records this payment against the selected statement month")
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                    .padding(.bottom, 40)
+                    .disabled(isSaving)
+                }
+                .scrollDismissesKeyboard(.interactively)
+            }
+            .navigationTitle("Record payment")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundStyle(Theme.muted)
+                        .disabled(isSaving)
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        amountFocused = false
+                        noteFocused = false
+                    }
+                    .foregroundStyle(Theme.accentText)
+                    .fontWeight(.semibold)
+                    .disabled(isSaving)
+                }
+            }
+        }
+        .interactiveDismissDisabled(isSaving)
+        .onAppear { amountFocused = true }
+    }
+
+    private var cardContext: some View {
+        VStack(spacing: 4) {
+            Text(card.row.label)
+                .font(.headline)
+                .foregroundStyle(Theme.ink)
+            Text("Statement month · \(monthLabel(card.resolvedDueMonthKey))")
+                .font(.subheadline)
+                .foregroundStyle(Theme.muted)
+            Text("Outstanding · \(moneyString(card.row.outstandingCents))")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Theme.faint)
+        }
+        .frame(maxWidth: .infinity)
+        .multilineTextAlignment(.center)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func saveOrRefresh() {
+        if recovery.nextAction == .refresh {
+            refreshOnly()
+        } else {
+            recordPayment()
+        }
+    }
+
+    private func recordPayment() {
+        guard let body = CardPaymentDraft.makeBody(
+            month: card.resolvedDueMonthKey,
+            cardId: card.row.creditCardId,
+            amountText: amountText,
+            note: note,
+            paidAt: paidAt
+        ) else {
+            errorMessage = "Enter an amount greater than zero."
+            amountFocused = true
+            return
+        }
+
+        isSaving = true
+        errorMessage = nil
+        Task {
+            defer {
+                if isPresentationCurrent() {
+                    isSaving = false
+                }
+            }
+            do {
+                handle(try await onRecord(body))
+            } catch is CancellationError {
+                // Workspace changes close the source sheet; do not attach an
+                // error to a card that is no longer current.
+            } catch {
+                if isPresentationCurrent() {
+                    errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func refreshOnly() {
+        isSaving = true
+        errorMessage = nil
+        Task {
+            defer {
+                if isPresentationCurrent() {
+                    isSaving = false
+                }
+            }
+            handle(await onRefresh())
+        }
+    }
+
+    private func handle(_ result: CardPaymentRecordResult) {
+        guard !Task.isCancelled, isPresentationCurrent() else { return }
+        switch recovery.receive(result, isPresentationCurrent: true) {
+        case .dismiss:
+            dismiss()
+        case .showRefreshError(let message):
+            errorMessage = "Payment was recorded, but status could not refresh. \(message)"
+        case .ignore:
+            break
+        }
+    }
+
+    private func monthLabel(_ monthKey: String) -> String {
+        let parts = monthKey.split(separator: "-")
+        guard parts.count == 2, let year = Int(parts[0]), let month = Int(parts[1]) else { return monthKey }
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = 1
+        guard let date = Calendar.current.date(from: components) else { return monthKey }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy"
+        return formatter.string(from: date)
+    }
+
+    private func moneyString(_ cents: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "MXN"
+        return formatter.string(from: NSNumber(value: Double(cents) / 100)) ?? "$\(cents / 100)"
+    }
+}
+
 // MARK: - Empty / Error
 
 private struct PaymentsEmptyView: View {
@@ -567,14 +909,14 @@ private struct PaymentsEmptyView: View {
         VStack(spacing: 20) {
             Image(systemName: "creditcard")
                 .font(.system(size: 48))
-                .foregroundStyle(Color(hex: "#5a5d63"))
+                .foregroundStyle(Theme.faint)
             VStack(spacing: 8) {
                 Text("No cards to pay")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#ecedee"))
+                    .foregroundStyle(Theme.ink)
                 Text("Add credit cards in the Cards tab to track payments here")
                     .font(.system(size: 14))
-                    .foregroundStyle(Color(hex: "#8e9197"))
+                    .foregroundStyle(Theme.muted)
                     .multilineTextAlignment(.center)
             }
         }
@@ -583,7 +925,7 @@ private struct PaymentsEmptyView: View {
     }
 }
 
-private struct FortnightEmptyView: View {
+struct FortnightEmptyView: View {
     let windowLabel: String
     let onShowAll: () -> Void
 
@@ -591,22 +933,23 @@ private struct FortnightEmptyView: View {
         VStack(spacing: 20) {
             Image(systemName: "calendar.badge.exclamationmark")
                 .font(.system(size: 48))
-                .foregroundStyle(Color(hex: "#5a5d63"))
+                .foregroundStyle(Theme.faint)
             VStack(spacing: 8) {
                 Text("No cards in this fortnight")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#ecedee"))
+                    .foregroundStyle(Theme.ink)
                 Text("No card has a payment date in \(windowLabel.lowercased()). Cards without a cutoff or payment day are hidden.")
                     .font(.system(size: 14))
-                    .foregroundStyle(Color(hex: "#8e9197"))
+                    .foregroundStyle(Theme.muted)
                     .multilineTextAlignment(.center)
             }
             Button(action: onShowAll) {
                 Text("Show all cards")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#0e0f11"))
+                    .foregroundStyle(Theme.buttonInk)
                     .padding(.horizontal, 28).padding(.vertical, 12)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: "#c8ff5a")))
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Theme.accent))
+                    .frame(minHeight: 44)
             }
         }
         .padding(.horizontal, 32)
@@ -614,21 +957,22 @@ private struct FortnightEmptyView: View {
     }
 }
 
-private struct PaymentsErrorView: View {
+struct PaymentsErrorView: View {
     let message: String
     let onRetry: () -> Void
     var body: some View {
         VStack(spacing: 14) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 32))
-                .foregroundStyle(Color(hex: "#ffb547"))
+                .foregroundStyle(Theme.warning)
             Text(message)
                 .font(.system(size: 14))
-                .foregroundStyle(Color(hex: "#8e9197"))
+                .foregroundStyle(Theme.muted)
                 .multilineTextAlignment(.center)
             Button("Retry", action: onRetry)
-                .foregroundStyle(Color(hex: "#c8ff5a"))
+                .foregroundStyle(Theme.accentText)
                 .font(.system(size: 15, weight: .semibold))
+                .frame(minWidth: 44, minHeight: 44)
         }
         .padding(.horizontal, 32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

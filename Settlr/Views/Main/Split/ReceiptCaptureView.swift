@@ -26,6 +26,7 @@ struct ReceiptCaptureView: View {
     @State private var pickedPhoto: PhotosPickerItem?
     @State private var isLoadingPhoto = false
     @State private var pickerError: String?
+    @State private var flashEnabled = false
     @AppStorage(AppPreferenceKey.saveCapturedReceiptsToPhotos)
     private var saveCapturedReceiptsToPhotos = true
 
@@ -63,9 +64,11 @@ struct ReceiptCaptureView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
         .task { await camera.start() }
-        .onDisappear { camera.stop() }
+        .onDisappear {
+            camera.setTorch(enabled: false)
+            camera.stop()
+        }
     }
 
     // MARK: - Chrome
@@ -74,6 +77,7 @@ struct ReceiptCaptureView: View {
         HStack {
             circleButton("xmark") { dismiss() }
             Spacer()
+            flashButton
             if onOpenSplits != nil {
                 circleButton("list.bullet") { onOpenSplits?() }
             }
@@ -87,9 +91,29 @@ struct ReceiptCaptureView: View {
             Image(systemName: systemName)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.ink)
-                .frame(width: 38, height: 38)
+                .frame(width: 44, height: 44)
                 .background(Circle().fill(.ultraThinMaterial))
         }
+        .contentShape(Circle())
+        .accessibilityLabel(systemName == "xmark" ? "Close" : "Open saved splits")
+    }
+
+    private var flashButton: some View {
+        Button {
+            guard camera.flashAvailable else { return }
+            flashEnabled.toggle()
+            camera.setTorch(enabled: flashEnabled)
+        } label: {
+            Image(systemName: flashEnabled ? "bolt.fill" : "bolt.slash")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(flashEnabled ? Theme.accentText : Theme.ink)
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(.ultraThinMaterial))
+        }
+        .contentShape(Circle())
+        .accessibilityLabel("Flash")
+        .accessibilityValue(flashEnabled ? "On" : "Off")
+        .accessibilityHint(camera.flashAvailable ? "Toggles the camera flash" : "Flash is unavailable on this device")
     }
 
     /// A receipt-shaped cut-out — tall and narrow — so people frame the whole
@@ -98,12 +122,35 @@ struct ReceiptCaptureView: View {
         GeometryReader { geo in
             let width = geo.size.width * 0.74
             let height = min(geo.size.height * 0.56, width * 1.5)
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Theme.accent.opacity(0.75), style: StrokeStyle(lineWidth: 2, dash: [9, 7]))
-                .frame(width: width, height: height)
-                .position(x: geo.size.width / 2, y: geo.size.height * 0.44)
-                .allowsHitTesting(false)
+            let origin = CGPoint(
+                x: (geo.size.width - width) / 2,
+                y: geo.size.height * 0.44 - height / 2
+            )
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Theme.accent.opacity(0.16), lineWidth: 1)
+                    .frame(width: width, height: height)
+                ForEach(0..<4, id: \.self) { index in
+                    scannerCorner(index: index, width: width, height: height)
+                }
+            }
+            .frame(width: width, height: height)
+            .position(x: geo.size.width / 2, y: origin.y + height / 2)
+            .allowsHitTesting(false)
         }
+    }
+
+    private func scannerCorner(index: Int, width: CGFloat, height: CGFloat) -> some View {
+        let isLeft = index % 2 == 0
+        let isTop = index < 2
+        return Path { path in
+            let x = isLeft ? 2 : width - 2
+            let y = isTop ? 2 : height - 2
+            path.move(to: CGPoint(x: x, y: isTop ? y + 26 : y - 26))
+            path.addLine(to: CGPoint(x: x, y: y))
+            path.addLine(to: CGPoint(x: isLeft ? x + 26 : x - 26, y: y))
+        }
+        .stroke(Theme.accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
     }
 
     private var bottomControls: some View {
@@ -198,7 +245,7 @@ struct ReceiptCaptureView: View {
     /// same treatment as the `+` button it was launched from.
     private var shutter: some View {
         Button {
-            camera.capture { image in
+            camera.capture(flashEnabled: flashEnabled) { image in
                 guard let image else { return }
                 if saveCapturedReceiptsToPhotos {
                     ReceiptPhotoLibrary.save(image)
@@ -216,7 +263,7 @@ struct ReceiptCaptureView: View {
                     .shadow(color: Theme.accent.opacity(0.45), radius: 18, y: 4)
                 Image(systemName: "doc.viewfinder")
                     .font(.system(size: 30, weight: .semibold))
-                    .foregroundStyle(Theme.bg)
+                    .foregroundStyle(Theme.buttonInk)
             }
         }
         .buttonStyle(.plain)
@@ -228,12 +275,7 @@ struct ReceiptCaptureView: View {
     private func busyOverlay(_ message: String) -> some View {
         ZStack {
             Color.black.opacity(0.72).ignoresSafeArea()
-            VStack(spacing: 14) {
-                ProgressView().tint(Theme.accent).scaleEffect(1.3)
-                Text(message)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Theme.ink)
-            }
+            SettlrPulseLoadingView(message: message)
         }
         .transition(.opacity)
     }
@@ -281,12 +323,14 @@ final class CameraController: NSObject, @unchecked Sendable {
     enum State: Equatable { case starting, running, denied, unavailable }
 
     @MainActor private(set) var state: State = .starting
+    @MainActor private(set) var flashAvailable = false
 
     let session = AVCaptureSession()
     private let output = AVCapturePhotoOutput()
     private let queue = DispatchQueue(label: "cash.settlr.camera")
     @MainActor private var captureHandler: (@MainActor (UIImage?) -> Void)?
     private var isConfigured = false
+    private var captureDevice: AVCaptureDevice?
 
     @MainActor
     func start() async {
@@ -323,6 +367,18 @@ final class CameraController: NSObject, @unchecked Sendable {
         }
     }
 
+    @MainActor
+    func setTorch(enabled: Bool) {
+        guard flashAvailable else { return }
+        queue.async { [self] in
+            guard let device = captureDevice, device.hasTorch else { return }
+            guard (try? device.lockForConfiguration()) != nil else { return }
+            defer { device.unlockForConfiguration() }
+            guard device.isTorchModeSupported(enabled ? .on : .off) else { return }
+            device.torchMode = enabled ? .on : .off
+        }
+    }
+
     private func configure() -> Bool {
         session.beginConfiguration()
         defer { session.commitConfiguration() }
@@ -337,6 +393,8 @@ final class CameraController: NSObject, @unchecked Sendable {
 
         session.addInput(input)
         session.addOutput(output)
+        captureDevice = device
+        DispatchQueue.main.async { self.flashAvailable = device.hasFlash }
 
         // Receipts are printed close up; without this the text lands soft.
         if (try? device.lockForConfiguration()) != nil {
@@ -349,12 +407,17 @@ final class CameraController: NSObject, @unchecked Sendable {
     }
 
     @MainActor
-    func capture(completion: @escaping @MainActor (UIImage?) -> Void) {
+    func capture(
+        flashEnabled: Bool = false,
+        completion: @escaping @MainActor (UIImage?) -> Void
+    ) {
         guard state == .running else { return completion(nil) }
         captureHandler = completion
+        let flashMode: AVCaptureDevice.FlashMode =
+            flashAvailable && flashEnabled && output.supportedFlashModes.contains(.on) ? .on : .off
         queue.async { [self] in
             let settings = AVCapturePhotoSettings()
-            settings.flashMode = .auto
+            settings.flashMode = flashMode
             output.capturePhoto(with: settings, delegate: self)
         }
     }

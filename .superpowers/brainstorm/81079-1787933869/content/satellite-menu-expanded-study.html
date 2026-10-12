@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Settlr — Expanded satellite menu study</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root { color-scheme: dark; }
+    body { margin: 0; background: #090a0b; color: #f4f5ef; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; -webkit-font-smoothing: antialiased; }
+    main { max-width: 1300px; margin: 0 auto; padding: 50px 28px 72px; }
+    .eyebrow { color: #caff3a; font-size: 10px; font-weight: 820; letter-spacing: .16em; text-transform: uppercase; }
+    h1 { max-width: 840px; margin: 10px 0 12px; font-size: clamp(32px, 5vw, 55px); line-height: 1; letter-spacing: -.045em; }
+    .intro { max-width: 770px; margin: 0 0 33px; color: #999da1; font-size: 15px; line-height: 1.55; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .choice { position: relative; min-width: 0; padding: 12px; border: 1px solid #292d31; border-radius: 25px; background: #111316; cursor: pointer; transition: transform .16s ease, border-color .16s ease; }
+    .choice:hover { transform: translateY(-3px); border-color: #5b6065; }
+    .choice.selected { border-color: #f4f5ef; outline: 2px solid rgba(244,245,239,.16); }
+    .choice.selected::after { content: "SELECTED"; position: absolute; z-index: 8; top: 23px; right: 23px; padding: 6px 9px; border-radius: 999px; background: #f4f5ef; color: #090a0b; font-size: 9px; font-weight: 850; letter-spacing: .12em; }
+    .phone { position: relative; height: 520px; overflow: hidden; border: 1px solid #202327; border-radius: 18px; background: #090a0b; }
+    .content { position: absolute; inset: 0; padding: 24px 19px 108px; }
+    .brand { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 820; letter-spacing: .06em; }
+    .logo { display: grid; gap: 3px; width: 21px; }
+    .logo i { display: block; height: 3px; border-radius: 2px; background: #caff3a; }
+    .logo i:nth-child(2) { margin-left: 5px; }
+    .label { margin-top: 31px; color: #caff3a; font-size: 9px; font-weight: 820; letter-spacing: .14em; text-transform: uppercase; }
+    .value { margin-top: 7px; font-size: 37px; font-weight: 780; letter-spacing: -.05em; }
+    .ghost-title { width: 104px; height: 8px; margin-top: 30px; border-radius: 8px; background: #2a2d31; }
+    .ghost { display: grid; grid-template-columns: 34px 1fr 55px; gap: 10px; align-items: center; padding: 14px 0; border-bottom: 1px solid #202327; }
+    .ghost-icon { width: 34px; height: 34px; border-radius: 10px; background: #191c1f; }
+    .ghost-copy b, .ghost-copy i, .ghost-amount { display: block; height: 7px; border-radius: 5px; background: #282b2f; }
+    .ghost-copy i { width: 64%; margin-top: 7px; background: #191c1f; }
+    .ghost-amount { width: 48px; justify-self: end; }
+    .veil { position: absolute; inset: 0; background: rgba(0,0,0,.56); }
+    .no-veil { background: rgba(0,0,0,.12); }
+    .bar { position: absolute; left: 16px; right: 16px; bottom: 16px; display: flex; align-items: center; gap: 11px; }
+    .tabs { height: 58px; flex: 1; display: grid; grid-template-columns: repeat(3,1fr); align-items: center; padding: 6px; border: 1px solid #2b2f33; border-radius: 999px; background: #171a1d; }
+    .tabs span { color: #777b80; text-align: center; font-size: 9px; font-weight: 720; }
+    .tabs .active { color: #caff3a; }
+    .fab { width: 58px; height: 58px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 50%; background: #caff3a; color: #090a0b; font-size: 30px; font-weight: 500; }
+    .panel { position: absolute; right: 16px; bottom: 87px; border: 1px solid #34383c; background: rgba(23,26,29,.97); }
+
+    /* Native popover */
+    .popover { width: 244px; overflow: hidden; border-radius: 20px; }
+    .pop-head { padding: 14px 15px 9px; color: #797e83; font-size: 8px; font-weight: 820; letter-spacing: .14em; text-transform: uppercase; }
+    .pop-row { display: grid; grid-template-columns: 31px 1fr auto; gap: 10px; align-items: center; min-height: 50px; padding: 7px 14px; }
+    .pop-row + .pop-row { border-top: 1px solid #2a2e32; }
+    .pop-icon { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; color: #caff3a; background: #23272b; font-size: 13px; font-weight: 800; }
+    .pop-row strong { font-size: 12px; }
+    .pop-row span:last-child { color: #61666b; font-size: 13px; }
+
+    /* Action dock */
+    .dock { left: 16px; right: 16px; width: auto; padding: 13px 12px; border-radius: 20px; }
+    .dock-title { display: flex; justify-content: space-between; margin: 0 4px 12px; }
+    .dock-title strong { font-size: 12px; }
+    .dock-title span { color: #74797e; font-size: 9px; }
+    .dock-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+    .dock-action { min-width: 0; padding: 11px 3px 9px; border-radius: 12px; background: #22262a; text-align: center; }
+    .dock-action.featured { background: #caff3a; color: #090a0b; }
+    .dock-action i { width: 29px; height: 29px; display: grid; place-items: center; margin: 0 auto 7px; border: 1px solid #3a3f44; border-radius: 9px; color: #caff3a; font-size: 12px; font-style: normal; font-weight: 800; }
+    .dock-action.featured i { border-color: rgba(9,10,11,.28); color: #090a0b; }
+    .dock-action b { display: block; overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Split launch */
+    .split-launch { width: 270px; padding: 9px; border-radius: 20px; }
+    .launch-row { min-height: 80px; padding: 14px; border-radius: 13px; background: #22262a; }
+    .launch-row + .launch-row { margin-top: 8px; }
+    .launch-row.primary { background: #caff3a; color: #090a0b; }
+    .launch-top { display: flex; justify-content: space-between; align-items: center; }
+    .launch-top strong { font-size: 14px; }
+    .launch-top span { font-size: 19px; }
+    .launch-row p { margin: 7px 0 0; color: #888d92; font-size: 10px; line-height: 1.35; }
+    .launch-row.primary p { color: rgba(9,10,11,.64); }
+
+    /* Orbit */
+    .orbit { border: 0; background: transparent; width: 255px; height: 250px; }
+    .orbit-item { position: absolute; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+    .orbit-item span { padding: 8px 10px; border: 1px solid #34383c; border-radius: 9px; background: #171a1d; font-size: 10px; font-weight: 740; }
+    .orbit-item i { width: 43px; height: 43px; display: grid; place-items: center; border-radius: 50%; background: #f4f5ef; color: #090a0b; font-size: 13px; font-style: normal; font-weight: 820; }
+    .orbit-item.one { right: 0; bottom: 0; }
+    .orbit-item.two { right: 15px; bottom: 58px; }
+    .orbit-item.three { right: 48px; bottom: 114px; }
+    .orbit-item.four { right: 94px; bottom: 165px; }
+
+    .meta { padding: 18px 9px 10px; }
+    .meta-head { display: flex; align-items: center; gap: 9px; }
+    .letter { width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid #494d52; border-radius: 50%; color: #c5c8ca; font-size: 10px; font-weight: 820; }
+    h2 { margin: 0; font-size: 20px; letter-spacing: -.025em; }
+    .source { margin: 6px 0 0; color: #caff3a; font-size: 9px; font-weight: 760; letter-spacing: .05em; }
+    .meta p:not(.source) { min-height: 38px; margin: 10px 0 14px; color: #9da1a5; font-size: 12px; line-height: 1.5; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chips span { padding: 6px 8px; border: 1px solid #2e3236; border-radius: 999px; color: #b2b5b8; font-size: 9px; }
+    .foot { margin-top: 18px; padding: 17px 19px; border: 1px solid #2d3135; border-radius: 17px; color: #a4a8ab; font-size: 12px; line-height: 1.55; }
+    .foot b { color: #caff3a; }
+    @media (max-width: 850px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">Signal Black · Broader interaction study</div>
+    <h1>Four more ways the satellite can become a command center.</h1>
+    <p class="intro">These directions borrow proven interaction patterns from current native apps, then translate them into Settlr’s black-and-lime system. The button stays bottom-right in every version.</p>
+
+    <section class="grid">
+      <article class="choice" data-choice="native-popover" onclick="toggleSelect(this)">
+        <div class="phone"><div class="content"><div class="brand"><span class="logo"><i></i><i></i><i></i></span>SETTLR</div><div class="label">Available this month</div><div class="value">$18,420</div><div class="ghost-title"></div><div class="ghost"><i class="ghost-icon"></i><div class="ghost-copy"><b></b><i></i></div><i class="ghost-amount"></i></div><div class="ghost"><i class="ghost-icon"></i><div class="ghost-copy"><b></b><i></i></div><i class="ghost-amount"></i></div></div><div class="veil no-veil"></div><div class="panel popover"><div class="pop-head">Create</div><div class="pop-row"><div class="pop-icon">⌁</div><strong>Scan and split</strong><span>›</span></div><div class="pop-row"><div class="pop-icon">−</div><strong>Add expense</strong><span>›</span></div><div class="pop-row"><div class="pop-icon">＋</div><strong>Add income</strong><span>›</span></div><div class="pop-row"><div class="pop-icon">S</div><strong>Add savings</strong><span>›</span></div></div><div class="bar"><div class="tabs"><span class="active">Overview</span><span>Activity</span><span>Money</span></div><div class="fab">×</div></div></div>
+        <div class="meta"><div class="meta-head"><span class="letter">D</span><h2>Native popover</h2></div><p class="source">INSPIRED BY APPLE ACTION MENUS</p><p>Minimal dimming and concise rows make this feel the most iOS-native. The app remains visible and oriented beneath it.</p><div class="chips"><span>Familiar</span><span>Fast</span><span>Low drama</span></div></div>
+      </article>
+
+      <article class="choice" data-choice="action-dock" onclick="toggleSelect(this)">
+        <div class="phone"><div class="content"><div class="brand"><span class="logo"><i></i><i></i><i></i></span>SETTLR</div><div class="label">Available this month</div><div class="value">$18,420</div><div class="ghost-title"></div><div class="ghost"><i class="ghost-icon"></i><div class="ghost-copy"><b></b><i></i></div><i class="ghost-amount"></i></div><div class="ghost"><i class="ghost-icon"></i><div class="ghost-copy"><b></b><i></i></div><i class="ghost-amount"></i></div></div><div class="veil"></div><div class="panel dock"><div class="dock-title"><strong>Quick create</strong><span>CHOOSE AN ACTION</span></div><div class="dock-actions"><div class="dock-action featured"><i>⌁</i><b>Scan</b></div><div class="dock-action"><i>−</i><b>Expense</b></div><div class="dock-action"><i>＋</i><b>Income</b></div><div class="dock-action"><i>S</i><b>Savings</b></div></div></div><div class="bar"><div class="tabs"><span class="active">Overview</span><span>Activity</span><span>Money</span></div><div class="fab">×</div></div></div>
+        <div class="meta"><div class="meta-head"><span class="letter">E</span><h2>Action dock</h2></div><p class="source">INSPIRED BY OUTLOOK’S DYNAMIC ACTION BAR</p><p>A command strip spans the navigation width, placing every action within one short thumb sweep while keeping Scan visually primary.</p><div class="chips"><span>Most energetic</span><span>One-hand friendly</span><span>Strong identity</span></div></div>
+      </article>
+
+      <article class="choice" data-choice="split-launcher" onclick="toggleSelect(this)">
+        <div class="phone"><div class="content"><div class="brand"><span class="logo"><i></i><i></i><i></i></span>SETTLR</div><div class="label">Available this month</div><div class="value">$18,420</div><div class="ghost-title"></div><div class="ghost"><i class="ghost-icon"></i><div class="ghost-copy"><b></b><i></i></div><i class="ghost-amount"></i></div><div class="ghost"><i class="ghost-icon"></i><div class="ghost-copy"><b></b><i></i></div><i class="ghost-amount"></i></div></div><div class="veil"></div><div class="panel split-launch"><div class="launch-row primary"><div class="launch-top"><strong>Scan a receipt</strong><span>⌁</span></div><p>Capture and split automatically.</p></div><div class="launch-row"><div class="launch-top"><strong>Add manually</strong><span>＋</span></div><p>Expense, income, or savings.</p></div></div><div class="bar"><div class="tabs"><span class="active">Overview</span><span>Activity</span><span>Money</span></div><div class="fab">×</div></div></div>
+        <div class="meta"><div class="meta-head"><span class="letter">F</span><h2>Split launcher</h2></div><p class="source">INSPIRED BY TASK-FIRST COMPOSERS</p><p>Reduces four choices to two intentions. Strong comprehension, but manual entries require one additional selection.</p><div class="chips"><span>Calmest choice</span><span>Task-first</span><span>Extra tap</span></div></div>
+      </article>
+
+      <article class="choice" data-choice="orbit-fan" onclick="toggleSelect(this)">
+        <div class="phone"><div class="content"><div class="brand"><span class="logo"><i></i><i></i><i></i></span>SETTLR</div><div class="label">Available this month</div><div class="value">$18,420</div><div class="ghost-title"></div><div class="ghost"><i class="ghost-icon"></i><div class="ghost-copy"><b></b><i></i></div><i class="ghost-amount"></i></div><div class="ghost"><i class="ghost-icon"></i><div class="ghost-copy"><b></b><i></i></div><i class="ghost-amount"></i></div></div><div class="veil"></div><div class="panel orbit"><div class="orbit-item four"><span>Scan and split</span><i>⌁</i></div><div class="orbit-item three"><span>Add expense</span><i>−</i></div><div class="orbit-item two"><span>Add income</span><i>＋</i></div><div class="orbit-item one"><span>Add savings</span><i>S</i></div></div><div class="bar"><div class="tabs"><span class="active">Overview</span><span>Activity</span><span>Money</span></div><div class="fab">×</div></div></div>
+        <div class="meta"><div class="meta-head"><span class="letter">G</span><h2>Orbit fan</h2></div><p class="source">INSPIRED BY CLASSIC FAB SPEED DIALS</p><p>The most kinetic expression. It creates a memorable arc around the thumb, but demands more motion and screen space.</p><div class="chips"><span>Distinctive</span><span>Gesture-like</span><span>Highest motion</span></div></div>
+      </article>
+    </section>
+
+    <div class="foot"><b>My new shortlist:</b> E if you want Settlr to feel energetic and ownable; D if native familiarity matters more. B from the previous screen remains the strongest list-based alternative.</div>
+  </main>
+</body>
+</html>

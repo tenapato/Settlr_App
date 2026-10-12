@@ -17,20 +17,20 @@ struct TelegramSettingsSection: View {
                 HStack(alignment: .top, spacing: 12) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 10)
-                            .fill(Color(hex: "#c8ff5a").opacity(0.12))
+                            .fill(Theme.accent.opacity(0.12))
                             .frame(width: 38, height: 38)
                         Image(systemName: "paperplane.fill")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#c8ff5a"))
+                            .foregroundStyle(Theme.accentText)
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Telegram")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#ecedee"))
+                            .foregroundStyle(Theme.ink)
                         Text("Log expenses and income from chat.")
                             .font(.system(size: 13))
-                            .foregroundStyle(Color(hex: "#8e9197"))
+                            .foregroundStyle(Theme.muted)
                     }
 
                     Spacer(minLength: 8)
@@ -40,7 +40,7 @@ struct TelegramSettingsSection: View {
 
                 if vm.isLoading && vm.status == nil {
                     ProgressView()
-                        .tint(Color(hex: "#c8ff5a"))
+                        .tint(Theme.accent)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
                 } else if vm.isConnected {
@@ -52,7 +52,7 @@ struct TelegramSettingsSection: View {
                 if let error = vm.errorMessage {
                     Text(error)
                         .font(.system(size: 13))
-                        .foregroundStyle(Color(hex: "#ff6b6b"))
+                        .foregroundStyle(Theme.expense)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -74,12 +74,12 @@ struct TelegramSettingsSection: View {
     private var statusBadge: some View {
         Text(vm.isConnected ? "Connected" : "Not connected")
             .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(vm.isConnected ? Color(hex: "#5ddf8a") : Color(hex: "#8e9197"))
+            .foregroundStyle(vm.isConnected ? Theme.income : Theme.muted)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .background(
                 Capsule().fill(
-                    (vm.isConnected ? Color(hex: "#5ddf8a") : Color(hex: "#8e9197")).opacity(0.12)
+                    (vm.isConnected ? Theme.income : Theme.muted).opacity(0.12)
                 )
             )
     }
@@ -91,22 +91,22 @@ struct TelegramSettingsSection: View {
                 if let username = vm.status?.telegramUsername, !username.isEmpty {
                     HStack(spacing: 4) {
                         Text("Account")
-                            .foregroundStyle(Color(hex: "#8e9197"))
+                            .foregroundStyle(Theme.muted)
                         Text("@\(username)")
-                            .foregroundStyle(Color(hex: "#ecedee"))
+                            .foregroundStyle(Theme.ink)
                             .fontWeight(.medium)
                     }
                     .font(.system(size: 14))
                 } else {
                     Text("Linked chat (no username)")
                         .font(.system(size: 14))
-                        .foregroundStyle(Color(hex: "#8e9197"))
+                        .foregroundStyle(Theme.muted)
                 }
 
                 if let connectedAt = vm.status?.connectedAt {
                     Text("Since \(formatTelegramDate(connectedAt))")
                         .font(.system(size: 12))
-                        .foregroundStyle(Color(hex: "#5a5d63"))
+                        .foregroundStyle(Theme.faint)
                 }
             }
 
@@ -117,7 +117,7 @@ struct TelegramSettingsSection: View {
                     HStack(spacing: 8) {
                         if vm.isDisconnecting {
                             ProgressView()
-                                .tint(Color(hex: "#ff6b6b"))
+                                .tint(Theme.expense)
                                 .scaleEffect(0.85)
                         } else {
                             Image(systemName: "link.badge.minus")
@@ -126,16 +126,16 @@ struct TelegramSettingsSection: View {
                         Text("Disconnect")
                             .font(.system(size: 15, weight: .medium))
                     }
-                    .foregroundStyle(Color(hex: "#ff6b6b"))
+                    .foregroundStyle(Theme.expense)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 12)
                     .frame(maxWidth: .infinity)
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(hex: "#1c1f23"))
+                            .fill(Theme.surface2)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .strokeBorder(Color(hex: "#3a3d44"), lineWidth: 1)
+                                    .strokeBorder(Theme.line, lineWidth: 1)
                             )
                     )
                 }
@@ -149,7 +149,7 @@ struct TelegramSettingsSection: View {
     private var disconnectedContent: some View {
         Text("Connect Telegram from the Settlr web panel to log expenses and income by chat.")
             .font(.system(size: 13))
-            .foregroundStyle(Color(hex: "#8e9197"))
+            .foregroundStyle(Theme.muted)
     }
 }
 

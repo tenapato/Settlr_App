@@ -1,5 +1,29 @@
 import Foundation
 
+func savingsTargetAmountText(for targetAmountCents: Int?) -> String {
+    guard let targetAmountCents else { return "" }
+    return String(format: "%.2f", Double(targetAmountCents) / 100.0)
+}
+
+enum SavingsTargetAmountError: Error, Equatable {
+    case invalid
+}
+
+/// Parses the optional account goal amount without allowing malformed or
+/// overflowing values to reach an Int conversion.
+func parseSavingsTargetAmount(_ raw: String) throws -> Int? {
+    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+    guard let amount = Double(trimmed), amount.isFinite, amount > 0 else {
+        throw SavingsTargetAmountError.invalid
+    }
+    let cents = amount * 100
+    guard cents.isFinite, cents.rounded() > 0, cents.rounded() < Double(Int.max) else {
+        throw SavingsTargetAmountError.invalid
+    }
+    return Int(cents.rounded())
+}
+
 struct SavingsAccount: Codable, Identifiable, Hashable {
     let id: String
     let name: String
@@ -7,6 +31,13 @@ struct SavingsAccount: Codable, Identifiable, Hashable {
     let color: String?
     let sortOrder: Int
     let balanceCents: Int
+    /// Optional goal metadata is supplied by the Server goal-target rollout.
+    /// Missing fields intentionally preserve flexible accounts from older responses.
+    let targetAmountCents: Int?
+    let targetDate: String?
+    let goalStatus: String?
+    let progressPct: Double?
+    let remainingCents: Int?
 
     var amount: Double { Double(balanceCents) / 100.0 }
 }
@@ -148,11 +179,55 @@ struct CreateSavingsAccountBody: Encodable {
     let name: String
     let color: String?
     let currency: String
+    let targetAmountCents: Int?
+    let targetDate: String?
+
+    init(
+        name: String,
+        color: String?,
+        currency: String,
+        targetAmountCents: Int? = nil,
+        targetDate: String? = nil
+    ) {
+        self.name = name
+        self.color = color
+        self.currency = currency
+        self.targetAmountCents = targetAmountCents
+        self.targetDate = targetDate
+    }
 }
 
 struct UpdateSavingsAccountBody: Encodable {
     let name: String
     let color: String?
+    let targetAmountCents: Int?
+    let targetDate: String?
+
+    init(
+        name: String,
+        color: String?,
+        targetAmountCents: Int? = nil,
+        targetDate: String? = nil
+    ) {
+        self.name = name
+        self.color = color
+        self.targetAmountCents = targetAmountCents
+        self.targetDate = targetDate
+    }
+
+    /// PATCH must send explicit nulls when a user clears a goal. Without this
+    /// custom encoding, synthesized Codable omits nil and leaves old targets set.
+    enum CodingKeys: String, CodingKey {
+        case name, color, targetAmountCents, targetDate
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(name, forKey: .name)
+        try container.encodeIfPresent(color, forKey: .color)
+        try container.encode(targetAmountCents, forKey: .targetAmountCents)
+        try container.encode(targetDate, forKey: .targetDate)
+    }
 }
 
 struct CreateSavingsEntryBody: Encodable {
