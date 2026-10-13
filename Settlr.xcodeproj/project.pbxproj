@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+        AE0000000000000000000001 /* PushNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0000000000000000000002 /* PushNotifications.swift */; };
 		AB0000000000000000000001 /* ReceiptEvidenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000003 /* ReceiptEvidenceTests.swift */; };
 		AB0000000000000000000002 /* ParserPreferenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000004 /* ParserPreferenceTests.swift */; };
 		AB0000000000000000000011 /* SplitDraftTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000010 /* SplitDraftTests.swift */; };
@@ -145,6 +146,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+        AE0000000000000000000002 /* PushNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotifications.swift; sourceTree = "<group>"; };
 		AB0000000000000000000003 /* ReceiptEvidenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptEvidenceTests.swift; sourceTree = "<group>"; };
 		AB0000000000000000000004 /* ParserPreferenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParserPreferenceTests.swift; sourceTree = "<group>"; };
 		AB0000000000000000000010 /* SplitDraftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitDraftTests.swift; sourceTree = "<group>"; };
@@ -537,7 +539,8 @@
 		AA000000000000000000GP0E /* Utils */ = {
 			isa = PBXGroup;
 			children = (
-				AA000000000000000000FR41 /* MonthRangeQuery.swift */,
+				AE0000000000000000000002 /* PushNotifications.swift */,
+                AA000000000000000000FR41 /* MonthRangeQuery.swift */,
 				AA000000000000000000FR46 /* LedgerTags.swift */,
 				AA000000000000000000FR50 /* LedgerDayGroup.swift */,
 				AA000000000000000000FR58 /* CardPaymentFortnight.swift */,
@@ -703,6 +706,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+                AE0000000000000000000001 /* PushNotifications.swift in Sources */,
 				AD0000000000000000000102 /* ExpenseAutomationGuide.swift in Sources */,
 				AD0000000000000000000101 /* AutomationExpenseReview.swift in Sources */,
 				AD0000000000000000000100 /* ExpenseAutomation.swift in Sources */,
@@ -972,9 +976,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Settlr/Settlr.entitlements;
+				APNS_ENVIRONMENT = development;
+                CODE_SIGN_ENTITLEMENTS = Settlr/Settlr.entitlements;
 					CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = 49T6266TLB;
 				ENABLE_PREVIEWS = YES;
@@ -989,7 +994,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.0.3;
+				MARKETING_VERSION = 2.0.4;
 				PRODUCT_BUNDLE_IDENTIFIER = cash.settlr.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1003,9 +1008,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Settlr/Settlr.entitlements;
+				APNS_ENVIRONMENT = production;
+                CODE_SIGN_ENTITLEMENTS = Settlr/Settlr.entitlements;
 					CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = 49T6266TLB;
 				ENABLE_PREVIEWS = YES;
@@ -1020,7 +1026,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.0.3;
+				MARKETING_VERSION = 2.0.4;
 				PRODUCT_BUNDLE_IDENTIFIER = cash.settlr.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

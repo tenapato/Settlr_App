@@ -1,6 +1,13 @@
 import SwiftUI
+import UIKit
+
+private struct PushRouteTask: Equatable {
+    let destination: PushNotifications.Destination?
+    let scenePhase: ScenePhase
+}
 
 struct MainTabView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(AppState.self) private var appState
     @Environment(\.colorScheme) private var colorScheme
     @State private var selectedTab: Tab = .home
@@ -43,6 +50,30 @@ struct MainTabView: View {
             }
         }
         .background(Theme.bg)
+        .task(id: PushRouteTask(destination: PushNotifications.shared.destination, scenePhase: scenePhase)) {
+            guard scenePhase == .active else { return }
+            guard let destination = PushNotifications.shared.destination,
+                  destination.recipientID == appState.currentUser?.id else { return }
+            do {
+                while UIApplication.shared.connectedScenes
+                    .compactMap({ $0 as? UIWindowScene })
+                    .flatMap(\.windows).first(where: \.isKeyWindow)?
+                    .rootViewController?.presentedViewController != nil {
+                    try await Task.sleep(for: .milliseconds(300))
+                }
+                let response: WorkspacesResponse = try await APIClient.shared.fetch(Endpoints.workspaces)
+                guard !Task.isCancelled, destination.recipientID == appState.currentUser?.id,
+                      let workspace = response.workspaces.first(where: { $0.id == destination.workspaceID }) else { return }
+                appState.select(workspace)
+                if destination.kind == "cards", availableTabs.contains(.cards) {
+                    selectedTab = .cards
+                } else if destination.kind == "split", appState.currentUser?.has(.billSplits) == true {
+                    createdSplitId = destination.splitID
+                    showSplitList = true
+                }
+                PushNotifications.shared.destination = nil
+            } catch { /* Keep the destination for a retry on the next foreground. */ }
+        }
         // A tab can disappear under the user: an admin turns a feature off and
         // the next `/api/me` drops it. Landing on Home beats rendering a tab
         // whose content no longer exists.

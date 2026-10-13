@@ -47,7 +47,6 @@ struct SettlrPulseLoadingView: View {
     let detail: String?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isAnimating = false
 
     init(message: String, detail: String? = nil) {
         self.message = message
@@ -56,35 +55,31 @@ struct SettlrPulseLoadingView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            VStack(spacing: 5) {
-                ForEach(0..<3, id: \.self) { index in
-                    RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .fill(
-                            reduceMotion
-                                ? (index == 0 ? Theme.accent : Theme.muted.opacity(0.38))
-                                : (isAnimating ? Theme.accent : Theme.muted.opacity(0.38))
-                        )
-                        .frame(width: 31, height: 5)
-                        .offset(x: index == 1 ? 5 : 0)
-                        .animation(
-                            reduceMotion
-                                ? nil
-                                : .easeInOut(duration: 0.62)
-                                    .repeatForever(autoreverses: true)
-                                    .delay(Double(index) * 0.16),
-                            value: isAnimating
-                        )
+            TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { context in
+                VStack(spacing: 5) {
+                    ForEach(0..<3, id: \.self) { index in
+                        RoundedRectangle(cornerRadius: 2, style: .continuous)
+                            .fill(Theme.muted.opacity(0.38))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                    .fill(Theme.accent)
+                                    .opacity(reduceMotion ? (index == 0 ? 1 : 0) : pulseOpacity(at: context.date, index: index))
+                            }
+                            .frame(width: 31, height: 5)
+                            .offset(x: index == 1 ? 5 : 0)
+                    }
                 }
+                .frame(width: 65, height: 65)
+                .background(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(Theme.surface2)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .strokeBorder(Theme.line, lineWidth: 1)
+                        )
+                )
+                .transaction { $0.animation = nil }
             }
-            .frame(width: 65, height: 65)
-            .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Theme.surface2)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .strokeBorder(Theme.line, lineWidth: 1)
-                    )
-            )
 
             VStack(spacing: 4) {
                 Text(message)
@@ -99,14 +94,15 @@ struct SettlrPulseLoadingView: View {
                 }
             }
         }
-        .onAppear {
-            guard !reduceMotion else { return }
-            isAnimating = true
-        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(message)
         .accessibilityValue(detail ?? "")
     }
+    private func pulseOpacity(at date: Date, index: Int) -> Double {
+        let phase = date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.56)
+        return (1 - cos((phase - Double(index) * 0.16) / 1.56 * 2 * .pi)) / 2
+    }
+
 }
 
 /// Skeleton rows for the Activity timeline. The neutral nodes and bars retain

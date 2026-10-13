@@ -106,6 +106,8 @@ struct SettingsView: View {
                             .buttonStyle(.plain)
                         }
 
+                        PushNotificationSettings()
+
                         // Workspace section
                         if let workspace = appState.activeWorkspace {
                             SectionCard {

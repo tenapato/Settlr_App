@@ -210,3 +210,9 @@ Device checks: confirm Keep receipt total on the pushed Confirm step; test one
 shared bottle across five guests; add and switch two guests on one device; report
 a group payment, refresh the organizer result, and confirm it. Verify guest reports
 do not mark balances paid, and confirm retry/stale-version errors remain visible.
+
+## Push notifications
+
+Settings includes a device opt-in with separate shared split and card reminder switches. The permission prompt appears only after the user turns on notifications. The API registration is tied to the current session and is removed on sign-out. Debug builds use the APNs sandbox; Release builds use production. Enable Push Notifications for `cash.settlr.app` and refresh provisioning profiles before distributing a signed build. Server rollout and credentials are documented in `Server/PUSH_NOTIFICATIONS.md` in the companion API repository.
+
+The full-screen loading mark now uses a time-based opacity pulse. The bar frames and offsets stay fixed, and the pulse cannot animate surrounding layout. Reduce Motion pauses the timeline and shows a static mark.

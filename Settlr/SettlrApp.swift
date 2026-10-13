@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct SettlrApp: App {
+    @UIApplicationDelegateAdaptor(PushAppDelegate.self) private var pushDelegate
     @State private var appState = AppState()
     @AppStorage("settlr.appearance") private var appearanceRawValue = SettlrAppearance.dark.rawValue
 

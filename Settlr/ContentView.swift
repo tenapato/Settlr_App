@@ -46,6 +46,9 @@ struct ContentView: View {
                     )
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(Theme.bg.ignoresSafeArea())
+        .task(id: appState.currentUser?.id) {
+            await PushNotifications.shared.reconcile(userID: appState.currentUser?.id)
+        }
                 } else {
                     WorkspacePickerView()
                 }
@@ -83,7 +86,10 @@ struct ContentView: View {
             }
         }
         .onChange(of: appState.deactivation != nil) { _, deactivated in
-            if deactivated { automationPresentation = nil }
+            if deactivated {
+                automationPresentation = nil
+                PushNotifications.shared.clearSession()
+            }
         }
         .task {
             await appState.initialize()
@@ -106,7 +112,10 @@ struct ContentView: View {
             // or switched it off, short of waiting for a cold launch.
             guard phase == .active else { return }
             flushPendingSplits()
-            Task { await appState.refreshSession() }
+            Task {
+                await appState.refreshSession()
+                await PushNotifications.shared.reconcile(userID: appState.currentUser?.id)
+            }
         }
         // A shared split belongs to someone else's workspace, so it opens over
         // whatever is on screen rather than inside the workspace navigation.

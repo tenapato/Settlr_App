@@ -125,6 +125,7 @@ final class AppState {
 
     @MainActor
     private func handleUnauthorized() {
+        PushNotifications.shared.clearSession()
         currentUser = nil
         activeWorkspace = nil
         hasVerifiedWorkspace = false
@@ -148,6 +149,7 @@ final class AppState {
 
     @MainActor
     func signOut() async {
+        await PushNotifications.shared.beforeSignOut()
         try? await api.send(Endpoints.signOut, method: "POST")
         // Drops the token first, which is what makes the guard above effective;
         // no suspension point separates the two, so nothing can interleave.
